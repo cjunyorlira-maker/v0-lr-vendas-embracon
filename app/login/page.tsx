@@ -46,7 +46,7 @@ export default function LoginPage() {
           </div>
           
           <div className="text-center mb-8">
-            <h1 className="font-serif text-2xl font-semibold text-[#f5f0e8] mb-2">Vendas Embracon</h1>
+            <h1 className="font-serif text-2xl font-semibold text-[#f5f0e8] mb-2">Controle de Clientes</h1>
             <p className="text-sm text-[#8a8070]">Acesse com suas credenciais</p>
           </div>
           
