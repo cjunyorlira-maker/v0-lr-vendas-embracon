@@ -16,8 +16,8 @@ const jetbrains = JetBrains_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'LR Multimarcas',
-  description: 'Sistema LR Multimarcas',
+  title: 'LR Vendas Embracon',
+  description: 'Sistema de gestão de vendas Embracon — LR Multimarcas',
 }
 
 export const viewport: Viewport = {

@@ -1,36 +1,37 @@
-import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { TrendingUp, DollarSign, Users, Target } from 'lucide-react'
+import { FileText, Clock, CheckCircle, DollarSign, Target } from 'lucide-react'
 
 const stats = [
   {
-    label: 'Vendas na Semana',
+    label: 'Vendas Pendentes',
     value: '–',
-    sub: 'Aguardando dados',
-    icon: TrendingUp,
+    icon: FileText,
+    color: '#f59e0b',
+  },
+  {
+    label: 'Aguardando Pagto',
+    value: '–',
+    icon: Clock,
+    color: '#f97316',
+  },
+  {
+    label: 'Boletos Pagos',
+    value: '–',
+    icon: CheckCircle,
     color: '#22c55e',
   },
   {
-    label: 'Receita Gerada',
-    value: '–',
-    sub: 'Aguardando dados',
+    label: 'Vendido Mês',
+    value: 'R$ 0',
     icon: DollarSign,
     color: '#d4af37',
   },
   {
-    label: 'Clientes Ativos',
+    label: 'Lances Pendentes',
     value: '–',
-    sub: 'Aguardando dados',
-    icon: Users,
-    color: '#3b82f6',
-  },
-  {
-    label: 'Meta do Mês',
-    value: '–',
-    sub: 'Aguardando dados',
     icon: Target,
-    color: '#f59e0b',
+    color: '#ef4444',
   },
 ]
 
@@ -60,13 +61,11 @@ function GlassCard({
 function StatCard({
   label,
   value,
-  sub,
   icon: Icon,
   color,
 }: {
   label: string
   value: string
-  sub: string
   icon: React.ElementType
   color: string
 }) {
@@ -78,13 +77,10 @@ function StatCard({
             {label}
           </span>
           <span
-            className="text-2xl font-bold font-mono"
-            style={{ color: 'var(--text)', fontFamily: 'var(--font-jetbrains-mono)' }}
+            className="text-2xl font-bold"
+            style={{ color: 'var(--text)', fontFamily: 'var(--font-mono)' }}
           >
             {value}
-          </span>
-          <span className="text-xs" style={{ color: 'var(--faint)' }}>
-            {sub}
           </span>
         </div>
         <div
@@ -104,85 +100,27 @@ function StatCard({
 export default function Home() {
   return (
     <div className="relative min-h-screen font-sans" style={{ background: 'var(--bg)' }}>
-      <AnimatedBackground />
       <Sidebar />
 
       <div className="relative lg:ml-60" style={{ zIndex: 1 }}>
         <Header title="Dashboard" />
 
         <main className="mx-auto max-w-[1400px] px-6 py-8 lg:px-8">
-          {/* Grid de stats */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {/* Grid de 5 stat cards */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
             {stats.map((s) => (
               <StatCard key={s.label} {...s} />
             ))}
           </div>
 
-          {/* Área principal vazia — próximas etapas */}
-          <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
-            {/* Tabela de vendas */}
-            <GlassCard className="lg:col-span-2">
-              <div className="p-5">
-                <div className="mb-4 flex items-center justify-between">
-                  <h2
-                    className="text-sm font-semibold"
-                    style={{ color: 'var(--text)' }}
-                  >
-                    Vendas Recentes
-                  </h2>
-                  <span
-                    className="rounded-full px-2.5 py-0.5 text-[11px] font-mono font-medium"
-                    style={{
-                      background: 'var(--accent-bg)',
-                      color: 'var(--accent)',
-                      border: '1px solid var(--accent-bg2)',
-                      fontFamily: 'var(--font-jetbrains-mono)',
-                    }}
-                  >
-                    Em desenvolvimento
-                  </span>
-                </div>
-                <div
-                  className="flex h-48 items-center justify-center rounded-lg"
-                  style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed var(--border2)' }}
-                >
-                  <span className="text-xs" style={{ color: 'var(--faint)' }}>
-                    Tabela de vendas — próxima etapa
-                  </span>
-                </div>
-              </div>
-            </GlassCard>
-
-            {/* Ranking */}
+          {/* Card de boas-vindas */}
+          <div className="mt-6">
             <GlassCard>
-              <div className="p-5">
-                <div className="mb-4 flex items-center justify-between">
-                  <h2
-                    className="text-sm font-semibold"
-                    style={{ color: 'var(--text)' }}
-                  >
-                    Ranking
-                  </h2>
-                  <span
-                    className="rounded-full px-2.5 py-0.5 text-[11px] font-mono font-medium"
-                    style={{
-                      background: 'var(--accent-bg)',
-                      color: 'var(--accent)',
-                      border: '1px solid var(--accent-bg2)',
-                      fontFamily: 'var(--font-jetbrains-mono)',
-                    }}
-                  >
-                    Em desenvolvimento
-                  </span>
-                </div>
-                <div
-                  className="flex h-48 items-center justify-center rounded-lg"
-                  style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed var(--border2)' }}
-                >
-                  <span className="text-xs" style={{ color: 'var(--faint)' }}>
-                    Top vendedores — próxima etapa
-                  </span>
-                </div>
+              <div className="flex min-h-[200px] items-center justify-center p-8 text-center">
+                <p className="text-sm" style={{ color: 'var(--muted-color)' }}>
+                  Bem-vindo! Próximo passo: cadastrar primeira venda em{' '}
+                  <span style={{ color: 'var(--accent)' }}>Nova Venda</span>
+                </p>
               </div>
             </GlassCard>
           </div>
