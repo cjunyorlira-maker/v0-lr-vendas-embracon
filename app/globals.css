@@ -44,8 +44,13 @@
 
 @layer base {
   * { @apply border-border; }
+  html {
+    background-color: #080808;
+    color: #f5f0e8;
+  }
   body {
-    @apply bg-background text-foreground antialiased;
+    background: transparent;
+    color: #f5f0e8;
     font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   }
 }

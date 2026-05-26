@@ -99,7 +99,7 @@ function StatCard({
 
 export default function Home() {
   return (
-    <div className="relative min-h-screen font-sans" style={{ background: 'var(--bg)' }}>
+    <div className="relative min-h-screen font-sans">
       <Sidebar />
 
       <div className="relative lg:ml-60" style={{ zIndex: 1 }}>
