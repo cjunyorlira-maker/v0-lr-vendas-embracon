@@ -1,4 +1,4 @@
-import AnimatedBackground from '@/components/ui/AnimatedBackground'
+import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import { TrendingUp, DollarSign, Users, Target } from 'lucide-react'

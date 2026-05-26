@@ -1,0 +1,21 @@
+<!-- LR Multimarcas Logo Placeholder -->
+<svg width="200" height="80" viewBox="0 0 200 80" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#d4af37;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#f0d060;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="200" height="80" fill="#0a0a0a" rx="8"/>
+  
+  <!-- LR Text -->
+  <text x="20" y="55" font-family="Plus Jakarta Sans, sans-serif" font-size="48" font-weight="700" fill="url(#logoGradient)" letter-spacing="-2">LR</text>
+  
+  <!-- Multimarcas Text -->
+  <text x="20" y="72" font-family="Plus Jakarta Sans, sans-serif" font-size="12" font-weight="500" fill="#8a8070" letter-spacing="1">MULTIMARCAS</text>
+  
+  <!-- Accent line -->
+  <line x1="110" y1="30" x2="180" y2="30" stroke="#d4af37" stroke-width="2" stroke-linecap="round"/>
+</svg>
