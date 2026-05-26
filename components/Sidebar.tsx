@@ -1,6 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import {
   Home,
   Upload,
@@ -79,7 +81,10 @@ function NavLink({ item }: { item: NavItem }) {
   )
 }
 
-function SidebarContent() {
+function SidebarContent({ userEmail, onSignOut }: { userEmail: string | null, onSignOut: () => void }) {
+  const initials = userEmail ? userEmail.charAt(0).toUpperCase() : 'U'
+  const displayName = userEmail || 'Usuário'
+  
   return (
     <div className="flex h-full flex-col" style={{ background: 'var(--surface)' }}>
       {/* Logo */}
@@ -110,7 +115,7 @@ function SidebarContent() {
         <div className="my-4 px-3">
           <p
             className="text-xs font-semibold uppercase tracking-widest"
-            style={{ color: 'var(--faint)' }}
+            style={{ color: 'var(--muted-color)' }}
           >
             Administração
           </p>
@@ -129,27 +134,28 @@ function SidebarContent() {
         style={{ borderTop: '1px solid var(--border)' }}
       >
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             {/* Avatar */}
             <div
               className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold shrink-0"
               style={{
-                background: 'var(--accent-bg2)',
+                background: 'rgba(212,175,55,0.15)',
                 color: 'var(--accent)',
-                border: '1px solid var(--accent-bg2)',
+                border: '1px solid rgba(212,175,55,0.25)',
               }}
             >
-              U
+              {initials}
             </div>
-            <span className="text-sm font-medium" style={{ color: 'var(--text2)' }}>
-              Usuário
+            <span className="text-xs font-medium truncate" style={{ color: 'var(--text2)' }}>
+              {displayName}
             </span>
           </div>
           <button
-            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs transition-colors duration-150 cursor-pointer"
+            onClick={onSignOut}
+            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs transition-colors duration-150 cursor-pointer shrink-0"
             style={{ color: 'var(--muted-color)' }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.color = 'var(--red)'
+              e.currentTarget.style.color = '#ef4444'
               e.currentTarget.style.background = 'rgba(239,68,68,0.08)'
             }}
             onMouseLeave={(e) => {
@@ -168,6 +174,22 @@ function SidebarContent() {
 
 export default function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [userEmail, setUserEmail] = useState<string | null>(null)
+  const router = useRouter()
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => {
+      setUserEmail(data.user?.email ?? null)
+    })
+  }, [])
+
+  const handleSignOut = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
 
   return (
     <>
@@ -176,7 +198,7 @@ export default function Sidebar() {
         className="fixed left-0 top-0 hidden h-screen w-60 lg:block"
         style={{ borderRight: '1px solid var(--border)', zIndex: 40 }}
       >
-        <SidebarContent />
+        <SidebarContent userEmail={userEmail} onSignOut={handleSignOut} />
       </aside>
 
       {/* Botão hamburguer mobile */}
@@ -184,7 +206,7 @@ export default function Sidebar() {
         className="fixed left-4 top-4 z-50 flex h-9 w-9 items-center justify-center rounded-lg lg:hidden"
         style={{
           background: 'var(--surface2)',
-          border: '1px solid var(--border2)',
+          border: '1px solid rgba(255,255,255,0.1)',
           color: 'var(--text)',
         }}
         onClick={() => setMobileOpen(true)}
@@ -218,7 +240,7 @@ export default function Sidebar() {
         >
           <X size={16} />
         </button>
-        <SidebarContent />
+        <SidebarContent userEmail={userEmail} onSignOut={handleSignOut} />
       </aside>
     </>
   )
