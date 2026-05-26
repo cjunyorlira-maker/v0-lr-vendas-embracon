@@ -1,75 +1,193 @@
 import AnimatedBackground from '@/components/ui/AnimatedBackground'
 import Sidebar from '@/components/Sidebar'
+import Header from '@/components/Header'
+import { TrendingUp, DollarSign, Users, Target } from 'lucide-react'
+
+const stats = [
+  {
+    label: 'Vendas na Semana',
+    value: '–',
+    sub: 'Aguardando dados',
+    icon: TrendingUp,
+    color: '#22c55e',
+  },
+  {
+    label: 'Receita Gerada',
+    value: '–',
+    sub: 'Aguardando dados',
+    icon: DollarSign,
+    color: '#d4af37',
+  },
+  {
+    label: 'Clientes Ativos',
+    value: '–',
+    sub: 'Aguardando dados',
+    icon: Users,
+    color: '#3b82f6',
+  },
+  {
+    label: 'Meta do Mês',
+    value: '–',
+    sub: 'Aguardando dados',
+    icon: Target,
+    color: '#f59e0b',
+  },
+]
+
+function GlassCard({
+  children,
+  className,
+}: {
+  children: React.ReactNode
+  className?: string
+}) {
+  return (
+    <div
+      className={className}
+      style={{
+        background: 'rgba(0,0,0,0.12)',
+        backdropFilter: 'blur(4px)',
+        WebkitBackdropFilter: 'blur(4px)',
+        border: '1px solid var(--border)',
+        borderRadius: '0.875rem',
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
+function StatCard({
+  label,
+  value,
+  sub,
+  icon: Icon,
+  color,
+}: {
+  label: string
+  value: string
+  sub: string
+  icon: React.ElementType
+  color: string
+}) {
+  return (
+    <GlassCard>
+      <div className="flex items-start justify-between p-5">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs font-medium" style={{ color: 'var(--muted-color)' }}>
+            {label}
+          </span>
+          <span
+            className="text-2xl font-bold font-mono"
+            style={{ color: 'var(--text)', fontFamily: 'var(--font-jetbrains-mono)' }}
+          >
+            {value}
+          </span>
+          <span className="text-xs" style={{ color: 'var(--faint)' }}>
+            {sub}
+          </span>
+        </div>
+        <div
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+          style={{
+            background: `${color}18`,
+            border: `1px solid ${color}30`,
+          }}
+        >
+          <Icon size={16} style={{ color }} />
+        </div>
+      </div>
+    </GlassCard>
+  )
+}
 
 export default function Home() {
   return (
     <div className="relative min-h-screen font-sans" style={{ background: 'var(--bg)' }}>
       <AnimatedBackground />
-
       <Sidebar />
 
-      {/* Área principal */}
-      <main
-        className="relative min-h-screen lg:ml-60"
-        style={{ zIndex: 1 }}
-      >
-        <div className="mx-auto max-w-[1400px] px-6 py-8 lg:px-8 lg:py-8">
-          {/* Padding top mobile para o botão hamburguer */}
-          <div className="pt-12 lg:pt-0 flex min-h-[calc(100vh-64px)] items-center justify-center">
-            <div
-              className="w-full max-w-lg rounded-2xl p-12 text-center shadow-2xl"
-              style={{
-                background: 'var(--surface)',
-                border: '1px solid var(--border)',
-                boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
-              }}
-            >
-              {/* Ícone decorativo */}
-              <div
-                className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl"
-                style={{ background: 'var(--accent-bg2)', border: '1px solid var(--accent-bg2)' }}
-              >
-                <span
-                  className="text-2xl font-bold"
-                  style={{ color: 'var(--accent)', fontFamily: 'var(--font-jetbrains-mono)' }}
-                >
-                  LR
-                </span>
-              </div>
+      <div className="relative lg:ml-60" style={{ zIndex: 1 }}>
+        <Header title="Dashboard" />
 
-              <h1
-                className="mb-3 text-3xl font-bold tracking-tight text-balance"
-                style={{ color: 'var(--text)' }}
-              >
-                Em construção
-              </h1>
-
-              <p
-                className="mb-4 text-base font-medium"
-                style={{ color: 'var(--muted-color)' }}
-              >
-                Sistema LR Vendas Embracon — Setup inicial
-              </p>
-
-              <div
-                className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-mono font-medium"
-                style={{
-                  background: 'var(--accent-bg)',
-                  color: 'var(--accent)',
-                  border: '1px solid var(--accent-bg2)',
-                  fontFamily: 'var(--font-jetbrains-mono)',
-                }}
-              >
-                <span
-                  className="h-1.5 w-1.5 rounded-full animate-pulse"
-                  style={{ background: 'var(--accent)' }}
-                />
-                Etapa 0.1 — Base visual
-              </div>
-            </div>
+        <main className="mx-auto max-w-[1400px] px-6 py-8 lg:px-8">
+          {/* Grid de stats */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {stats.map((s) => (
+              <StatCard key={s.label} {...s} />
+            ))}
           </div>
-        </div>
-      </main>
+
+          {/* Área principal vazia — próximas etapas */}
+          <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
+            {/* Tabela de vendas */}
+            <GlassCard className="lg:col-span-2">
+              <div className="p-5">
+                <div className="mb-4 flex items-center justify-between">
+                  <h2
+                    className="text-sm font-semibold"
+                    style={{ color: 'var(--text)' }}
+                  >
+                    Vendas Recentes
+                  </h2>
+                  <span
+                    className="rounded-full px-2.5 py-0.5 text-[11px] font-mono font-medium"
+                    style={{
+                      background: 'var(--accent-bg)',
+                      color: 'var(--accent)',
+                      border: '1px solid var(--accent-bg2)',
+                      fontFamily: 'var(--font-jetbrains-mono)',
+                    }}
+                  >
+                    Em desenvolvimento
+                  </span>
+                </div>
+                <div
+                  className="flex h-48 items-center justify-center rounded-lg"
+                  style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed var(--border2)' }}
+                >
+                  <span className="text-xs" style={{ color: 'var(--faint)' }}>
+                    Tabela de vendas — próxima etapa
+                  </span>
+                </div>
+              </div>
+            </GlassCard>
+
+            {/* Ranking */}
+            <GlassCard>
+              <div className="p-5">
+                <div className="mb-4 flex items-center justify-between">
+                  <h2
+                    className="text-sm font-semibold"
+                    style={{ color: 'var(--text)' }}
+                  >
+                    Ranking
+                  </h2>
+                  <span
+                    className="rounded-full px-2.5 py-0.5 text-[11px] font-mono font-medium"
+                    style={{
+                      background: 'var(--accent-bg)',
+                      color: 'var(--accent)',
+                      border: '1px solid var(--accent-bg2)',
+                      fontFamily: 'var(--font-jetbrains-mono)',
+                    }}
+                  >
+                    Em desenvolvimento
+                  </span>
+                </div>
+                <div
+                  className="flex h-48 items-center justify-center rounded-lg"
+                  style={{ background: 'rgba(255,255,255,0.02)', border: '1px dashed var(--border2)' }}
+                >
+                  <span className="text-xs" style={{ color: 'var(--faint)' }}>
+                    Top vendedores — próxima etapa
+                  </span>
+                </div>
+              </div>
+            </GlassCard>
+          </div>
+        </main>
+      </div>
     </div>
   )
 }
