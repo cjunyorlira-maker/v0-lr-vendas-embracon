@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import Image from 'next/image'
 import {
   Home,
   Upload,
@@ -16,7 +17,6 @@ import {
   DollarSign,
   Settings,
   LogOut,
-  Crown,
   Menu,
   X,
 } from 'lucide-react'
@@ -88,19 +88,17 @@ function SidebarContent({ userEmail, onSignOut }: { userEmail: string | null, on
   return (
     <div className="flex h-full flex-col" style={{ background: 'var(--surface)' }}>
       {/* Logo */}
-      <div className="px-5 py-6" style={{ borderBottom: '1px solid var(--border)' }}>
-        <div className="flex items-center gap-2">
-          <Crown size={18} style={{ color: 'var(--accent)' }} />
-          <span
-            className="text-sm font-bold tracking-wide uppercase"
-            style={{ color: 'var(--accent)' }}
-          >
-            LR Multimarcas
-          </span>
+      <div className="px-3 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
+        <div className="flex items-center justify-center">
+          <Image
+            src="/images/logo-lr.png"
+            alt="LR Multimarcas"
+            width={180}
+            height={60}
+            className="h-[50px] w-auto object-contain"
+            priority
+          />
         </div>
-        <p className="mt-1 text-xs" style={{ color: 'var(--muted-color)' }}>
-          Vendas Embracon
-        </p>
       </div>
 
       {/* Navegação principal */}
