@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { X, Copy, Check, Eye, EyeOff, Upload } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { X, Copy, Check, Eye, EyeOff, Upload, Plus } from 'lucide-react'
 
 interface Equipe {
   id: string
@@ -15,6 +16,7 @@ interface Props {
   equipes: Equipe[]
   currentUserRole: string | null
   onSuccess: (usuario: any) => void
+  onEquipeCriada?: () => void
 }
 
 const TODOS_ROLES = [
@@ -31,6 +33,7 @@ export default function AdicionarUsuarioModal({
   equipes,
   currentUserRole,
   onSuccess,
+  onEquipeCriada,
 }: Props) {
   const [nome, setNome] = useState('')
   const [email, setEmail] = useState('')
@@ -46,6 +49,9 @@ export default function AdicionarUsuarioModal({
   const [copiedSenha, setCopiedSenha] = useState(false)
   const [copiedEmail, setCopiedEmail] = useState(false)
   const [showSenha, setShowSenha] = useState(true)
+  const [showCriarEquipe, setShowCriarEquipe] = useState(false)
+  const [nomeNovaEquipe, setNomeNovaEquipe] = useState('')
+  const [criandoEquipe, setCriandoEquipe] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const rolesPermitidos = TODOS_ROLES.filter((r) => {
@@ -85,6 +91,36 @@ export default function AdicionarUsuarioModal({
     setLogoBase64(null)
     setLogoPreview(null)
     if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  async function criarEquipeInline() {
+    if (!nomeNovaEquipe.trim() || !empresaId) return
+    setCriandoEquipe(true)
+    setError('')
+    try {
+      const supabase = createClient()
+      const { data, error: err } = await supabase
+        .from('equipes')
+        .insert({ nome: nomeNovaEquipe.trim(), empresa_id: empresaId, ativo: true })
+        .select()
+        .single()
+
+      if (err) {
+        setError('Erro ao criar equipe: ' + err.message)
+        setCriandoEquipe(false)
+        return
+      }
+
+      if (data) {
+        setEquipeId(data.id)
+        setShowCriarEquipe(false)
+        setNomeNovaEquipe('')
+        if (onEquipeCriada) onEquipeCriada()
+      }
+    } catch (e) {
+      setError('Erro ao criar equipe')
+    }
+    setCriandoEquipe(false)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -148,6 +184,8 @@ export default function AdicionarUsuarioModal({
     setEmailCriado(null)
     setCopiedSenha(false)
     setCopiedEmail(false)
+    setShowCriarEquipe(false)
+    setNomeNovaEquipe('')
     onClose()
   }
 
@@ -226,7 +264,7 @@ export default function AdicionarUsuarioModal({
             </div>
 
             <div className="rounded-lg p-3 text-xs" style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b' }}>
-              Anote agora. O usuário será forçado a trocar a senha no primeiro login.
+              ⚠️ Anote agora. O usuário será forçado a trocar a senha no primeiro login.
             </div>
 
             <button onClick={handleClose} className="w-full rounded-lg py-2.5 text-sm font-semibold" style={{ background: 'linear-gradient(135deg, #d4af37 0%, #c9a227 50%, #b8941f 100%)', color: '#0a0a0a' }}>
@@ -292,21 +330,42 @@ export default function AdicionarUsuarioModal({
               </div>
             )}
 
-            {mostraEquipe && equipes.length > 0 && (
+            {mostraEquipe && !showCriarEquipe && (
               <div>
-                <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--muted-color)' }}>Equipe</label>
-                <select value={equipeId} onChange={(e) => setEquipeId(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
-                  <option value="" style={{ background: '#131313' }}>Sem equipe</option>
-                  {equipes.map((eq) => (
-                    <option key={eq.id} value={eq.id} style={{ background: '#131313' }}>{eq.nome}</option>
-                  ))}
-                </select>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-medium" style={{ color: 'var(--muted-color)' }}>Equipe</label>
+                  <button type="button" onClick={() => setShowCriarEquipe(true)} className="flex items-center gap-1 text-xs font-medium" style={{ color: 'var(--accent)' }}>
+                    <Plus size={12} />
+                    Criar equipe
+                  </button>
+                </div>
+                {equipes.length > 0 ? (
+                  <select value={equipeId} onChange={(e) => setEquipeId(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                    <option value="" style={{ background: '#131313' }}>Sem equipe</option>
+                    {equipes.map((eq) => (
+                      <option key={eq.id} value={eq.id} style={{ background: '#131313' }}>{eq.nome}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <div className="rounded-lg p-3 text-xs" style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6' }}>
+                    Nenhuma equipe cadastrada. Clique em &quot;Criar equipe&quot; acima ou crie depois.
+                  </div>
+                )}
               </div>
             )}
 
-            {mostraEquipe && equipes.length === 0 && (
-              <div className="rounded-lg p-3 text-xs" style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6' }}>
-                Nenhuma equipe cadastrada. O usuário será criado sem equipe (você pode atribuir depois).
+            {mostraEquipe && showCriarEquipe && (
+              <div className="rounded-lg p-3 space-y-2" style={{ background: 'rgba(212,175,55,0.05)', border: '1px solid rgba(212,175,55,0.2)' }}>
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-medium" style={{ color: 'var(--accent)' }}>Nova equipe</label>
+                  <button type="button" onClick={() => { setShowCriarEquipe(false); setNomeNovaEquipe('') }} className="text-xs" style={{ color: 'var(--muted-color)' }}>
+                    Cancelar
+                  </button>
+                </div>
+                <input type="text" value={nomeNovaEquipe} onChange={(e) => setNomeNovaEquipe(e.target.value)} placeholder="Nome da equipe (ex: TDM)" className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+                <button type="button" onClick={criarEquipeInline} disabled={criandoEquipe || !nomeNovaEquipe.trim()} className="w-full rounded-lg py-2 text-xs font-semibold disabled:opacity-50" style={{ background: 'var(--accent)', color: '#0a0a0a' }}>
+                  {criandoEquipe ? 'Criando...' : 'Criar e usar essa equipe'}
+                </button>
               </div>
             )}
 
