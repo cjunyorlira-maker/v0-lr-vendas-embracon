@@ -21,7 +21,7 @@ interface Props {
 
 const TODOS_ROLES = [
   { value: 'representante', label: 'Representante' },
-  { value: 'adm', label: 'Administrador' },
+  { value: 'adm', label: 'Administrativo' },
   { value: 'supervisor', label: 'Supervisor' },
   { value: 'vendedor', label: 'Vendedor' },
 ]

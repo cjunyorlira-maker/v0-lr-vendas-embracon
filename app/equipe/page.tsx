@@ -28,7 +28,7 @@ interface Equipe {
 const roleLabels: Record<string, string> = {
   master: 'Master',
   representante: 'Representante',
-  adm: 'Administrador',
+  adm: 'Administrativo',
   supervisor: 'Supervisor',
   vendedor: 'Vendedor',
 }

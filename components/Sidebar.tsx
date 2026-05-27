@@ -73,7 +73,7 @@ function SidebarContent({ userNome, userEmail, userRole, empresaNome, empresaLog
   }
 
   const roleLabels: Record<string, string> = {
-    master: 'Master', representante: 'Representante', adm: 'Administrador', supervisor: 'Supervisor', vendedor: 'Vendedor',
+    master: 'Master', representante: 'Representante', adm: 'Administrativo', supervisor: 'Supervisor', vendedor: 'Vendedor',
   }
   const roleColors: Record<string, string> = {
     master: '#d4af37', representante: '#22c55e', adm: '#3b82f6', supervisor: '#a855f7', vendedor: '#64748b',
