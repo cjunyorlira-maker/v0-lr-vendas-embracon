@@ -5,7 +5,8 @@ import { createClient } from '@/lib/supabase/client'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import AdicionarUsuarioModal from '@/components/AdicionarUsuarioModal'
-import { Plus, Users, UserX, UserCheck, Trash2, AlertTriangle, AlertOctagon } from 'lucide-react'
+import ResetSenhaModal from '@/components/ResetSenhaModal'
+import { Plus, Users, UserX, UserCheck, Trash2, KeyRound, AlertTriangle, AlertOctagon } from 'lucide-react'
 
 interface Usuario {
   id: string
@@ -62,6 +63,7 @@ export default function EquipePage() {
   const [confirmDeletar, setConfirmDeletar] = useState<Usuario | null>(null)
   const [textoConfirmDeletar, setTextoConfirmDeletar] = useState('')
   const [acaoLoading, setAcaoLoading] = useState(false)
+  const [confirmReset, setConfirmReset] = useState<Usuario | null>(null)
 
   useEffect(() => { loadData() }, [])
 
@@ -244,6 +246,15 @@ export default function EquipePage() {
                           <div className="flex items-center justify-end gap-2">
                             {podeDesativarAlvo(u) && (
                               <>
+                                <button
+                                  onClick={() => setConfirmReset(u)}
+                                  className="flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors"
+                                  style={{ color: '#3b82f6', background: 'rgba(59,130,246,0.08)' }}
+                                  title="Resetar senha"
+                                >
+                                  <KeyRound size={14} />
+                                  <span className="hidden sm:inline">Reset</span>
+                                </button>
                                 <button onClick={() => setConfirmDesativar(u)} className="flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors" style={{ color: u.ativo ? '#ef4444' : '#22c55e', background: u.ativo ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)' }} title={u.ativo ? 'Desativar (preserva dados)' : 'Reativar'}>
                                   {u.ativo ? <UserX size={14} /> : <UserCheck size={14} />}
                                   <span>{u.ativo ? 'Desativar' : 'Reativar'}</span>
@@ -267,6 +278,13 @@ export default function EquipePage() {
           </div>
         </main>
       </div>
+
+      <ResetSenhaModal
+        open={!!confirmReset}
+        onClose={() => setConfirmReset(null)}
+        usuario={confirmReset}
+        onSuccess={loadData}
+      />
 
       <AdicionarUsuarioModal
         open={modalOpen}
