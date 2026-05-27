@@ -22,8 +22,24 @@ export default function LoginPage() {
     setError(null)
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({ email, password })
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
       if (error) throw error
+
+      // Verifica se usuário tem senha temporária
+      if (data.user) {
+        const { data: usuario } = await supabase
+          .from('usuarios')
+          .select('senha_temporaria')
+          .eq('auth_user_id', data.user.id)
+          .single()
+
+        if (usuario?.senha_temporaria) {
+          router.push('/trocar-senha')
+          router.refresh()
+          return
+        }
+      }
+
       router.push("/")
       router.refresh()
     } catch (err: unknown) {

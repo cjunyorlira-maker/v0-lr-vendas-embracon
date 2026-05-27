@@ -24,30 +24,31 @@ import {
 interface NavItem {
   icon: React.ReactNode
   label: string
+  href: string
   active?: boolean
 }
 
 const mainNav: NavItem[] = [
-  { icon: <Home size={16} />, label: 'Dashboard', active: true },
-  { icon: <Upload size={16} />, label: 'Nova Venda' },
-  { icon: <Users size={16} />, label: 'Clientes' },
-  { icon: <FileText size={16} />, label: 'Boletos' },
-  { icon: <Target size={16} />, label: 'Lances' },
-  { icon: <Trophy size={16} />, label: 'Ranking' },
+  { icon: <Home size={16} />, label: 'Dashboard', href: '/', active: true },
+  { icon: <Upload size={16} />, label: 'Nova Venda', href: '/nova-venda' },
+  { icon: <Users size={16} />, label: 'Clientes', href: '/clientes' },
+  { icon: <FileText size={16} />, label: 'Boletos', href: '/boletos' },
+  { icon: <Target size={16} />, label: 'Lances', href: '/lances' },
+  { icon: <Trophy size={16} />, label: 'Ranking', href: '/ranking' },
 ]
 
 const adminNav: NavItem[] = [
-  { icon: <UserCircle size={16} />, label: 'Vendedores' },
-  { icon: <Users2 size={16} />, label: 'Equipes' },
-  { icon: <CheckCircle size={16} />, label: 'Aprovações' },
-  { icon: <DollarSign size={16} />, label: 'Comissões' },
-  { icon: <Settings size={16} />, label: 'Planos' },
+  { icon: <UserCircle size={16} />, label: 'Vendedores', href: '/vendedores' },
+  { icon: <Users2 size={16} />, label: 'Equipe', href: '/equipe' },
+  { icon: <CheckCircle size={16} />, label: 'Aprovações', href: '/aprovacoes' },
+  { icon: <DollarSign size={16} />, label: 'Comissões', href: '/comissoes' },
+  { icon: <Settings size={16} />, label: 'Planos', href: '/planos' },
 ]
 
 function NavLink({ item }: { item: NavItem }) {
   return (
     <a
-      href="#"
+      href={item.href}
       className="group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-150 cursor-pointer"
       style={
         item.active
