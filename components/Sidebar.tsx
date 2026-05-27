@@ -82,9 +82,24 @@ function NavLink({ item }: { item: NavItem }) {
   )
 }
 
-function SidebarContent({ userEmail, onSignOut }: { userEmail: string | null, onSignOut: () => void }) {
+function SidebarContent({ userEmail, userRole, onSignOut }: { userEmail: string | null, userRole: string | null, onSignOut: () => void }) {
   const initials = userEmail ? userEmail.charAt(0).toUpperCase() : 'U'
   const displayName = userEmail || 'Usuário'
+  
+  const roleLabels: Record<string, string> = {
+    master: 'Master',
+    representante: 'Representante', 
+    adm: 'Administrador',
+    supervisor: 'Supervisor',
+    vendedor: 'Vendedor'
+  }
+  const roleColors: Record<string, string> = {
+    master: '#d4af37',
+    representante: '#22c55e',
+    adm: '#3b82f6',
+    supervisor: '#a855f7',
+    vendedor: '#64748b'
+  }
   
   return (
     <div className="flex h-full flex-col" style={{ background: 'var(--surface)' }}>
@@ -145,9 +160,22 @@ function SidebarContent({ userEmail, onSignOut }: { userEmail: string | null, on
             >
               {initials}
             </div>
-            <span className="text-xs font-medium truncate" style={{ color: 'var(--text2)' }}>
-              {displayName}
-            </span>
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs font-medium truncate" style={{ color: 'var(--text2)' }}>
+                {displayName}
+              </span>
+              {userRole && (
+                <span 
+                  className="text-[10px] font-semibold px-1.5 py-0.5 rounded mt-0.5 w-fit"
+                  style={{ 
+                    background: `${roleColors[userRole] || '#64748b'}20`,
+                    color: roleColors[userRole] || '#64748b'
+                  }}
+                >
+                  {roleLabels[userRole] || userRole}
+                </span>
+              )}
+            </div>
           </div>
           <button
             onClick={onSignOut}
@@ -174,12 +202,21 @@ function SidebarContent({ userEmail, onSignOut }: { userEmail: string | null, on
 export default function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [userRole, setUserRole] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getUser().then(async ({ data }) => {
       setUserEmail(data.user?.email ?? null)
+      if (data.user) {
+        const { data: usuario } = await supabase
+          .from('usuarios')
+          .select('role')
+          .eq('auth_user_id', data.user.id)
+          .single()
+        setUserRole(usuario?.role ?? null)
+      }
     })
   }, [])
 
@@ -197,7 +234,7 @@ export default function Sidebar() {
         className="fixed left-0 top-0 hidden h-screen w-60 lg:block"
         style={{ borderRight: '1px solid var(--border)', zIndex: 40 }}
       >
-        <SidebarContent userEmail={userEmail} onSignOut={handleSignOut} />
+        <SidebarContent userEmail={userEmail} userRole={userRole} onSignOut={handleSignOut} />
       </aside>
 
       {/* Botão hamburguer mobile */}
@@ -239,7 +276,7 @@ export default function Sidebar() {
         >
           <X size={16} />
         </button>
-        <SidebarContent userEmail={userEmail} onSignOut={handleSignOut} />
+        <SidebarContent userEmail={userEmail} userRole={userRole} onSignOut={handleSignOut} />
       </aside>
     </>
   )

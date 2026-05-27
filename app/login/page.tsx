@@ -22,7 +22,10 @@ export default function LoginPage() {
     setError(null)
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+      const { data, error } = await supabase.auth.signInWithPassword({ 
+        email: email.toUpperCase().trim(), 
+        password 
+      })
       if (error) throw error
 
       // Verifica se usuário tem senha temporária
