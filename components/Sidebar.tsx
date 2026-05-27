@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
   Home, Upload, Users, FileText, Target, Trophy, Users2,
-  DollarSign, Settings, LogOut, Menu, X,
+  DollarSign, Settings, LogOut, Menu, X, Camera, Trash2,
 } from 'lucide-react'
 
 interface NavItem {
@@ -55,18 +55,140 @@ function NavLink({ item }: { item: NavItem }) {
   )
 }
 
+interface UserAvatarProps {
+  userNome: string | null
+  userEmail: string | null
+  fotoUrl: string | null
+  onFotoChange: (novaFotoUrl: string | null) => void
+}
+
+function UserAvatar({ userNome, userEmail, fotoUrl, onFotoChange }: UserAvatarProps) {
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const initials = userNome ? userNome.charAt(0).toUpperCase() : (userEmail ? userEmail.charAt(0).toUpperCase() : 'U')
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Foto muito grande (máx 2MB)')
+      return
+    }
+    if (!file.type.startsWith('image/')) {
+      alert('Arquivo deve ser uma imagem')
+      return
+    }
+    setUploading(true)
+    const reader = new FileReader()
+    reader.onload = async (event) => {
+      const foto_base64 = event.target?.result as string
+      try {
+        const res = await fetch('/api/usuarios/foto', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ foto_base64 }),
+        })
+        const data = await res.json()
+        if (res.ok) {
+          onFotoChange(data.foto_url)
+        } else {
+          alert(data.error || 'Erro ao salvar foto')
+        }
+      } catch {
+        alert('Erro de conexão')
+      }
+      setUploading(false)
+      setMenuOpen(false)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  async function handleRemove() {
+    if (!confirm('Remover foto?')) return
+    setUploading(true)
+    try {
+      const res = await fetch('/api/usuarios/foto', { method: 'DELETE' })
+      if (res.ok) {
+        onFotoChange(null)
+      } else {
+        alert('Erro ao remover')
+      }
+    } catch {
+      alert('Erro de conexão')
+    }
+    setUploading(false)
+    setMenuOpen(false)
+  }
+
+  return (
+    <div className="relative">
+      <input ref={fileInputRef} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+      <button
+        onClick={() => setMenuOpen(!menuOpen)}
+        disabled={uploading}
+        className="relative flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold shrink-0 overflow-hidden transition-all"
+        style={{
+          background: 'rgba(212,175,55,0.15)',
+          color: 'var(--accent)',
+          border: '1px solid rgba(212,175,55,0.25)',
+        }}
+        title="Trocar foto"
+      >
+        {fotoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={fotoUrl} alt="" className="h-full w-full object-cover" />
+        ) : (
+          initials
+        )}
+        {uploading && (
+          <div className="absolute inset-0 flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }}>
+            <div className="h-3 w-3 rounded-full animate-pulse" style={{ background: 'var(--accent)' }} />
+          </div>
+        )}
+      </button>
+
+      {menuOpen && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+          <div className="absolute bottom-10 left-0 z-50 w-44 rounded-lg overflow-hidden" style={{ background: 'var(--surface2)', border: '1px solid var(--border)', boxShadow: '0 8px 24px rgba(0,0,0,0.4)' }}>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="flex items-center gap-2 w-full px-3 py-2.5 text-xs text-left transition-colors hover:bg-white/5"
+              style={{ color: 'var(--text2)' }}
+            >
+              <Camera size={14} style={{ color: 'var(--accent)' }} />
+              <span>{fotoUrl ? 'Trocar foto' : 'Adicionar foto'}</span>
+            </button>
+            {fotoUrl && (
+              <button
+                onClick={handleRemove}
+                className="flex items-center gap-2 w-full px-3 py-2.5 text-xs text-left transition-colors hover:bg-white/5"
+                style={{ color: '#ef4444', borderTop: '1px solid var(--border)' }}
+              >
+                <Trash2 size={14} />
+                <span>Remover foto</span>
+              </button>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 interface SidebarContentProps {
   userNome: string | null
   userEmail: string | null
   userRole: string | null
   empresaNome: string | null
   empresaLogo: string | null
+  fotoUrl: string | null
+  onFotoChange: (novaFotoUrl: string | null) => void
   onSignOut: () => void
 }
 
-function SidebarContent({ userNome, userEmail, userRole, empresaNome, empresaLogo, onSignOut }: SidebarContentProps) {
-  const initials = userNome ? userNome.charAt(0).toUpperCase() : (userEmail ? userEmail.charAt(0).toUpperCase() : 'U')
-
+function SidebarContent({ userNome, userEmail, userRole, empresaNome, empresaLogo, fotoUrl, onFotoChange, onSignOut }: SidebarContentProps) {
   let displayName = userNome || 'Usuário'
   if (userRole === 'representante' && empresaNome) {
     displayName = empresaNome
@@ -100,34 +222,39 @@ function SidebarContent({ userNome, userEmail, userRole, empresaNome, empresaLog
         <div className="flex flex-col gap-1">
           {mainNav.map((item) => (<NavLink key={item.label} item={item} />))}
         </div>
-        <div className="my-4 px-3">
-          <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--muted-color)' }}>Administração</p>
-        </div>
-        <div className="flex flex-col gap-1">
+        <div className="my-4 px-3" style={{ borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
           {adminNav.map((item) => (<NavLink key={item.label} item={item} />))}
         </div>
       </nav>
 
-      <div className="px-4 py-4" style={{ borderTop: '1px solid var(--border)' }}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold shrink-0" style={{ background: 'rgba(212,175,55,0.15)', color: 'var(--accent)', border: '1px solid rgba(212,175,55,0.25)' }}>
-              {initials}
-            </div>
-            <div className="flex flex-col min-w-0">
-              <span className="text-xs font-medium truncate" style={{ color: 'var(--text2)' }} title={displayName}>{displayName}</span>
-              {userRole && (
-                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded mt-0.5 w-fit" style={{ background: `${roleColors[userRole] || '#64748b'}20`, color: roleColors[userRole] || '#64748b' }}>
-                  {roleLabels[userRole] || userRole}
-                </span>
-              )}
-            </div>
+      <div className="border-t" style={{ borderColor: 'var(--border)' }}>
+        <div className="flex items-center gap-3 px-3 py-4 min-w-0">
+          <UserAvatar userNome={userNome} userEmail={userEmail} fotoUrl={fotoUrl} onFotoChange={onFotoChange} />
+          <div className="flex flex-col min-w-0 gap-1">
+            <span className="text-xs font-medium truncate" style={{ color: 'var(--text2)' }}>
+              {displayName}
+            </span>
+            {userRole && (
+              <span
+                className="text-[10px] font-semibold px-1.5 py-0.5 rounded w-fit"
+                style={{
+                  background: `${roleColors[userRole] || '#64748b'}20`,
+                  color: roleColors[userRole] || '#64748b',
+                }}
+              >
+                {roleLabels[userRole] || userRole}
+              </span>
+            )}
           </div>
-          <button onClick={onSignOut} className="flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs transition-colors duration-150 cursor-pointer shrink-0" style={{ color: 'var(--muted-color)' }} onMouseEnter={(e) => { e.currentTarget.style.color = '#ef4444'; e.currentTarget.style.background = 'rgba(239,68,68,0.08)' }} onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--muted-color)'; e.currentTarget.style.background = 'transparent' }}>
-            <LogOut size={14} />
-            <span>Sair</span>
-          </button>
         </div>
+        <button
+          onClick={onSignOut}
+          className="flex w-full items-center gap-3 px-3 py-2.5 text-xs font-medium transition-all hover:bg-white/5 rounded-md"
+          style={{ color: 'var(--muted-color)' }}
+        >
+          <LogOut size={16} />
+          <span>Sair</span>
+        </button>
       </div>
     </div>
   )
@@ -140,25 +267,28 @@ export default function Sidebar() {
   const [userRole, setUserRole] = useState<string | null>(null)
   const [empresaNome, setEmpresaNome] = useState<string | null>(null)
   const [empresaLogo, setEmpresaLogo] = useState<string | null>(null)
+  const [fotoUrl, setFotoUrl] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(async ({ data }) => {
-      setUserEmail(data.user?.email ?? null)
       if (data.user) {
         const { data: usuario } = await supabase
           .from('usuarios')
-          .select('nome, role, empresa:empresas(nome, logo_url)')
+          .select(`nome, role, foto_url, empresas(nome, logo_url)`)
           .eq('auth_user_id', data.user.id)
-          .single<{ nome: string; role: string; empresa: { nome: string; logo_url: string | null } | null }>()
+          .single()
 
         if (usuario) {
           setUserNome(usuario.nome)
+          setUserEmail(data.user.email ?? null)
           setUserRole(usuario.role)
-          if (usuario.empresa) {
-            setEmpresaNome(usuario.empresa.nome)
-            setEmpresaLogo(usuario.empresa.logo_url)
+          setFotoUrl(usuario.foto_url)
+          const emp = usuario.empresas as any
+          if (emp) {
+            setEmpresaNome(emp.nome)
+            setEmpresaLogo(emp.logo_url)
           }
         }
       }
@@ -172,26 +302,43 @@ export default function Sidebar() {
     router.refresh()
   }
 
+  const handleFotoChange = (novaFotoUrl: string | null) => {
+    setFotoUrl(novaFotoUrl)
+  }
+
   return (
     <>
-      <aside className="fixed left-0 top-0 hidden h-screen w-60 lg:block" style={{ borderRight: '1px solid var(--border)', zIndex: 40 }}>
-        <SidebarContent userNome={userNome} userEmail={userEmail} userRole={userRole} empresaNome={empresaNome} empresaLogo={empresaLogo} onSignOut={handleSignOut} />
-      </aside>
-
-      <button className="fixed left-4 top-4 z-50 flex h-9 w-9 items-center justify-center rounded-lg lg:hidden" style={{ background: 'var(--surface2)', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text)' }} onClick={() => setMobileOpen(true)} aria-label="Abrir menu">
-        <Menu size={18} />
-      </button>
-
-      {mobileOpen && (
-        <div className="fixed inset-0 z-40 lg:hidden" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setMobileOpen(false)} />
-      )}
-
-      <aside className="fixed left-0 top-0 z-50 h-screen w-60 transition-transform duration-300 lg:hidden" style={{ borderRight: '1px solid var(--border)', transform: mobileOpen ? 'translateX(0)' : 'translateX(-100%)' }}>
-        <button className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-md" style={{ color: 'var(--muted-color)' }} onClick={() => setMobileOpen(false)} aria-label="Fechar menu">
-          <X size={16} />
+      {/* Mobile Menu Button */}
+      <div className="fixed top-0 left-0 right-0 lg:hidden z-50 flex items-center px-4 py-3" style={{ background: 'var(--surface)', borderBottom: '1px solid var(--border)' }}>
+        <button onClick={() => setMobileOpen(!mobileOpen)} className="p-2">
+          {mobileOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
-        <SidebarContent userNome={userNome} userEmail={userEmail} userRole={userRole} empresaNome={empresaNome} empresaLogo={empresaLogo} onSignOut={handleSignOut} />
+      </div>
+
+      {/* Sidebar */}
+      <aside
+        className={`fixed left-0 top-0 h-screen w-60 transform transition-transform duration-300 ease-in-out lg:translate-x-0 z-40 ${mobileOpen ? 'translate-x-0' : '-translate-x-full'}`}
+      >
+        <SidebarContent
+          userNome={userNome}
+          userEmail={userEmail}
+          userRole={userRole}
+          empresaNome={empresaNome}
+          empresaLogo={empresaLogo}
+          fotoUrl={fotoUrl}
+          onFotoChange={handleFotoChange}
+          onSignOut={handleSignOut}
+        />
       </aside>
+
+      {/* Mobile Overlay */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-30 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+          style={{ background: 'rgba(0, 0, 0, 0.5)' }}
+        />
+      )}
     </>
   )
 }
