@@ -382,14 +382,10 @@ export default function NovaVendaPage() {
               {/* Assembleia e cobrança */}
               <div className="rounded-xl p-5" style={{ background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.2)' }}>
                 <h3 className="text-sm font-semibold mb-4" style={{ color: '#3b82f6' }}>Assembleia e Cobrança</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Assembleia de entrada {grupoEncontrado === false && <span style={{ color: '#ef4444' }}>*</span>}</label>
                     <input type="date" value={dataAssembleia} onChange={(e) => setDataAssembleia(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
-                  </div>
-                  <div>
-                    <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Vencimento</label>
-                    <input type="date" value={dataVencimento} onChange={(e) => setDataVencimento(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
                   </div>
                   <div>
                     <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Próxima cobrança</label>
