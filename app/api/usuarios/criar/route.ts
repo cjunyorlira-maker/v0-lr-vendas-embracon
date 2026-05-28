@@ -11,7 +11,7 @@ const supabaseAdmin = createClient(
 )
 
 const HIERARQUIA: Record<string, string[]> = {
-  master: ['representante'],
+  master: ['representante', 'adm', 'supervisor', 'vendedor'],
   representante: ['adm', 'supervisor', 'vendedor'],
   adm: ['supervisor', 'vendedor'],
   supervisor: ['vendedor'],
@@ -102,7 +102,11 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: "Erro ao criar empresa: " + (empresaError?.message || '') }, { status: 500 })
       }
       empresa_id = empresaNova.id
+    } else if (criador.role === 'master' && body.empresa_id_alvo) {
+      // Master criando adm/supervisor/vendedor em empresa ESCOLHIDA
+      empresa_id = body.empresa_id_alvo
     } else {
+      // Outros casos: usa empresa do criador
       if (!criador.empresa_id) {
         return NextResponse.json({ error: "Criador não tem empresa associada" }, { status: 400 })
       }
