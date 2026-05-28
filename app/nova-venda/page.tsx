@@ -45,6 +45,10 @@ export default function NovaVendaPage() {
   const [planoId, setPlanoId] = useState('')
   const [qtdParcelas, setQtdParcelas] = useState('1')
   const [observacoes, setObservacoes] = useState('')
+  const [dataAssembleia, setDataAssembleia] = useState('')
+  const [grupoEncontrado, setGrupoEncontrado] = useState<boolean | null>(null)
+  const [buscandoGrupo, setBuscandoGrupo] = useState(false)
+  const [proximaCobranca, setProximaCobranca] = useState('')
 
   useEffect(() => {
     const supabase = createClient()
@@ -56,6 +60,10 @@ export default function NovaVendaPage() {
       if (pl) setPlanos(pl as Plano[])
     })
   }, [])
+
+  useEffect(() => {
+    setProximaCobranca(calcularProximaCobranca())
+  }, [dataAssembleia, qtdParcelas])
 
   // Valor do boleto calculado = demais parcelas × quantidade
   const valorBoletoCalc = (() => {
@@ -100,7 +108,7 @@ export default function NovaVendaPage() {
         if (d.email) setEmail(d.email)
         if (d.numero_proposta) setNumeroProposta(d.numero_proposta)
         if (d.numero_contrato) setNumeroContrato(d.numero_contrato)
-        if (d.grupo) setGrupo(d.grupo)
+        if (d.grupo) { setGrupo(d.grupo); buscarGrupo(d.grupo) }
         if (d.cota) setCota(d.cota)
         if (d.valor_credito) setValorCredito(fmtMoeda(d.valor_credito))
         if (d.valor_primeira_parcela) setValorPrimeiraParcela(fmtMoeda(d.valor_primeira_parcela))
@@ -118,6 +126,31 @@ export default function NovaVendaPage() {
       setErro('Erro ao processar o PDF')
     }
     setParsing(false)
+  }
+
+  async function buscarGrupo(grupoNum: string) {
+    if (!grupoNum || grupoNum.length < 3) { setGrupoEncontrado(null); return }
+    setBuscandoGrupo(true)
+    try {
+      const res = await fetch(`/api/grupos/${grupoNum}`)
+      const data = await res.json()
+      if (data.encontrado) {
+        setGrupoEncontrado(true)
+        if (data.proxima_assembleia) setDataAssembleia(data.proxima_assembleia)
+      } else {
+        setGrupoEncontrado(false)
+      }
+    } catch { setGrupoEncontrado(null) }
+    setBuscandoGrupo(false)
+  }
+
+  // Calcula próxima cobrança = assembleia + qtd meses adiantados
+  function calcularProximaCobranca() {
+    if (!dataAssembleia || !qtdParcelas) return ''
+    const d = new Date(dataAssembleia + 'T00:00:00')
+    const qtd = parseInt(qtdParcelas) || 1
+    d.setMonth(d.getMonth() + qtd)
+    return d.toISOString().slice(0, 10)
   }
 
   function parseValor(s: string): number {
@@ -292,7 +325,10 @@ export default function NovaVendaPage() {
                   </div>
                   <div>
                     <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Grupo</label>
-                    <input value={grupo} onChange={(e) => setGrupo(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
+                    <input value={grupo} onChange={(e) => setGrupo(e.target.value)} onBlur={(e) => buscarGrupo(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
+                    {buscandoGrupo && <p className="text-xs mt-1" style={{ color: 'var(--muted-color)' }}>Buscando grupo...</p>}
+                    {grupoEncontrado === true && <p className="text-xs mt-1" style={{ color: '#22c55e' }}>{'\u2713'} Grupo mapeado — assembleia preenchida</p>}
+                    {grupoEncontrado === false && <p className="text-xs mt-1" style={{ color: '#f59e0b' }}>{'\u26a0'} Grupo novo — informe a assembleia abaixo (será salva)</p>}
                   </div>
                   <div>
                     <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Cota</label>
@@ -311,6 +347,22 @@ export default function NovaVendaPage() {
                     <input value={valorDemaisParcelas} onChange={(e) => setValorDemaisParcelas(e.target.value)} placeholder="705,00" className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
                   </div>
                 </div>
+              </div>
+
+              {/* Assembleia e cobrança */}
+              <div className="rounded-xl p-5" style={{ background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.2)' }}>
+                <h3 className="text-sm font-semibold mb-4" style={{ color: '#3b82f6' }}>Assembleia e Cobrança</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Data da assembleia de entrada {grupoEncontrado === false && <span style={{ color: '#ef4444' }}>*</span>}</label>
+                    <input type="date" value={dataAssembleia} onChange={(e) => setDataAssembleia(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
+                  </div>
+                  <div>
+                    <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Próxima cobrança (calculada)</label>
+                    <div className="rounded-lg px-3 py-2 text-sm font-bold" style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6' }}>{proximaCobranca ? new Date(proximaCobranca + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}</div>
+                  </div>
+                </div>
+                <p className="text-xs mt-2" style={{ color: 'var(--muted-color)' }}>Após as {qtdParcelas || 'X'} parcelas adiantadas, a próxima cobrança cai nessa data.</p>
               </div>
 
               {/* Boleto único */}
