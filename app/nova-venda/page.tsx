@@ -185,6 +185,23 @@ export default function NovaVendaPage() {
         pdf_base64: pdfBase64,
         pdf_nome: pdfNome,
         observacoes: observacoes || null,
+        data_assembleia_entrada: dataAssembleia || null,
+        proxima_cobranca: proximaCobranca || null,
+      }
+
+      // Se o grupo é novo (não mapeado) e o vendedor informou a assembleia, salva pro futuro
+      if (grupoEncontrado === false && grupo && dataAssembleia) {
+        try {
+          await fetch(`/api/grupos/${grupo}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              bem: planos.find(p => p.id === planoId)?.bem || null,
+              data_assembleia: dataAssembleia,
+              dia_vencimento: null,
+            }),
+          })
+        } catch {}
       }
 
       const res = await fetch('/api/vendas/criar', {
