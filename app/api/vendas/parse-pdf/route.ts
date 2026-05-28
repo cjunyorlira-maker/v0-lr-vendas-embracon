@@ -85,11 +85,13 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 
-    // Extrai texto do PDF
+    // Extrai texto do PDF (API da v2: classe PDFParse)
     let textoPdf = ''
     try {
-      const pdfParse = (await import('pdf-parse')).default
-      const data = await pdfParse(buffer)
+      const { PDFParse } = await import('pdf-parse')
+      const parser = new PDFParse({ data: buffer })
+      const data = await parser.getText()
+      await parser.destroy()
       textoPdf = data.text || ''
     } catch (e) {
       return NextResponse.json({
