@@ -20,7 +20,6 @@ export interface DadosProposta {
 function parseValorBR(texto: string): number | null {
   if (!texto) return null
   let limpo = texto.replace(/[R$\s]/g, '')
-  // Remove pontos de milhar, troca vírgula decimal por ponto
   if (limpo.includes(',')) {
     limpo = limpo.replace(/\./g, '').replace(',', '.')
   }
@@ -32,91 +31,111 @@ export function parseProposta(textoPdf: string): DadosProposta {
   const texto = textoPdf.replace(/\r/g, '')
   const linhas = texto.split('\n').map(l => l.trim()).filter(Boolean)
 
-  // ─── NOME ─── linha em maiúsculas, 2+ palavras, não institucional
+  // Helper: acha índice da primeira linha que casa com regex
+  const idxLinha = (re: RegExp, start = 0) => {
+    for (let i = start; i < linhas.length; i++) if (re.test(linhas[i])) return i
+    return -1
+  }
+  const isCPF = (s: string) => /^\d{3}\.\d{3}\.\d{3}-\d{2}$/.test(s)
+  const isNomeMaiusculo = (s: string) =>
+    /^[A-ZÀ-Ú][A-ZÀ-Ú\s]{8,60}$/.test(s) &&
+    s.split(/\s+/).length >= 2 &&
+    !/EMBRACON|CONSORCIO|CONSÓRCIO|CONSORCIADO|ADMINISTRADORA|PROPOSTA|PARTICIPA|REGULAMENTO|BANCO CENTRAL|RUA|AVENIDA|ALAMEDA|JARDIM|BAIRRO|CIDADE|CRAVINHOS|RECEPCIONISTA|MAIS POR MENOS|IMOVEL|AUTOMOVEL|RESID[EÊ]NCIA|PR[ÓO]PRIA/.test(s)
+
+  // ─── NOME do titular ─── primeira linha maiúscula que NÃO é a do cônjuge.
+  // O nome do cônjuge vem após "(X)Nome do Cônjuge". O titular vem antes.
   let nome: string | null = null
+  const idxLabelConjugeNome = idxLinha(/Nome do C[ôo]njuge/i)
   for (let i = 0; i < linhas.length; i++) {
-    const linha = linhas[i]
-    if (
-      /^[A-ZÀ-Ú][A-ZÀ-Ú\s]{8,60}$/.test(linha) &&
-      linha.split(/\s+/).length >= 2 &&
-      !/EMBRACON|CONSORCIO|CONSÓRCIO|CONSORCIADO|ADMINISTRADORA|PROPOSTA|PARTICIPA|REGULAMENTO|BANCO CENTRAL|RUA|AVENIDA|ALAMEDA|JD |JARDIM|BAIRRO|CIDADE|CRAVINHOS|RECEPCIONISTA|MAIS POR MENOS|IMOVEL|AUTOMOVEL/.test(linha)
-    ) {
-      nome = linha
+    if (isNomeMaiusculo(linhas[i])) {
+      // se essa linha vem logo depois do label "Nome do Cônjuge", pula (é o cônjuge)
+      if (idxLabelConjugeNome !== -1 && i > idxLabelConjugeNome && i <= idxLabelConjugeNome + 2) continue
+      nome = linhas[i]
       break
     }
   }
 
-  // ─── CPF do titular ─── pega o que NÃO é do cônjuge
-  // No PDF: linha "414.009.398-60" vem após "CPF do Cônjuge"
-  //         linha "525.576.958-40" vem após "(X)CPF ( )CNPJ" (titular)
+  // ─── CPF do titular ─── o CPF que vem logo APÓS o nome do titular.
   let cpf_cnpj: string | null = null
-  const cpfRegex = /\b(\d{3}\.\d{3}\.\d{3}-\d{2})\b/g
-  const todosCpfs: { cpf: string; idx: number }[] = []
-  let m
-  while ((m = cpfRegex.exec(texto)) !== null) {
-    todosCpfs.push({ cpf: m[1], idx: m.index })
-  }
-  // Acha índice de "CPF do Cônjuge" pra descartar o CPF logo após
-  const idxConjuge = texto.search(/CPF do C[ôo]njuge/i)
-  if (todosCpfs.length === 1) {
-    cpf_cnpj = todosCpfs[0].cpf
-  } else if (todosCpfs.length > 1) {
-    // Pega o CPF que NÃO está logo após "CPF do Cônjuge"
-    const naoConjuge = todosCpfs.find(c => {
-      if (idxConjuge === -1) return true
-      // se o CPF está dentro de ~40 chars depois de "CPF do Cônjuge", é do cônjuge
-      return !(c.idx > idxConjuge && c.idx < idxConjuge + 40)
-    })
-    cpf_cnpj = naoConjuge ? naoConjuge.cpf : todosCpfs[0].cpf
-  }
-
-  // ─── TELEFONE ─── DDD perto de "Tel. Celular", número logo após
-  let telefone: string | null = null
-  const celNumMatch = texto.match(/Tel\.?\s*Celular[\s\S]{0,30}?(\d{8,9})/i)
-  let ddd = ''
-  // DDD do celular costuma ser o último "DDD\n16" antes ou perto
-  const dddMatches = [...texto.matchAll(/DDD\s*\n?\s*(\d{2})/gi)]
-  if (dddMatches.length > 0) {
-    // pega o último DDD válido (≠ 0)
-    for (let i = dddMatches.length - 1; i >= 0; i--) {
-      if (dddMatches[i][1] !== '00' && dddMatches[i][1] !== '0') { ddd = dddMatches[i][1]; break }
+  if (nome) {
+    const idxNome = linhas.indexOf(nome)
+    // procura primeiro CPF depois do nome (dentro de 5 linhas)
+    for (let i = idxNome + 1; i < Math.min(idxNome + 6, linhas.length); i++) {
+      if (isCPF(linhas[i])) { cpf_cnpj = linhas[i]; break }
     }
   }
-  if (celNumMatch) {
-    const num = celNumMatch[1]
-    if (num && num !== '0') telefone = (ddd ? ddd + ' ' : '') + num
+  // fallback: pega CPF que não é o do cônjuge
+  if (!cpf_cnpj) {
+    const idxConjuge = idxLinha(/CPF do C[ôo]njuge/i)
+    for (let i = 0; i < linhas.length; i++) {
+      if (isCPF(linhas[i])) {
+        if (idxConjuge !== -1 && i > idxConjuge && i <= idxConjuge + 2) continue
+        cpf_cnpj = linhas[i]; break
+      }
+    }
   }
+
+  // ─── TELEFONE ─── número de 8-9 dígitos após "Tel. Celular", DDD após "DDD"
+  let telefone: string | null = null
+  const idxCel = idxLinha(/Tel\.?\s*Celular/i)
+  let numCel = ''
+  if (idxCel !== -1) {
+    for (let i = idxCel + 1; i < Math.min(idxCel + 4, linhas.length); i++) {
+      const mm = linhas[i].match(/^(\d{8,9})$/)
+      if (mm && mm[1] !== '0') { numCel = mm[1]; break }
+    }
+  }
+  // DDD: última linha "DDD" seguida de 2 dígitos ≠ 0
+  let ddd = ''
+  for (let i = 0; i < linhas.length; i++) {
+    if (/^DDD$/i.test(linhas[i]) && i + 1 < linhas.length) {
+      const d = linhas[i + 1].trim()
+      if (/^\d{2}$/.test(d) && d !== '00' && d !== '0') ddd = d
+    }
+  }
+  if (numCel) telefone = (ddd ? ddd + ' ' : '') + numCel
 
   // ─── EMAIL ───
   const emailMatch = texto.match(/([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/i)
   const email = emailMatch ? emailMatch[1] : null
 
-  // ─── Nº PROPOSTA ─── 7 dígitos perto de "Proposta n°"
+  // ─── Nº PROPOSTA ─── 7 dígitos na linha "Grupo Cota...9881377"
   let numero_proposta: string | null = null
-  const propRegex = /Proposta\s*n[°º]?[\s\S]{0,120}?\b(\d{7})\b/i
-  const propMatch = texto.match(propRegex)
-  if (propMatch) {
-    numero_proposta = propMatch[1]
-  } else {
-    for (const linha of linhas.slice(0, 20)) {
-      if (/^\d{7}$/.test(linha)) { numero_proposta = linha; break }
+  for (const linha of linhas) {
+    // linha que contém "Grupo Cota" e um número de 6-8 dígitos
+    if (/Grupo\s*Cota/i.test(linha)) {
+      const numMatch = linha.match(/(\d{6,8})/)
+      if (numMatch) { numero_proposta = numMatch[1]; break }
+    }
+  }
+  // fallback: 7 dígitos isolados nas primeiras linhas
+  if (!numero_proposta) {
+    for (const linha of linhas.slice(0, 15)) {
+      const mm = linha.match(/^(\d{7})$/)
+      if (mm) { numero_proposta = mm[1]; break }
     }
   }
 
-  // ─── GRUPO e COTA ─── padrão "7275" e "2913 - 0"
+  // ─── GRUPO e COTA ─── linha "7275 2913 - 0"
   let grupo: string | null = null
   let cota: string | null = null
-  const grupoCotaMatch = texto.match(/\b(\d{4})\s+(\d{4})\s*-\s*(\d)\b/)
-  if (grupoCotaMatch) {
-    grupo = grupoCotaMatch[1]
-    cota = grupoCotaMatch[2] + '-' + grupoCotaMatch[3]
+  for (const linha of linhas) {
+    const gc = linha.match(/^(\d{4})\s+(\d{3,5})\s*-\s*(\d)$/)
+    if (gc) { grupo = gc[1]; cota = gc[2] + '-' + gc[3]; break }
   }
 
-  // ─── VALOR DO CRÉDITO ─── "R$400.000,00"
+  // ─── VALOR DO CRÉDITO ─── primeiro "R$NNN.NNN,NN" >= 30.000
   let valor_credito: number | null = null
-  const creditoMatch = texto.match(/Valor do Cr[ée]dito[\s\S]{0,80}?(R\$\s*[\d.]+,\d{2})/i)
-  if (creditoMatch) {
-    valor_credito = parseValorBR(creditoMatch[1])
+  // procura linha que começa com R$ e tem valor alto, perto de "Valor do Crédito"
+  const idxCredLabel = idxLinha(/Valor do Cr[ée]dito/i)
+  if (idxCredLabel !== -1) {
+    for (let i = idxCredLabel; i < Math.min(idxCredLabel + 5, linhas.length); i++) {
+      const v = linhas[i].match(/R\$\s*[\d.]+,\d{2}/)
+      if (v) {
+        const num = parseValorBR(v[0])
+        if (num && num >= 30000) { valor_credito = num; break }
+      }
+    }
   }
   if (!valor_credito) {
     const valores = (texto.match(/R\$\s*[\d.]+,\d{2}/g) || [])
@@ -125,45 +144,34 @@ export function parseProposta(textoPdf: string): DadosProposta {
     if (valores.length > 0) valor_credito = Math.max(...valores)
   }
 
-  // ─── 1ª PARCELA ─── "importância de R$ 9182,8" (valor pago de entrada)
+  // ─── 1ª PARCELA ─── "importância de R$" ... valor "9182,8" numa linha próxima
   let valor_primeira_parcela: number | null = null
-  const impMatch = texto.match(/import[âa]ncia de R\$\s*\n?\s*([\d.]+,?\d*)/i)
-  if (impMatch) {
-    let v = impMatch[1]
-    // formato "9182,8" -> 9182.80
-    if (v.includes(',')) {
-      v = v.replace(/\./g, '').replace(',', '.')
+  const idxImp = idxLinha(/import[âa]ncia de R\$/i)
+  if (idxImp !== -1) {
+    // o valor pode estar na mesma linha ou nas próximas 6 linhas (após "CONSORCIADO")
+    for (let i = idxImp; i < Math.min(idxImp + 8, linhas.length); i++) {
+      // procura valor tipo "9182,8" ou "9.182,80" sozinho ou no fim da linha
+      const vm = linhas[i].match(/(?:^|\s)(\d{1,3}(?:\.\d{3})*,\d{1,2})\s*$/) || linhas[i].match(/^(\d{3,6},\d{1,2})$/)
+      if (vm) {
+        const num = parseValorBR(vm[1])
+        if (num && num >= 100) { valor_primeira_parcela = num; break }
+      }
     }
-    const num = parseFloat(v)
-    if (!isNaN(num) && num > 0) valor_primeira_parcela = num
   }
 
-  // ─── ADESÃO calculada ─── deduz 1% ou 2% pela taxa antecipada
-  // taxa = % do crédito embutida na 1ª parcela
-  // 1ª parcela = parcela_normal + (% × crédito)
+  // ─── ADESÃO calculada ─── deduz 1% ou 2% pela taxa antecipada embutida
   let adesao_calculada: number | null = null
   let valor_demais_parcelas: number | null = null
   if (valor_credito && valor_primeira_parcela) {
-    const taxa1 = valor_credito * 0.01
-    const taxa2 = valor_credito * 0.02
-    const parcelaSe1 = valor_primeira_parcela - taxa1
-    const parcelaSe2 = valor_primeira_parcela - taxa2
-    // A parcela normal de um consórcio costuma ser 0,1% a 1% do crédito/mês
-    const minParcela = valor_credito * 0.001
-    const maxParcela = valor_credito * 0.01
-    const valido1 = parcelaSe1 >= minParcela && parcelaSe1 <= maxParcela
-    const valido2 = parcelaSe2 >= minParcela && parcelaSe2 <= maxParcela
-    if (valido2 && !valido1) {
-      adesao_calculada = 2
-      valor_demais_parcelas = Math.round(parcelaSe2 * 100) / 100
-    } else if (valido1 && !valido2) {
-      adesao_calculada = 1
-      valor_demais_parcelas = Math.round(parcelaSe1 * 100) / 100
-    } else if (valido1 && valido2) {
-      // ambíguo: usa o que dá parcela mais "redonda" — fica com 2% (mais comum em imóvel grande)
-      adesao_calculada = parcelaSe2 > 0 ? 2 : 1
-      valor_demais_parcelas = Math.round((adesao_calculada === 2 ? parcelaSe2 : parcelaSe1) * 100) / 100
-    }
+    const parcelaSe1 = valor_primeira_parcela - valor_credito * 0.01
+    const parcelaSe2 = valor_primeira_parcela - valor_credito * 0.02
+    const minP = valor_credito * 0.0008
+    const maxP = valor_credito * 0.012
+    const ok1 = parcelaSe1 >= minP && parcelaSe1 <= maxP
+    const ok2 = parcelaSe2 >= minP && parcelaSe2 <= maxP
+    if (ok2 && !ok1) { adesao_calculada = 2; valor_demais_parcelas = Math.round(parcelaSe2 * 100) / 100 }
+    else if (ok1 && !ok2) { adesao_calculada = 1; valor_demais_parcelas = Math.round(parcelaSe1 * 100) / 100 }
+    else if (ok1 && ok2) { adesao_calculada = 2; valor_demais_parcelas = Math.round(parcelaSe2 * 100) / 100 }
   }
 
   // ─── PLANO / BEM ───
