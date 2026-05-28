@@ -38,6 +38,8 @@ export async function POST(req: NextRequest) {
       pdf_base64, pdf_nome,
       empresa_id_alvo, equipe_id_alvo, vendedor_id_alvo,
       observacoes,
+      data_assembleia_entrada,
+      proxima_cobranca,
     } = body
 
     if (!nome_cliente || !valor_credito) {
@@ -123,6 +125,7 @@ export async function POST(req: NextRequest) {
         pdf_proposta_url: pdf_url,
         pdf_proposta_nome: pdf_nome || null,
         observacoes: observacoes || null,
+        data_assembleia_entrada: data_assembleia_entrada || null,
       })
       .select('id')
       .single()
@@ -143,6 +146,8 @@ export async function POST(req: NextRequest) {
         qtd_parcelas: qtd_parcelas || 1,
         valor_boleto: valor_boleto || valor_primeira_parcela || 0,
         status: 'pendente',
+        meses_cobertos: qtd_parcelas || 1,
+        data_proxima_cobranca: proxima_cobranca || null,
         criado_por: criador.id,
       })
       .select('id')
