@@ -106,6 +106,7 @@ export default function NovaVendaPage() {
         if (d.cota) setCota(d.cota)
         if (d.valor_credito) setValorCredito(fmtMoeda(d.valor_credito))
         if (d.valor_primeira_parcela) setValorPrimeiraParcela(fmtMoeda(d.valor_primeira_parcela))
+        if (d.valor_demais_parcelas) setValorDemaisParcelas(fmtMoeda(d.valor_demais_parcelas))
         if (d.adesao_calculada) setAdesaoPercent(String(d.adesao_calculada))
         if (data.plano_detectado) setPlanoId(data.plano_detectado.id)
 
