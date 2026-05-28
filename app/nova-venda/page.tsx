@@ -57,13 +57,11 @@ export default function NovaVendaPage() {
     })
   }, [])
 
-  // Valor do boleto calculado = 1ª parcela + demais × (qtd - 1)
+  // Valor do boleto calculado = demais parcelas × quantidade
   const valorBoletoCalc = (() => {
-    const p1 = parseFloat(valorPrimeiraParcela.replace(/\./g, '').replace(',', '.')) || 0
     const pd = parseFloat(valorDemaisParcelas.replace(/\./g, '').replace(',', '.')) || 0
     const qtd = parseInt(qtdParcelas) || 1
-    if (p1 === 0) return 0
-    return p1 + pd * (qtd - 1)
+    return pd * qtd
   })()
 
   function fmtMoeda(v: number): string {
@@ -328,7 +326,7 @@ export default function NovaVendaPage() {
                     <div className="rounded-lg px-3 py-2 text-sm font-bold" style={{ background: 'rgba(212,175,55,0.1)', color: 'var(--accent)' }}>R$ {fmtMoeda(valorBoletoCalc)}</div>
                   </div>
                 </div>
-                <p className="text-xs mt-2" style={{ color: 'var(--muted-color)' }}>1ª parcela + demais × (qtd − 1)</p>
+                <p className="text-xs mt-2" style={{ color: 'var(--muted-color)' }}>demais parcelas × quantidade (a adesão/1ª parcela é paga só uma vez na proposta)</p>
               </div>
 
               {/* Observações */}
