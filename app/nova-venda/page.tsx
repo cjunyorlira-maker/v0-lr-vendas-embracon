@@ -43,7 +43,7 @@ export default function NovaVendaPage() {
   const [valorDemaisParcelas, setValorDemaisParcelas] = useState('')
   const [adesaoPercent, setAdesaoPercent] = useState('')
   const [planoId, setPlanoId] = useState('')
-  const [qtdParcelas, setQtdParcelas] = useState('1')
+  const [qtdParcelas, setQtdParcelas] = useState('0')
   const [observacoes, setObservacoes] = useState('')
   const [dataAssembleia, setDataAssembleia] = useState('')
   const [grupoEncontrado, setGrupoEncontrado] = useState<boolean | null>(null)
@@ -153,7 +153,7 @@ export default function NovaVendaPage() {
   function calcularProximaCobranca() {
     if (!dataVencimento || !qtdParcelas) return ''
     const base = new Date(dataVencimento + 'T00:00:00')
-    const qtd = parseInt(qtdParcelas) || 1
+    const qtd = parseInt(qtdParcelas) || 0
     const alvo = new Date(base)
     alvo.setMonth(alvo.getMonth() + qtd + 1)
     const mesAlvo = alvo.getMonth() + 1
@@ -408,7 +408,7 @@ export default function NovaVendaPage() {
                     <div className="rounded-lg px-3 py-2 text-sm font-bold" style={{ background: 'rgba(212,175,55,0.1)', color: 'var(--accent)' }}>R$ {fmtMoeda(valorBoletoCalc)}</div>
                   </div>
                 </div>
-                <p className="text-xs mt-2" style={{ color: 'var(--muted-color)' }}>demais parcelas × quantidade (a adesão/1ª parcela é paga só uma vez na proposta)</p>
+                <p className="text-xs mt-2" style={{ color: 'var(--muted-color)' }}>Opcional. Quantas parcelas o cliente quer adiantar no boleto único (0 = sem adiantamento). Adesão/1ª parcela é paga só uma vez na proposta.</p>
               </div>
 
               {/* Observações */}
