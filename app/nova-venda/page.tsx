@@ -92,12 +92,6 @@ export default function NovaVendaPage() {
       const res = await fetch('/api/vendas/parse-pdf', { method: 'POST', body: formData })
       const data = await res.json()
 
-      console.log('[v0] TEXTO BRUTO DO PDF:', data.texto_bruto)
-      if (data.texto_bruto) {
-        // mostra num alert os primeiros 1500 chars pra debug
-        alert('TEXTO EXTRAÍDO (primeiros 1500 chars):\n\n' + String(data.texto_bruto).slice(0, 1500))
-      }
-
       if (data.parse_falhou) {
         setAvisoParser(data.error || 'Não consegui ler o PDF automaticamente. Preencha os campos manualmente.')
       } else if (data.dados) {
