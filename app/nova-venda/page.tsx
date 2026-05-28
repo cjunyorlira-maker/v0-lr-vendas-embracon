@@ -49,6 +49,8 @@ export default function NovaVendaPage() {
   const [grupoEncontrado, setGrupoEncontrado] = useState<boolean | null>(null)
   const [buscandoGrupo, setBuscandoGrupo] = useState(false)
   const [proximaCobranca, setProximaCobranca] = useState('')
+  const [dataVencimento, setDataVencimento] = useState('')
+  const [calendarioGrupo, setCalendarioGrupo] = useState<any[]>([])
 
   useEffect(() => {
     const supabase = createClient()
@@ -63,7 +65,7 @@ export default function NovaVendaPage() {
 
   useEffect(() => {
     setProximaCobranca(calcularProximaCobranca())
-  }, [dataAssembleia, qtdParcelas])
+  }, [dataVencimento, qtdParcelas, calendarioGrupo])
 
   // Valor do boleto calculado = demais parcelas × quantidade
   const valorBoletoCalc = (() => {
@@ -137,20 +139,31 @@ export default function NovaVendaPage() {
       if (data.encontrado) {
         setGrupoEncontrado(true)
         if (data.proxima_assembleia) setDataAssembleia(data.proxima_assembleia)
+        if (data.proximo_vencimento) setDataVencimento(data.proximo_vencimento)
+        if (data.calendario_ano) setCalendarioGrupo(data.calendario_ano)
       } else {
         setGrupoEncontrado(false)
+        setCalendarioGrupo([])
       }
     } catch { setGrupoEncontrado(null) }
     setBuscandoGrupo(false)
   }
 
-  // Calcula próxima cobrança = assembleia + qtd meses adiantados
+  // Próxima cobrança = vencimento do mês (entrada + qtd meses), buscando no calendário Embracon
   function calcularProximaCobranca() {
-    if (!dataAssembleia || !qtdParcelas) return ''
-    const d = new Date(dataAssembleia + 'T00:00:00')
+    if (!dataVencimento || !qtdParcelas) return ''
+    const base = new Date(dataVencimento + 'T00:00:00')
     const qtd = parseInt(qtdParcelas) || 1
-    d.setMonth(d.getMonth() + qtd)
-    return d.toISOString().slice(0, 10)
+    const alvo = new Date(base)
+    alvo.setMonth(alvo.getMonth() + qtd)
+    const mesAlvo = alvo.getMonth() + 1
+    // tenta achar o vencimento real desse mês no calendário do grupo
+    const noCalendario = calendarioGrupo.find((c: any) => c.mes === mesAlvo)
+    if (noCalendario && alvo.getFullYear() === 2026) {
+      return noCalendario.data_vencimento
+    }
+    // fora de 2026 (sem calendário): usa o mesmo dia, mês/ano calculado
+    return alvo.toISOString().slice(0, 10)
   }
 
   function parseValor(s: string): number {
@@ -369,17 +382,21 @@ export default function NovaVendaPage() {
               {/* Assembleia e cobrança */}
               <div className="rounded-xl p-5" style={{ background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.2)' }}>
                 <h3 className="text-sm font-semibold mb-4" style={{ color: '#3b82f6' }}>Assembleia e Cobrança</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
-                    <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Data da assembleia de entrada {grupoEncontrado === false && <span style={{ color: '#ef4444' }}>*</span>}</label>
+                    <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Assembleia de entrada {grupoEncontrado === false && <span style={{ color: '#ef4444' }}>*</span>}</label>
                     <input type="date" value={dataAssembleia} onChange={(e) => setDataAssembleia(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
                   </div>
                   <div>
-                    <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Próxima cobrança (calculada)</label>
+                    <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Vencimento</label>
+                    <input type="date" value={dataVencimento} onChange={(e) => setDataVencimento(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
+                  </div>
+                  <div>
+                    <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Próxima cobrança</label>
                     <div className="rounded-lg px-3 py-2 text-sm font-bold" style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6' }}>{proximaCobranca ? new Date(proximaCobranca + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}</div>
                   </div>
                 </div>
-                <p className="text-xs mt-2" style={{ color: 'var(--muted-color)' }}>Após as {qtdParcelas || 'X'} parcelas adiantadas, a próxima cobrança cai nessa data.</p>
+                <p className="text-xs mt-2" style={{ color: 'var(--muted-color)' }}>A cobrança segue o vencimento do calendário Embracon. Após as {qtdParcelas || 'X'} parcelas, a próxima cai nessa data.</p>
               </div>
 
               {/* Boleto único */}
