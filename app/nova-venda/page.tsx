@@ -155,7 +155,7 @@ export default function NovaVendaPage() {
     const base = new Date(dataVencimento + 'T00:00:00')
     const qtd = parseInt(qtdParcelas) || 1
     const alvo = new Date(base)
-    alvo.setMonth(alvo.getMonth() + qtd)
+    alvo.setMonth(alvo.getMonth() + qtd + 1)
     const mesAlvo = alvo.getMonth() + 1
     // tenta achar o vencimento real desse mês no calendário do grupo
     const noCalendario = calendarioGrupo.find((c: any) => c.mes === mesAlvo)
