@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
         bem: planoDetectado.bem,
         adesao_percent: planoDetectado.adesao_percent,
       } : null,
-      texto_bruto: textoPdf.slice(0, 500), // primeiros 500 chars pra debug
+      texto_bruto: textoPdf, // texto completo pra debug
     })
 
   } catch (err) {
