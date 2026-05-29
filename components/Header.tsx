@@ -1,7 +1,8 @@
 'use client'
 
-import { Plus, Download, Bell, Crown } from 'lucide-react'
+import { Plus, Download, Crown } from 'lucide-react'
 import Link from 'next/link'
+import SinoNotificacoes from '@/components/SinoNotificacoes'
 
 interface HeaderProps {
   title?: string
@@ -32,32 +33,8 @@ export default function Header({ title = 'Dashboard' }: HeaderProps) {
 
       {/* Lado direito: ações */}
       <div className="flex shrink-0 items-center gap-2">
-        {/* Botão notificações */}
-        <button
-          className="relative flex h-8 w-8 items-center justify-center rounded-lg transition-all duration-150"
-          style={{
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid var(--border)',
-            color: 'var(--muted-color)',
-          }}
-          onMouseEnter={(e) => {
-            e.currentTarget.style.color = 'var(--accent)'
-            e.currentTarget.style.borderColor = 'rgba(212,175,55,0.3)'
-            e.currentTarget.style.background = 'rgba(212,175,55,0.06)'
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.color = 'var(--muted-color)'
-            e.currentTarget.style.borderColor = 'var(--border)'
-            e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
-          }}
-          aria-label="Notificações"
-        >
-          <Bell size={14} />
-          <span
-            className="absolute right-1.5 top-1.5 h-1.5 w-1.5 rounded-full"
-            style={{ background: 'var(--accent)' }}
-          />
-        </button>
+        {/* Sino de notificações */}
+        <SinoNotificacoes />
 
         {/* Botão exportar */}
         <button
