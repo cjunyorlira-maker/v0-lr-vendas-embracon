@@ -9,11 +9,12 @@ const supabaseAdmin = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
 
+// Fluxo: pendente -> solicitado -> aguardando_pagamento -> aguardando_baixa -> efetivado
 const TRANSICOES: Record<string, { proximo: string; roles: string[]; campoData: string }> = {
   pendente: { proximo: 'solicitado', roles: ['master','representante','adm'], campoData: 'data_solicitacao' },
-  solicitado: { proximo: 'pago_aguardando_baixa', roles: ['master','representante','adm','supervisor','vendedor'], campoData: 'data_pagamento' },
-  pago_aguardando_baixa: { proximo: 'enviado_para_baixa', roles: ['master','representante','adm'], campoData: 'data_envio_baixa' },
-  enviado_para_baixa: { proximo: 'efetivado', roles: ['master','representante','adm'], campoData: 'data_efetivacao' },
+  solicitado: { proximo: 'aguardando_pagamento', roles: ['master','representante','adm'], campoData: 'data_anexo_boleto' },
+  aguardando_pagamento: { proximo: 'aguardando_baixa', roles: ['master','representante','adm','supervisor','vendedor'], campoData: 'data_pagamento' },
+  aguardando_baixa: { proximo: 'efetivado', roles: ['master','representante','adm'], campoData: 'data_efetivacao' },
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -29,21 +30,16 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!authUser) return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
 
     const { data: usuario } = await supabaseAdmin
-      .from('usuarios')
-      .select('id, role, empresa_id')
-      .eq('auth_user_id', authUser.id)
-      .single()
+      .from('usuarios').select('id, role, empresa_id').eq('auth_user_id', authUser.id).single()
     if (!usuario) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 403 })
 
     const body = await req.json().catch(() => ({}))
     const observacao = body.observacao || null
-    const comprovante_url = body.comprovante_url || null
+    const boleto_pdf_url = body.boleto_pdf_url || null
+    const boleto_pdf_nome = body.boleto_pdf_nome || null
 
     const { data: boleto } = await supabaseAdmin
-      .from('boletos')
-      .select('*, clientes(nome)')
-      .eq('id', boletoId)
-      .single()
+      .from('boletos').select('*, clientes(nome)').eq('id', boletoId).single()
     if (!boleto) return NextResponse.json({ error: "Boleto não encontrado" }, { status: 404 })
 
     if (usuario.role !== 'master' && boleto.empresa_id !== usuario.empresa_id) {
@@ -52,12 +48,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const statusAtual = boleto.status
     const transicao = TRANSICOES[statusAtual]
-    if (!transicao) {
-      return NextResponse.json({ error: `Boleto já está em status final (${statusAtual})` }, { status: 400 })
-    }
-    if (!transicao.roles.includes(usuario.role)) {
-      return NextResponse.json({ error: "Seu cargo não pode fazer essa ação" }, { status: 403 })
-    }
+    if (!transicao) return NextResponse.json({ error: `Boleto já está em status final` }, { status: 400 })
+    if (!transicao.roles.includes(usuario.role)) return NextResponse.json({ error: "Seu cargo não pode fazer essa ação" }, { status: 403 })
 
     const novoStatus = transicao.proximo
     const updateData: any = {
@@ -65,33 +57,29 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       atualizado_em: new Date().toISOString(),
       [transicao.campoData]: new Date().toISOString(),
     }
-    if (comprovante_url) updateData.comprovante_pagamento_url = comprovante_url
+    // ao sair de "solicitado" (anexar boleto), salva o PDF do boleto
+    if (statusAtual === 'solicitado' && boleto_pdf_url) {
+      updateData.boleto_pdf_url = boleto_pdf_url
+      updateData.boleto_pdf_nome = boleto_pdf_nome
+    }
 
-    const { error: updateErr } = await supabaseAdmin
-      .from('boletos')
-      .update(updateData)
-      .eq('id', boletoId)
+    const { error: updateErr } = await supabaseAdmin.from('boletos').update(updateData).eq('id', boletoId)
     if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
 
-    // Log (best-effort, não quebra se falhar)
     try {
       await supabaseAdmin.from('status_log').insert({
-        empresa_id: boleto.empresa_id,
-        boleto_id: boletoId,
-        status_anterior: statusAtual,
-        status_novo: novoStatus,
-        alterado_por: usuario.id,
-        observacao,
+        empresa_id: boleto.empresa_id, boleto_id: boletoId,
+        status_anterior: statusAtual, status_novo: novoStatus,
+        alterado_por: usuario.id, observacao,
       })
     } catch {}
 
-    // Notificações (best-effort)
     try {
       const nomeCliente = boleto.clientes?.nome || 'Cliente'
       const notifs: any[] = []
-      if (novoStatus === 'solicitado' && boleto.vendedor_id) {
-        notifs.push({ empresa_id: boleto.empresa_id, destinatario_id: boleto.vendedor_id, titulo: 'Boleto solicitado', mensagem: `${nomeCliente} — boleto solicitado à Embracon`, tipo: 'generico', link_url: '/boletos', boleto_id: boletoId })
-      } else if (novoStatus === 'pago_aguardando_baixa') {
+      if (novoStatus === 'aguardando_pagamento' && boleto.vendedor_id) {
+        notifs.push({ empresa_id: boleto.empresa_id, destinatario_id: boleto.vendedor_id, titulo: 'Boleto disponível', mensagem: `${nomeCliente} — boleto anexado, aguardando pagamento`, tipo: 'generico', link_url: '/boletos', boleto_id: boletoId })
+      } else if (novoStatus === 'aguardando_baixa') {
         notifs.push(
           { empresa_id: boleto.empresa_id, destinatario_role: 'adm', titulo: 'Cliente pagou', mensagem: `${nomeCliente} — pago, aguardando baixa`, tipo: 'cliente_pagou', link_url: '/boletos', boleto_id: boletoId },
           { empresa_id: boleto.empresa_id, destinatario_role: 'representante', titulo: 'Cliente pagou', mensagem: `${nomeCliente} — pago, aguardando baixa`, tipo: 'cliente_pagou', link_url: '/boletos', boleto_id: boletoId }
@@ -103,7 +91,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     } catch {}
 
     return NextResponse.json({ success: true, novo_status: novoStatus })
-
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
