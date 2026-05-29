@@ -1,32 +1,32 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { FileText, Copy, Check, ArrowRight, Loader2, Clock, Send, DollarSign, Upload, CheckCircle2 } from 'lucide-react'
+import { FileText, Copy, Check, ArrowRight, Loader2, Clock, Send, DollarSign, Upload, CheckCircle2, Paperclip } from 'lucide-react'
 
 interface Boleto {
   id: string
   qtd_parcelas: number
   valor_boleto: number
   status: string
-  data_proxima_cobranca: string | null
+  boleto_pdf_url: string | null
   clientes?: { nome: string }
   vendas?: { numero_proposta: string; numero_contrato: string; grupo: string; cota: string; valor_credito: number }
+  empresas?: { nome: string }
+  usuarios?: { nome: string }
 }
 
 const STATUS = [
   { key: 'pendente', label: 'Pendentes', cor: '#eab308', icon: Clock, proxLabel: 'Solicitar' },
-  { key: 'solicitado', label: 'Solicitados', cor: '#f97316', icon: Send, proxLabel: 'Cliente pagou' },
-  { key: 'pago_aguardando_baixa', label: 'Aguardando baixa', cor: '#3b82f6', icon: DollarSign, proxLabel: 'Enviar p/ baixa' },
-  { key: 'enviado_para_baixa', label: 'Enviados', cor: '#a855f7', icon: Upload, proxLabel: 'Marcar efetivado' },
+  { key: 'solicitado', label: 'Solicitados', cor: '#f97316', icon: Send, proxLabel: 'Anexar boleto' },
+  { key: 'aguardando_pagamento', label: 'Aguardando pagamento', cor: '#3b82f6', icon: DollarSign, proxLabel: 'Pagou' },
+  { key: 'aguardando_baixa', label: 'Aguardando baixa', cor: '#a855f7', icon: Upload, proxLabel: 'Efetivar' },
   { key: 'efetivado', label: 'Efetivados', cor: '#22c55e', icon: CheckCircle2, proxLabel: null },
 ]
 
-function fmtMoeda(v: number): string {
-  return (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-}
+const fmtMoeda = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
 export default function BoletosPage() {
   const [boletos, setBoletos] = useState<Boleto[]>([])
@@ -35,7 +35,10 @@ export default function BoletosPage() {
   const [role, setRole] = useState('')
   const [processando, setProcessando] = useState<string | null>(null)
   const [msgModal, setMsgModal] = useState<{ texto: string; boletoId: string } | null>(null)
+  const [anexoModal, setAnexoModal] = useState<{ boleto: Boleto } | null>(null)
   const [copiado, setCopiado] = useState(false)
+  const [pdfAnexo, setPdfAnexo] = useState<{ base64: string; nome: string } | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { loadData() }, [])
 
@@ -45,16 +48,15 @@ export default function BoletosPage() {
     if (!user) return
     const { data: cu } = await supabase.from('usuarios').select('role').eq('auth_user_id', user.id).single()
     if (cu) setRole(cu.role)
-
     const { data } = await supabase
       .from('boletos')
-      .select('id, qtd_parcelas, valor_boleto, status, data_proxima_cobranca, clientes(nome), vendas(numero_proposta, numero_contrato, grupo, cota, valor_credito)')
+      .select('id, qtd_parcelas, valor_boleto, status, boleto_pdf_url, clientes(nome), vendas(numero_proposta, numero_contrato, grupo, cota, valor_credito), empresas(nome), usuarios:vendedor_id(nome)')
       .order('criado_em', { ascending: false })
     if (data) setBoletos(data as any)
     setLoading(false)
   }
 
-  function gerarMensagem(b: Boleto): string {
+  function gerarMsgSolicitacao(b: Boleto): string {
     const v = b.vendas
     return `Gostaria de um boleto unico
 ${b.clientes?.nome || ''}
@@ -65,34 +67,62 @@ Quantidade de parcelas: ${b.qtd_parcelas}
 Valor do boleto: R$${(b.valor_boleto || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
   }
 
-  async function avancarStatus(b: Boleto) {
-    // se está pendente, primeiro mostra a mensagem pra copiar
-    if (b.status === 'pendente') {
-      setMsgModal({ texto: gerarMensagem(b), boletoId: b.id })
-      return
-    }
-    await confirmarAvanco(b.id)
+  function gerarMsgBoletoDisponivel(b: Boleto): string {
+    const v = b.vendas
+    return `Boleto disponível!
+Cliente: ${b.clientes?.nome || ''}
+Grupo/Cota: ${v?.grupo || ''}/${v?.cota || ''}
+Empresa: ${b.empresas?.nome || ''}
+Vendedor: ${b.usuarios?.nome || ''}
+Valor: ${fmtMoeda(b.valor_boleto)}
+O boleto está em anexo.`
   }
 
-  async function confirmarAvanco(boletoId: string) {
+  async function avancarStatus(b: Boleto) {
+    if (b.status === 'pendente') { setMsgModal({ texto: gerarMsgSolicitacao(b), boletoId: b.id }); return }
+    if (b.status === 'solicitado') { setAnexoModal({ boleto: b }); setPdfAnexo(null); return }
+    await confirmarAvanco(b.id, {})
+  }
+
+  async function confirmarAvanco(boletoId: string, extra: any) {
     setProcessando(boletoId)
     try {
       const res = await fetch(`/api/boletos/${boletoId}/status`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ acao: 'avancar' }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(extra),
       })
       const data = await res.json()
       if (!res.ok) { alert(data.error || 'Erro'); setProcessando(null); return }
-      setMsgModal(null)
+      setMsgModal(null); setAnexoModal(null); setPdfAnexo(null)
       await loadData()
     } catch { alert('Erro de conexão') }
     setProcessando(null)
   }
 
-  async function copiarMsg(texto: string) {
-    try { await navigator.clipboard.writeText(texto) }
-    catch {
+  // Upload do PDF do boleto e avança status
+  async function anexarEAvancar(b: Boleto) {
+    if (!pdfAnexo) { alert('Anexe o PDF do boleto'); return }
+    setProcessando(b.id)
+    try {
+      const supabase = createClient()
+      const matches = pdfAnexo.base64.match(/^data:(.+);base64,(.+)$/)
+      if (!matches) { alert('PDF inválido'); setProcessando(null); return }
+      const buffer = Uint8Array.from(atob(matches[2]), c => c.charCodeAt(0))
+      const fileName = `${b.id}-${Date.now()}-${pdfAnexo.nome.replace(/[^a-zA-Z0-9.\-]/g, '_')}`
+      const { error: upErr } = await supabase.storage.from('boletos-pdf').upload(fileName, buffer, { contentType: 'application/pdf' })
+      if (upErr) { alert('Erro ao subir boleto: ' + upErr.message); setProcessando(null); return }
+      await confirmarAvanco(b.id, { boleto_pdf_url: fileName, boleto_pdf_nome: pdfAnexo.nome })
+    } catch (e) { alert('Erro ao anexar'); setProcessando(null) }
+  }
+
+  function handlePdfFile(file: File) {
+    if (file.type !== 'application/pdf') { alert('O arquivo deve ser PDF'); return }
+    const reader = new FileReader()
+    reader.onload = (e) => setPdfAnexo({ base64: e.target?.result as string, nome: file.name })
+    reader.readAsDataURL(file)
+  }
+
+  async function copiar(texto: string) {
+    try { await navigator.clipboard.writeText(texto) } catch {
       const ta = document.createElement('textarea'); ta.value = texto; ta.style.position = 'fixed'; ta.style.opacity = '0'
       document.body.appendChild(ta); ta.focus(); ta.select(); try { document.execCommand('copy') } catch {}; document.body.removeChild(ta)
     }
@@ -102,15 +132,9 @@ Valor do boleto: R$${(b.valor_boleto || 0).toLocaleString('pt-BR', { minimumFrac
   const podeOperar = ['master', 'representante', 'adm'].includes(role)
   const podePagar = ['master', 'representante', 'adm', 'supervisor', 'vendedor'].includes(role)
   const filtrados = boletos.filter(b => b.status === abaAtiva)
-  const contar = (key: string) => boletos.filter(b => b.status === key).length
-
+  const contar = (k: string) => boletos.filter(b => b.status === k).length
   const statusAtual = STATUS.find(s => s.key === abaAtiva)
-
-  // quem pode avançar o status atual?
-  function podeAvancar(status: string): boolean {
-    if (status === 'solicitado') return podePagar // marcar "pago" pode vendedor tb
-    return podeOperar
-  }
+  const podeAvancar = (status: string) => status === 'aguardando_pagamento' ? podePagar : podeOperar
 
   return (
     <div className="relative min-h-screen font-sans">
@@ -118,13 +142,9 @@ Valor do boleto: R$${(b.valor_boleto || 0).toLocaleString('pt-BR', { minimumFrac
       <div className="relative lg:ml-60" style={{ zIndex: 1 }}>
         <Header title="Boletos" />
         <main className="mx-auto max-w-[1400px] px-6 py-8 lg:px-8">
-
-          {/* Abas */}
           <div className="flex gap-2 mb-6 flex-wrap">
             {STATUS.map(s => {
-              const Icon = s.icon
-              const ativo = abaAtiva === s.key
-              const qt = contar(s.key)
+              const Icon = s.icon; const ativo = abaAtiva === s.key; const qt = contar(s.key)
               return (
                 <button key={s.key} onClick={() => setAbaAtiva(s.key)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-all" style={{ background: ativo ? `${s.cor}20` : 'rgba(255,255,255,0.03)', border: `1px solid ${ativo ? s.cor : 'var(--border)'}`, color: ativo ? s.cor : 'var(--muted-color)' }}>
                   <Icon size={14} />{s.label}<span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ background: ativo ? s.cor : 'rgba(255,255,255,0.08)', color: ativo ? '#0a0a0a' : 'var(--muted-color)' }}>{qt}</span>
@@ -147,6 +167,7 @@ Valor do boleto: R$${(b.valor_boleto || 0).toLocaleString('pt-BR', { minimumFrac
                       <span>Grupo/Cota: {b.vendas?.grupo}/{b.vendas?.cota}</span>
                       <span>{b.qtd_parcelas} parc.</span>
                       <span className="font-semibold" style={{ color: statusAtual?.cor }}>{fmtMoeda(b.valor_boleto)}</span>
+                      {b.boleto_pdf_url && <span className="flex items-center gap-1" style={{ color: '#22c55e' }}><Paperclip size={11} />boleto anexado</span>}
                     </div>
                   </div>
                   {statusAtual?.proxLabel && podeAvancar(b.status) && (
@@ -161,20 +182,38 @@ Valor do boleto: R$${(b.valor_boleto || 0).toLocaleString('pt-BR', { minimumFrac
         </main>
       </div>
 
-      {/* Modal da mensagem de solicitação */}
+      {/* Modal solicitar (copiar mensagem) */}
       {msgModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }} onClick={() => setMsgModal(null)} />
           <div className="relative w-full max-w-md rounded-xl p-6" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
             <h3 className="text-base font-semibold mb-1" style={{ color: 'var(--text)' }}>Solicitar boleto</h3>
-            <p className="text-xs mb-4" style={{ color: 'var(--muted-color)' }}>Copie a mensagem e mande no grupo da Embracon. Depois confirme abaixo.</p>
+            <p className="text-xs mb-4" style={{ color: 'var(--muted-color)' }}>Copie e mande no grupo da Embracon. Depois confirme.</p>
             <div className="rounded-lg p-3 mb-4 whitespace-pre-wrap text-sm font-mono" style={{ background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.2)', color: 'var(--text2)' }}>{msgModal.texto}</div>
+            <button onClick={() => copiar(msgModal.texto)} className="w-full flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold mb-3" style={{ background: copiado ? 'rgba(34,197,94,0.15)' : 'rgba(212,175,55,0.12)', color: copiado ? '#22c55e' : 'var(--accent)' }}>{copiado ? <><Check size={16} />Copiado!</> : <><Copy size={16} />Copiar mensagem</>}</button>
             <div className="flex gap-2">
-              <button onClick={() => copiarMsg(msgModal.texto)} className="flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold" style={{ background: copiado ? 'rgba(34,197,94,0.15)' : 'rgba(212,175,55,0.12)', color: copiado ? '#22c55e' : 'var(--accent)' }}>{copiado ? <><Check size={16} />Copiado!</> : <><Copy size={16} />Copiar mensagem</>}</button>
-            </div>
-            <div className="flex gap-2 mt-3">
               <button onClick={() => setMsgModal(null)} className="flex-1 rounded-lg py-2.5 text-sm" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text2)' }}>Cancelar</button>
-              <button onClick={() => confirmarAvanco(msgModal.boletoId)} disabled={processando === msgModal.boletoId} className="flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #d4af37 0%, #c9a227 50%, #b8941f 100%)', color: '#0a0a0a' }}>{processando === msgModal.boletoId ? <Loader2 size={14} className="animate-spin" /> : 'Marcar como solicitado'}</button>
+              <button onClick={() => confirmarAvanco(msgModal.boletoId, {})} disabled={processando === msgModal.boletoId} className="flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #d4af37 0%, #c9a227 50%, #b8941f 100%)', color: '#0a0a0a' }}>{processando === msgModal.boletoId ? <Loader2 size={14} className="animate-spin" /> : 'Marcar solicitado'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal anexar boleto */}
+      {anexoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }} onClick={() => { setAnexoModal(null); setPdfAnexo(null) }} />
+          <div className="relative w-full max-w-md rounded-xl p-6" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+            <h3 className="text-base font-semibold mb-1" style={{ color: 'var(--text)' }}>Anexar boleto</h3>
+            <p className="text-xs mb-4" style={{ color: 'var(--muted-color)' }}>Anexe o PDF do boleto que a Embracon mandou. Ao confirmar, vai pra "Aguardando pagamento".</p>
+            <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePdfFile(f) }} />
+            <div onClick={() => fileRef.current?.click()} className="flex flex-col items-center justify-center gap-2 py-6 rounded-lg cursor-pointer mb-4" style={{ border: '2px dashed var(--border)', background: 'rgba(255,255,255,0.02)' }}>
+              {pdfAnexo ? (<><Paperclip size={20} style={{ color: '#22c55e' }} /><span className="text-xs" style={{ color: '#22c55e' }}>{pdfAnexo.nome}</span><span className="text-[10px]" style={{ color: 'var(--muted-color)' }}>clique para trocar</span></>) : (<><Upload size={20} style={{ color: 'var(--accent)' }} /><span className="text-xs" style={{ color: 'var(--muted-color)' }}>Clique para selecionar o PDF do boleto</span></>)}
+            </div>
+            <div className="rounded-lg p-3 mb-4 text-xs" style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', color: '#3b82f6' }}>Em breve: envio automático via WhatsApp (Evolution). Por enquanto, anexe e mande manual.</div>
+            <div className="flex gap-2">
+              <button onClick={() => { setAnexoModal(null); setPdfAnexo(null) }} className="flex-1 rounded-lg py-2.5 text-sm" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text2)' }}>Cancelar</button>
+              <button onClick={() => anexarEAvancar(anexoModal.boleto)} disabled={processando === anexoModal.boleto.id || !pdfAnexo} className="flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #d4af37 0%, #c9a227 50%, #b8941f 100%)', color: '#0a0a0a' }}>{processando === anexoModal.boleto.id ? <Loader2 size={14} className="animate-spin" /> : 'Anexar e avançar'}</button>
             </div>
           </div>
         </div>
