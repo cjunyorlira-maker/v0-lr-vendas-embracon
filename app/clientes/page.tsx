@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { Users, Search, FileText, Phone, Mail, Calendar, ChevronDown, ChevronUp } from 'lucide-react'
+import { Users, Search, FileText, Phone, Mail, Calendar, ChevronDown, ChevronUp, Target, Loader2, X } from 'lucide-react'
 
 interface Cliente {
   id: string
@@ -44,6 +44,29 @@ export default function ClientesPage() {
   const [busca, setBusca] = useState('')
   const [expandido, setExpandido] = useState<string | null>(null)
   const [baixando, setBaixando] = useState<string | null>(null)
+  const [lanceModal, setLanceModal] = useState<{ clienteId: string; vendaId: string; nome: string } | null>(null)
+  const [tipoLance, setTipoLance] = useState<'fixo25' | 'valor' | 'livre'>('fixo25')
+  const [valorLance, setValorLance] = useState('')
+  const [obsLance, setObsLance] = useState('')
+  const [recorrente, setRecorrente] = useState(false)
+  const [salvandoLance, setSalvandoLance] = useState(false)
+
+  async function criarLance() {
+    if (!lanceModal) return
+    setSalvandoLance(true)
+    try {
+      const valor = tipoLance === 'fixo25' ? 25 : parseFloat(valorLance.replace(/\./g, '').replace(',', '.')) || 0
+      const res = await fetch('/api/lances/acao', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ acao: 'criar', cliente_id: lanceModal.clienteId, venda_id: lanceModal.vendaId, tipo: tipoLance, valor_percentual: valor, observacao: obsLance || null, recorrente }),
+      })
+      const data = await res.json()
+      if (!res.ok) { alert(data.error || 'Erro'); setSalvandoLance(false); return }
+      setLanceModal(null); setTipoLance('fixo25'); setValorLance(''); setObsLance(''); setRecorrente(false)
+      alert('Lance criado! Acompanhe na tela de Lances.')
+    } catch { alert('Erro de conexão') }
+    setSalvandoLance(false)
+  }
 
   useEffect(() => { loadData() }, [])
 
@@ -155,11 +178,16 @@ export default function ClientesPage() {
                                 <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{fmtMoeda(v.valor_credito)}</span>
                                 {v.adesao_percent && <span className="text-xs" style={{ color: 'var(--muted-color)' }}>Adesão {v.adesao_percent}%</span>}
                               </div>
-                              {v.pdf_proposta_url && (
-                                <button onClick={() => baixarPdf(v)} disabled={baixando === v.id} className="flex items-center gap-1 text-xs rounded px-2 py-1 disabled:opacity-50" style={{ color: 'var(--accent)', background: 'rgba(212,175,55,0.08)' }}>
-                                  <FileText size={12} />{baixando === v.id ? 'Abrindo...' : 'Baixar proposta'}
+                              <div className="flex items-center gap-2">
+                                <button onClick={() => setLanceModal({ clienteId: c.id, vendaId: v.id, nome: c.nome })} className="flex items-center gap-1 text-xs rounded px-2 py-1 transition-transform hover:scale-105 active:scale-95" style={{ color: '#a855f7', background: 'rgba(168,85,247,0.1)' }}>
+                                  <Target size={12} />Lance
                                 </button>
-                              )}
+                                {v.pdf_proposta_url && (
+                                  <button onClick={() => baixarPdf(v)} disabled={baixando === v.id} className="flex items-center gap-1 text-xs rounded px-2 py-1 disabled:opacity-50" style={{ color: 'var(--accent)', background: 'rgba(212,175,55,0.08)' }}>
+                                    <FileText size={12} />{baixando === v.id ? 'Abrindo...' : 'Baixar proposta'}
+                                  </button>
+                                )}
+                              </div>
                             </div>
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs" style={{ color: 'var(--muted-color)' }}>
                               {v.grupo && <span>Grupo/Cota: <strong style={{ color: 'var(--text2)' }}>{v.grupo}/{v.cota}</strong></span>}
@@ -177,6 +205,42 @@ export default function ClientesPage() {
           )}
         </main>
       </div>
+
+      {lanceModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }} onClick={() => setLanceModal(null)} />
+          <div className="relative w-full max-w-md rounded-xl p-6" style={{ background: 'var(--surface, #131313)', border: '1px solid var(--border)' }}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-semibold" style={{ color: 'var(--text)' }}>Novo lance · {lanceModal.nome}</h3>
+              <button onClick={() => setLanceModal(null)}><X size={18} style={{ color: 'var(--muted-color)' }} /></button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs mb-2" style={{ color: 'var(--muted-color)' }}>Tipo de lance</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[{ k: 'fixo25', l: 'Fixo 25%' }, { k: 'valor', l: 'Valor R$' }, { k: 'livre', l: 'Livre %' }].map(t => (
+                    <button key={t.k} onClick={() => setTipoLance(t.k as any)} className="rounded-lg py-2 text-xs font-medium transition-all" style={{ background: tipoLance === t.k ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${tipoLance === t.k ? 'var(--accent)' : 'var(--border)'}`, color: tipoLance === t.k ? 'var(--accent)' : 'var(--muted-color)' }}>{t.l}</button>
+                  ))}
+                </div>
+              </div>
+              {tipoLance === 'valor' && (
+                <div><label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Valor do lance (R$)</label><input value={valorLance} onChange={(e) => setValorLance(e.target.value)} placeholder="10.000,00" className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }} /></div>
+              )}
+              {tipoLance === 'livre' && (
+                <div><label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Percentual (%)</label><input value={valorLance} onChange={(e) => setValorLance(e.target.value)} placeholder="30" className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }} /></div>
+              )}
+              <div><label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Observação</label><textarea value={obsLance} onChange={(e) => setObsLance(e.target.value)} rows={2} placeholder="Ex: só embutido / parte do bolso R$ 5.000" className="w-full rounded-lg px-3 py-2 text-sm outline-none resize-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }} /></div>
+              <label className="flex items-center gap-2 text-sm cursor-pointer" style={{ color: 'var(--text2)' }}>
+                <input type="checkbox" checked={recorrente} onChange={(e) => setRecorrente(e.target.checked)} className="accent-purple-500" />
+                Lance recorrente (repete todo mês até contemplar)
+              </label>
+              <button onClick={criarLance} disabled={salvandoLance} className="w-full flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50 transition-transform hover:scale-105 active:scale-95" style={{ background: 'linear-gradient(135deg, #d4af37 0%, #c9a227 50%, #b8941f 100%)', color: '#0a0a0a' }}>
+                {salvandoLance ? <Loader2 size={16} className="animate-spin" /> : <><Target size={16} />Criar lance</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
