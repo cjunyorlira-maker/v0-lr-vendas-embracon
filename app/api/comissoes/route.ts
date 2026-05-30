@@ -48,7 +48,7 @@ export async function GET() {
     // vendas com dados de comissão + plano + estorno
     let q = supabaseAdmin
       .from('vendas')
-      .select('id, valor_credito, comissao_vendedor_percent, comissao_supervisor_percent, comissao_recebida_rs, comissao_recebida_percent, criado_em, clientes(nome), usuarios:vendedor_id(nome), planos(sigla, comissao_total, estorno_percent, estorno_ate_pgto), boletos(qtd_parcelas, status)')
+      .select('id, valor_credito, comissao_vendedor_percent, comissao_supervisor_percent, comissao_recebida_rs, comissao_recebida_percent, criado_em, clientes(nome), usuarios:vendedor_id(nome), planos(sigla, comissao_total, estorno_percent, estorno_ate_pgto, categoria_comissao), boletos(qtd_parcelas, status)')
       .order('criado_em', { ascending: false })
 
     if (me.role !== 'master') q = q.eq('empresa_id', me.empresa_id)
@@ -61,8 +61,11 @@ export async function GET() {
       const boleto = Array.isArray(v.boletos) ? v.boletos[0] : v.boletos
       const credito = v.valor_credito || 0
       const comLR = plano?.comissao_total ? credito * (plano.comissao_total / 100) : 0
-      const pVend = v.comissao_vendedor_percent ?? config?.percentual_vendedor_padrao ?? 0
-      const pSup = v.comissao_supervisor_percent ?? config?.percentual_supervisor_padrao ?? 0
+      // precedência: % individual da venda > padrão da categoria do plano > 0
+      const catPlano = plano?.categoria_comissao
+      const cfgCat = (configCategorias || []).find((cc: any) => cc.categoria === catPlano)
+      const pVend = v.comissao_vendedor_percent ?? cfgCat?.percentual_vendedor ?? 0
+      const pSup = v.comissao_supervisor_percent ?? cfgCat?.percentual_supervisor ?? 0
       const comVend = credito * (pVend / 100)
       const comSup = credito * (pSup / 100)
       // risco de estorno
