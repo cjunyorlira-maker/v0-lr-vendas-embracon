@@ -7,7 +7,7 @@ import Header from '@/components/Header'
 import { BookOpen, Loader2, Home, Car, Truck, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react'
 
 interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number; estorno_ate_pgto: number | null }
-interface Faixa { credito: number; primeira_parcela: number; demais_parcela: number; total_nao_estornar: number; taxa_antecip: number }
+interface Faixa { credito: number; primeira_parcela: number; demais_parcela: number; mais_7: number; total_nao_estornar: number; taxa_antecip: number }
 
 const fmtMoeda = (v: number | null) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 const fmtMoeda2 = (v: number | null) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -35,7 +35,7 @@ export default function TabelasPage() {
     setExpandido(p.id)
     if (!faixasPorSigla[p.sigla]) {
       const supabase = createClient()
-      const { data } = await supabase.from('tabelas_credito').select('credito, primeira_parcela, demais_parcela, total_nao_estornar, taxa_antecip').eq('sigla', p.sigla).order('credito', { ascending: false })
+      const { data } = await supabase.from('tabelas_credito').select('credito, primeira_parcela, demais_parcela, mais_7, total_nao_estornar, taxa_antecip').eq('sigla', p.sigla).order('credito', { ascending: false })
       if (data) setFaixasPorSigla(prev => ({ ...prev, [p.sigla]: data as Faixa[] }))
     }
   }
@@ -91,7 +91,8 @@ export default function TabelasPage() {
                                         <tr style={{ borderBottom: '1px solid var(--border)' }}>
                                           <th className="p-2 text-left" style={{ color: 'var(--muted-color)' }}>Crédito</th>
                                           <th className="p-2 text-right" style={{ color: 'var(--muted-color)' }}>1ª parcela</th>
-                                          <th className="p-2 text-right" style={{ color: 'var(--muted-color)' }}>Demais</th>
+                                          <th className="p-2 text-right" style={{ color: 'var(--muted-color)' }}>Demais (cada)</th>
+                                          <th className="p-2 text-right" style={{ color: 'var(--muted-color)' }}>Soma das demais<br/><span className="text-[9px]" style={{ color: 'var(--muted-color)' }}>(antecipadas)</span></th>
                                           <th className="p-2 text-right" style={{ color: 'var(--muted-color)' }}>Total p/ não estornar<br/><span className="text-[9px]" style={{ color: '#f59e0b' }}>(1ª + {(p.estorno_ate_pgto || 8) - 1} parcelas = {p.estorno_ate_pgto || 8}x)</span></th>
                                         </tr>
                                       </thead>
@@ -101,6 +102,7 @@ export default function TabelasPage() {
                                             <td className="p-2 font-medium" style={{ color: 'var(--text)' }}>{fmtMoeda(f.credito)}</td>
                                             <td className="p-2 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda2(f.primeira_parcela)}</td>
                                             <td className="p-2 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda2(f.demais_parcela)}</td>
+                                            <td className="p-2 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda2(f.mais_7)}</td>
                                             <td className="p-2 text-right" style={{ color: '#f59e0b' }}>{fmtMoeda2(f.total_nao_estornar)}</td>
                                           </tr>
                                         ))}
