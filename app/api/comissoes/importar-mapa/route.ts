@@ -2,7 +2,6 @@ import { createClient } from "@supabase/supabase-js"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextRequest, NextResponse } from "next/server"
-import pdf from "pdf-parse"
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -44,8 +43,19 @@ export async function POST(req: NextRequest) {
     if (!file) return NextResponse.json({ error: "Nenhum arquivo" }, { status: 400 })
 
     const buffer = Buffer.from(await file.arrayBuffer())
-    const data = await pdf(buffer)
-    const texto = data.text
+    let texto = ''
+    try {
+      const { PDFParse } = await import('pdf-parse')
+      const parser = new PDFParse({ data: buffer })
+      const parsed = await parser.getText()
+      await parser.destroy()
+      texto = parsed.text || ''
+    } catch (e) {
+      return NextResponse.json({ error: "Não consegui ler o PDF do mapa: " + String(e) }, { status: 400 })
+    }
+    if (!texto || texto.trim().length < 20) {
+      return NextResponse.json({ error: "PDF vazio ou ilegível" }, { status: 400 })
+    }
 
     // data de encerramento
     const dataEnc = dataISO((texto.match(/Encerramento de:\s*(\d{2}\/\d{2}\/\d{4})/) || [])[1] || '')
