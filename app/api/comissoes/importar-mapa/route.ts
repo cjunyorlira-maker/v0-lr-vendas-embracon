@@ -64,26 +64,42 @@ export async function POST(req: NextRequest) {
     // 28/05/2026 25/05/2026 25/05/2026 112520 IE400 9881377 007275-2913-00 A 1 1 006058 000085 0000043604 1,0000 400.000,00 4.000,00 0,00 ...
     // Regex: data data data equipe bem CONTRATO consorciado ger PCL_DE PCL_ATE regra categ usuario %COMIS CALC $COMISSAO
     const linhas: any[] = []
-    // Ordem real do PDF: ...112520 BEM CONTRATO CONSORCIADO user categ %COMIS+A Pcl_de Pcl_ate CALC $COMISSAO
-    const regex = /112520\s+(\S+)\s+(\d{6,8})\s+([\d-]+)\s+\d+\s+\d+\s+([\d,]+)A\s+(\d+)\s+(\d+)\s+([\d.,]+)\s+([\d.,]+)/g
+    // normaliza espaços (pdf-parse pode usar espaços/quebras variados)
+    const textoNorm = texto.replace(/\s+/g, ' ')
 
-    let m
-    while ((m = regex.exec(texto)) !== null) {
-      linhas.push({
-        bem: m[1],
-        contrato: m[2],
-        consorciado: m[3],
-        percentual_comis: parseNum(m[4]),
-        parcela_de: parseInt(m[5]),
-        parcela_ate: parseInt(m[6]),
-        calc_comis: parseNum(m[7]),
-        valor_comissao: parseNum(m[8]),
-        valor_estorno: 0,
-      })
+    // Vários padrões pra tolerar como o PDF foi extraído.
+    // Âncora: CONTRATO(6-8díg) CONSORCIADO(xxxxxx-xxxx-xx) ... %COMIS+A Pcl_de Pcl_ate CALC $COMISSAO
+    const padroes = [
+      /(\d{6,8}) (\d{6}-\d{4}-\d{2}) \d+ \d+ ([\d,]+)A (\d+) (\d+) ([\d.,]+) ([\d.,]+)/g,
+      /(\d{6,8}) (\d{6}-\d{4}-\d{2}) \d+ \d+ ([\d,]+)\s*A\s*(\d+)\s+(\d+)\s+([\d.,]+)\s+([\d.,]+)/g,
+      /(\d{6,8})\s+(\d{6}-\d{4}-\d{2}).*?([\d,]+)A\s*(\d+)\s+(\d+)\s+([\d.,]+)\s+([\d.,]+)/g,
+    ]
+
+    for (const padrao of padroes) {
+      let m
+      const tmp: any[] = []
+      while ((m = padrao.exec(textoNorm)) !== null) {
+        tmp.push({
+          contrato: m[1],
+          consorciado: m[2],
+          percentual_comis: parseNum(m[3]),
+          parcela_de: parseInt(m[4]),
+          parcela_ate: parseInt(m[5]),
+          calc_comis: parseNum(m[6]),
+          valor_comissao: parseNum(m[7]),
+          bem: null,
+          valor_estorno: 0,
+        })
+      }
+      if (tmp.length > 0) { linhas.push(...tmp); break }
     }
 
     if (linhas.length === 0) {
-      return NextResponse.json({ error: "Não consegui ler linhas do mapa. Confira o PDF." }, { status: 400 })
+      // retorna um trecho do texto pra diagnosticar como o PDF foi extraído
+      return NextResponse.json({
+        error: "Não consegui ler linhas do mapa. Veja a amostra do texto extraído abaixo e me envie.",
+        amostra_texto: textoNorm.slice(0, 1200),
+      }, { status: 400 })
     }
 
     // Cria o registro do mapa
