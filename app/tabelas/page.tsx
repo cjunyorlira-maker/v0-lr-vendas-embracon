@@ -6,7 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import { BookOpen, Loader2, Home, Car, Truck, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react'
 
-interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number; prazo_meses: string | null }
+interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number }
 interface Faixa { credito: number; primeira_parcela: number; demais_parcela: number; total_nao_estornar: number; taxa_antecip: number }
 
 const fmtMoeda = (v: number | null) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
@@ -23,8 +23,10 @@ export default function TabelasPage() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.from('planos').select('id, sigla, nome_completo, bem, adesao_percent, prazo_meses').eq('ativo', true).order('bem').then(({ data }) => {
-      if (data) setPlanos(data as Plano[]); setLoading(false)
+    supabase.from('planos').select('id, sigla, nome_completo, bem, adesao_percent').eq('ativo', true).order('bem').then(({ data, error }) => {
+      if (error) console.error('Erro ao buscar planos:', error)
+      if (data) setPlanos(data as Plano[])
+      setLoading(false)
     })
   }, [])
 
@@ -75,7 +77,6 @@ export default function TabelasPage() {
                                 <span className="font-mono text-xs font-bold px-2 py-1 rounded" style={{ background: `${cor}20`, color: cor }}>{p.sigla}</span>
                                 <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{p.nome_completo}</span>
                                 <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)' }}>Adesão {p.adesao_percent}%</span>
-                                {p.prazo_meses && <span className="text-xs" style={{ color: 'var(--muted-color)' }}>{p.prazo_meses} meses</span>}
                               </div>
                               {aberto ? <ChevronUp size={16} style={{ color: 'var(--muted-color)' }} /> : <ChevronDown size={16} style={{ color: 'var(--muted-color)' }} />}
                             </div>
