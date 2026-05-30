@@ -24,9 +24,15 @@ export default function ComissoesPage() {
   const [pctVend, setPctVend] = useState('')
   const [pctSup, setPctSup] = useState('')
   const [aplicando, setAplicando] = useState(false)
-  const [padraoVend, setPadraoVend] = useState('')
-  const [padraoSup, setPadraoSup] = useState('')
   const [salvandoConfig, setSalvandoConfig] = useState(false)
+  const CATEGORIAS = [
+    { key: 'imovel_1', label: 'Imóvel 1%', planos: 'EI1, SUE' },
+    { key: 'imovel_2', label: 'Imóvel 2%', planos: 'PSE, SEP' },
+    { key: 'auto_1', label: 'Auto 1%', planos: 'ETA' },
+    { key: 'auto_2', label: 'Auto 2%', planos: 'PE2' },
+    { key: 'pesados_2', label: 'Pesados 2%', planos: 'SP' },
+  ]
+  const [catConfig, setCatConfig] = useState<Record<string, { vend: string; sup: string }>>({})
   const [importando, setImportando] = useState(false)
   const [resultImport, setResultImport] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -39,7 +45,13 @@ export default function ComissoesPage() {
     if (res.status === 403) { setSemAcesso(true); setLoading(false); return }
     const data = await res.json()
     if (data.vendas) setVendas(data.vendas)
-    if (data.config) { setPadraoVend(String(data.config.percentual_vendedor_padrao || '')); setPadraoSup(String(data.config.percentual_supervisor_padrao || '')) }
+    if (data.config_categorias) {
+      const map: Record<string, { vend: string; sup: string }> = {}
+      for (const c of data.config_categorias) {
+        map[c.categoria] = { vend: String(c.percentual_vendedor || ''), sup: String(c.percentual_supervisor || '') }
+      }
+      setCatConfig(map)
+    }
     setLoading(false)
   }
 
@@ -61,7 +73,12 @@ export default function ComissoesPage() {
 
   async function salvarConfig() {
     setSalvandoConfig(true)
-    await fetch('/api/comissoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'salvar_config', percentual_vendedor_padrao: parseFloat(padraoVend) || 0, percentual_supervisor_padrao: parseFloat(padraoSup) || 0 }) })
+    const categorias = CATEGORIAS.map(c => ({
+      categoria: c.key,
+      percentual_vendedor: parseFloat(catConfig[c.key]?.vend || '0') || 0,
+      percentual_supervisor: parseFloat(catConfig[c.key]?.sup || '0') || 0,
+    }))
+    await fetch('/api/comissoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'salvar_config_categoria', categorias }) })
     await loadData(); setSalvandoConfig(false)
   }
 
@@ -144,13 +161,27 @@ export default function ComissoesPage() {
           {loading ? (
             <div className="flex items-center justify-center py-12"><Loader2 size={20} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
           ) : aba === 'config' ? (
-            <div className="rounded-xl p-5 max-w-md" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
-              <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text)' }}>Percentuais padrão</h3>
-              <p className="text-xs mb-4" style={{ color: 'var(--muted-color)' }}>Aplicados nas vendas sem % definida.</p>
+            <div className="rounded-xl p-5 max-w-2xl" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+              <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text)' }}>Comissão padrão por categoria</h3>
+              <p className="text-xs mb-4" style={{ color: 'var(--muted-color)' }}>% sobre o crédito. Aplicado automaticamente conforme o plano da venda.</p>
               <div className="space-y-3">
-                <div><label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>% padrão do vendedor</label><input value={padraoVend} onChange={(e) => setPadraoVend(e.target.value)} placeholder="0,5" className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} /></div>
-                <div><label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>% padrão do supervisor</label><input value={padraoSup} onChange={(e) => setPadraoSup(e.target.value)} placeholder="0,2" className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} /></div>
-                <button onClick={salvarConfig} disabled={salvandoConfig} className="w-full flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50 transition-transform hover:scale-105 active:scale-95" style={{ background: 'linear-gradient(135deg, #d4af37 0%, #c9a227 50%, #b8941f 100%)', color: '#0a0a0a' }}>{salvandoConfig ? <Loader2 size={14} className="animate-spin" /> : <><Check size={14} />Salvar padrão</>}</button>
+                {CATEGORIAS.map(c => (
+                  <div key={c.key} className="flex items-center gap-3 flex-wrap rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)' }}>
+                    <div className="flex-1 min-w-[140px]">
+                      <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>{c.label}</p>
+                      <p className="text-[10px]" style={{ color: 'var(--muted-color)' }}>{c.planos}</p>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>% Vendedor</label>
+                      <input value={catConfig[c.key]?.vend || ''} onChange={(e) => setCatConfig(prev => ({ ...prev, [c.key]: { ...prev[c.key], vend: e.target.value } }))} placeholder="0,5" className="rounded-lg px-2 py-1.5 text-sm outline-none w-24" style={inputStyle} />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>% Supervisor</label>
+                      <input value={catConfig[c.key]?.sup || ''} onChange={(e) => setCatConfig(prev => ({ ...prev, [c.key]: { ...prev[c.key], sup: e.target.value } }))} placeholder="0,2" className="rounded-lg px-2 py-1.5 text-sm outline-none w-24" style={inputStyle} />
+                    </div>
+                  </div>
+                ))}
+                <button onClick={salvarConfig} disabled={salvandoConfig} className="w-full flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50 transition-transform hover:scale-105 active:scale-95" style={{ background: 'linear-gradient(135deg, #d4af37 0%, #c9a227 50%, #b8941f 100%)', color: '#0a0a0a' }}>{salvandoConfig ? <Loader2 size={14} className="animate-spin" /> : <><Check size={14} />Salvar comissões por categoria</>}</button>
               </div>
             </div>
           ) : (
