@@ -43,7 +43,7 @@ export async function GET() {
     // vendas com dados de comissão + plano + estorno
     let q = supabaseAdmin
       .from('vendas')
-      .select('id, valor_credito, comissao_vendedor_percent, comissao_supervisor_percent, criado_em, clientes(nome), usuarios:vendedor_id(nome), planos(sigla, comissao_total, estorno_percent, estorno_ate_pgto), boletos(qtd_parcelas, status)')
+      .select('id, valor_credito, comissao_vendedor_percent, comissao_supervisor_percent, comissao_recebida_rs, comissao_recebida_percent, criado_em, clientes(nome), usuarios:vendedor_id(nome), planos(sigla, comissao_total, estorno_percent, estorno_ate_pgto), boletos(qtd_parcelas, status)')
       .order('criado_em', { ascending: false })
 
     if (me.role !== 'master') q = q.eq('empresa_id', me.empresa_id)
@@ -71,6 +71,8 @@ export async function GET() {
         plano: plano?.sigla || '-', credito,
         comissao_lr: comLR, percentual_vendedor: pVend, comissao_vendedor: comVend,
         percentual_supervisor: pSup, comissao_supervisor: comSup,
+        comissao_recebida_rs: v.comissao_recebida_rs || 0,
+        comissao_recebida_percent: v.comissao_recebida_percent || 0,
         em_risco: emRisco, valor_estorno: estorno, faltam: emRisco ? pgtoSeg - pgtosCobertos : 0, pgto_seguranca: pgtoSeg,
       }
     })
