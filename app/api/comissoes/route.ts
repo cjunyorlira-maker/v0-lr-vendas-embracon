@@ -48,7 +48,7 @@ export async function GET() {
     // vendas com dados de comissão + plano + estorno
     let q = supabaseAdmin
       .from('vendas')
-      .select('id, valor_credito, comissao_vendedor_percent, comissao_supervisor_percent, comissao_recebida_rs, comissao_recebida_percent, criado_em, clientes(nome), usuarios:vendedor_id(nome), planos(sigla, comissao_total, estorno_percent, estorno_ate_pgto, categoria_comissao), boletos(qtd_parcelas, status)')
+      .select('id, valor_credito, empresa_id, equipe_id, vendedor_id, comissao_vendedor_percent, comissao_supervisor_percent, comissao_recebida_rs, comissao_recebida_percent, criado_em, clientes(nome), usuarios:vendedor_id(nome), planos(sigla, comissao_total, estorno_percent, estorno_ate_pgto, categoria_comissao), boletos(qtd_parcelas, status)')
       .order('criado_em', { ascending: false })
 
     if (me.role !== 'master') q = q.eq('empresa_id', me.empresa_id)
@@ -75,7 +75,7 @@ export async function GET() {
       const emRisco = pgtosCobertos < pgtoSeg
       const estorno = plano?.estorno_percent ? credito * (plano.estorno_percent / 100) : 0
       return {
-        id: v.id, criado_em: v.criado_em, cliente: cliente?.nome || '-', vendedor: vendedor?.nome || '-',
+        id: v.id, criado_em: v.criado_em, empresa_id: v.empresa_id, equipe_id: v.equipe_id, vendedor_id: v.vendedor_id, cliente: cliente?.nome || '-', vendedor: vendedor?.nome || '-',
         plano: plano?.sigla || '-', credito,
         comissao_lr: comLR, percentual_vendedor: pVend, comissao_vendedor: comVend,
         percentual_supervisor: pSup, comissao_supervisor: comSup,
@@ -85,7 +85,29 @@ export async function GET() {
       }
     })
 
-    return NextResponse.json({ vendas: lista, config, config_categorias: configCategorias || [], meu_role: me.role })
+    // Opções de filtro conforme o role
+    let empresasOpc: any[] = [], equipesOpc: any[] = [], vendedoresOpc: any[] = []
+    if (me.role === 'master') {
+      const { data: emp } = await supabaseAdmin.from('empresas').select('id, nome').order('nome')
+      empresasOpc = emp || []
+      const { data: eq } = await supabaseAdmin.from('equipes').select('id, nome, empresa_id').order('nome')
+      equipesOpc = eq || []
+      const { data: vd } = await supabaseAdmin.from('usuarios').select('id, nome, empresa_id, equipe_id').eq('role', 'vendedor').order('nome')
+      vendedoresOpc = vd || []
+    } else if (['representante', 'adm'].includes(me.role)) {
+      const { data: eq } = await supabaseAdmin.from('equipes').select('id, nome, empresa_id').eq('empresa_id', me.empresa_id).order('nome')
+      equipesOpc = eq || []
+      const { data: vd } = await supabaseAdmin.from('usuarios').select('id, nome, empresa_id, equipe_id').eq('role', 'vendedor').eq('empresa_id', me.empresa_id).order('nome')
+      vendedoresOpc = vd || []
+    } else if (me.role === 'supervisor') {
+      const { data: vd } = await supabaseAdmin.from('usuarios').select('id, nome, empresa_id, equipe_id').eq('role', 'vendedor').eq('equipe_id', me.equipe_id).order('nome')
+      vendedoresOpc = vd || []
+    }
+
+    return NextResponse.json({
+      vendas: lista, config, config_categorias: configCategorias || [], meu_role: me.role,
+      filtros: { empresas: empresasOpc, equipes: equipesOpc, vendedores: vendedoresOpc },
+    })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
