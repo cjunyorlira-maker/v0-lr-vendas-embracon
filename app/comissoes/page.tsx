@@ -123,6 +123,11 @@ export default function ComissoesPage() {
   const totalRecebido = vendasFiltradas.reduce((s, v) => s + (v.comissao_recebida_rs || 0), 0)
   const totalFalta = totalLR - totalRecebido
   const emRisco = vendasFiltradas.filter(v => v.em_risco).length
+  const totalVendedores = vendasFiltradas.reduce((s, v) => s + (v.comissao_vendedor || 0), 0)
+  const totalSupervisores = vendasFiltradas.reduce((s, v) => s + (v.comissao_supervisor || 0), 0)
+  // Master: 0,25% sobre toda a produção (crédito) do filtro atual
+  const producaoTotal = vendasFiltradas.reduce((s, v) => s + (v.credito || 0), 0)
+  const comissaoMaster = producaoTotal * 0.0025
   const inputStyle = { background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }
 
   if (semAcesso) {
@@ -164,6 +169,25 @@ export default function ComissoesPage() {
               <div className="flex items-center gap-2 mb-1"><AlertTriangle size={14} style={{ color: emRisco > 0 ? '#ef4444' : 'var(--muted-color)' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Em risco de estorno</p></div>
               <p className="text-xl font-bold" style={{ color: emRisco > 0 ? '#ef4444' : 'var(--text)' }}>{emRisco}</p>
             </div>
+          </div>
+
+          {/* Cards de comissão de equipe */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
+            <div className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+              <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Comissão Vendedores</p>
+              <p className="text-xl font-bold" style={{ color: '#3b82f6' }}>{fmtMoeda(totalVendedores)}</p>
+            </div>
+            <div className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+              <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Comissão Supervisores</p>
+              <p className="text-xl font-bold" style={{ color: '#a855f7' }}>{fmtMoeda(totalSupervisores)}</p>
+            </div>
+            {meuRole === 'master' && (
+              <div className="rounded-xl p-4" style={{ background: 'linear-gradient(135deg, rgba(212,175,55,0.15) 0%, rgba(212,175,55,0.04) 100%)', border: '1px solid rgba(212,175,55,0.3)' }}>
+                <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Comissão Master (0,25%)</p>
+                <p className="text-xl font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(comissaoMaster)}</p>
+                <p className="text-[10px] mt-0.5" style={{ color: 'var(--muted-color)' }}>sobre {fmtMoeda(producaoTotal)} de produção</p>
+              </div>
+            )}
           </div>
 
           {/* Importar mapa */}
