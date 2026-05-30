@@ -92,8 +92,8 @@ export default function TabelasPage() {
                                           <th className="p-2 text-left" style={{ color: 'var(--muted-color)' }}>Crédito</th>
                                           <th className="p-2 text-right" style={{ color: 'var(--muted-color)' }}>1ª parcela</th>
                                           <th className="p-2 text-right" style={{ color: 'var(--muted-color)' }}>Demais (cada)</th>
-                                          <th className="p-2 text-right" style={{ color: 'var(--muted-color)' }}>Soma das demais<br/><span className="text-[9px]" style={{ color: 'var(--muted-color)' }}>(antecipadas)</span></th>
-                                          <th className="p-2 text-right" style={{ color: 'var(--muted-color)' }}>Total p/ não estornar<br/><span className="text-[9px]" style={{ color: '#f59e0b' }}>(1ª + {(p.estorno_ate_pgto || 8) - 1} parcelas = {p.estorno_ate_pgto || 8}x)</span></th>
+                                          <th className="p-2 text-right" style={{ color: '#22c55e' }}>Garantir comissão<br/><span className="text-[9px]" style={{ color: 'var(--muted-color)' }}>(1ª + {(p.estorno_ate_pgto || 8) - 1} = {p.estorno_ate_pgto || 8}x)</span></th>
+                                          <th className="p-2 text-right" style={{ color: '#f59e0b' }}>Não estornar<br/><span className="text-[9px]" style={{ color: 'var(--muted-color)' }}>(1ª + {(p.estorno_ate_pgto || 8) - 1} = {p.estorno_ate_pgto || 8}x)</span></th>
                                         </tr>
                                       </thead>
                                       <tbody>
@@ -102,8 +102,8 @@ export default function TabelasPage() {
                                             <td className="p-2 font-medium" style={{ color: 'var(--text)' }}>{fmtMoeda(f.credito)}</td>
                                             <td className="p-2 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda2(f.primeira_parcela)}</td>
                                             <td className="p-2 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda2(f.demais_parcela)}</td>
-                                            <td className="p-2 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda2(f.mais_7)}</td>
-                                            <td className="p-2 text-right" style={{ color: '#f59e0b' }}>{fmtMoeda2(f.total_nao_estornar)}</td>
+                                            <td className="p-2 text-right" style={{ color: '#22c55e' }}>{fmtMoeda2(f.total_nao_estornar)}</td>
+                                            <td className="p-2 text-right" style={{ color: '#f59e0b' }}>{fmtMoeda2(f.primeira_parcela + f.demais_parcela * ((p.estorno_ate_pgto || 8) - 1))}</td>
                                           </tr>
                                         ))}
                                       </tbody>
