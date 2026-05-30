@@ -40,6 +40,11 @@ export async function GET() {
     const { data: configs } = await configQuery
     const config = configs?.[0] || null
 
+    // config por categoria
+    let catQuery = supabaseAdmin.from('comissao_config_categoria').select('*')
+    if (empresaId) catQuery = catQuery.eq('empresa_id', empresaId)
+    const { data: configCategorias } = await catQuery
+
     // vendas com dados de comissão + plano + estorno
     let q = supabaseAdmin
       .from('vendas')
@@ -77,7 +82,7 @@ export async function GET() {
       }
     })
 
-    return NextResponse.json({ vendas: lista, config, meu_role: me.role })
+    return NextResponse.json({ vendas: lista, config, config_categorias: configCategorias || [], meu_role: me.role })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
@@ -110,6 +115,22 @@ export async function POST(req: NextRequest) {
         percentual_supervisor_padrao: body.percentual_supervisor_padrao || 0,
         atualizado_em: new Date().toISOString(),
       }, { onConflict: 'empresa_id' })
+      return NextResponse.json({ success: true })
+    }
+
+    // salvar config por categoria
+    if (body.acao === 'salvar_config_categoria') {
+      const empresaId = body.empresa_id || me.empresa_id
+      const cats = body.categorias || []
+      for (const c of cats) {
+        await supabaseAdmin.from('comissao_config_categoria').upsert({
+          empresa_id: empresaId,
+          categoria: c.categoria,
+          percentual_vendedor: c.percentual_vendedor || 0,
+          percentual_supervisor: c.percentual_supervisor || 0,
+          atualizado_em: new Date().toISOString(),
+        }, { onConflict: 'empresa_id,categoria' })
+      }
       return NextResponse.json({ success: true })
     }
 
