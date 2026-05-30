@@ -64,20 +64,21 @@ export async function POST(req: NextRequest) {
     // 28/05/2026 25/05/2026 25/05/2026 112520 IE400 9881377 007275-2913-00 A 1 1 006058 000085 0000043604 1,0000 400.000,00 4.000,00 0,00 ...
     // Regex: data data data equipe bem CONTRATO consorciado ger PCL_DE PCL_ATE regra categ usuario %COMIS CALC $COMISSAO
     const linhas: any[] = []
-    const regex = /(\d{2}\/\d{2}\/\d{4})\s+(\d{2}\/\d{2}\/\d{4})\s+(\d{2}\/\d{2}\/\d{4})\s+(\d+)\s+(\S+)\s+(\d+)\s+([\d-]+)\s+(\w)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+([\d,]+)\s+([\d.,]+)\s+([\d.,]+)\s+([\d.,]+)/g
+    // Ordem real do PDF: ...112520 BEM CONTRATO CONSORCIADO user categ %COMIS+A Pcl_de Pcl_ate CALC $COMISSAO
+    const regex = /112520\s+(\S+)\s+(\d{6,8})\s+([\d-]+)\s+\d+\s+\d+\s+([\d,]+)A\s+(\d+)\s+(\d+)\s+([\d.,]+)\s+([\d.,]+)/g
 
     let m
     while ((m = regex.exec(texto)) !== null) {
       linhas.push({
-        bem: m[5],
-        contrato: m[6],
-        consorciado: m[7],
-        parcela_de: parseInt(m[9]),
-        parcela_ate: parseInt(m[10]),
-        percentual_comis: parseNum(m[14]),
-        calc_comis: parseNum(m[15]),
-        valor_comissao: parseNum(m[16]),
-        valor_estorno: parseNum(m[17]),
+        bem: m[1],
+        contrato: m[2],
+        consorciado: m[3],
+        percentual_comis: parseNum(m[4]),
+        parcela_de: parseInt(m[5]),
+        parcela_ate: parseInt(m[6]),
+        calc_comis: parseNum(m[7]),
+        valor_comissao: parseNum(m[8]),
+        valor_estorno: 0,
       })
     }
 
