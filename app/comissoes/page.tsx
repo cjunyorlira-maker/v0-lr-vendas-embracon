@@ -21,6 +21,8 @@ export default function ComissoesPage() {
   const [semAcesso, setSemAcesso] = useState(false)
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set())
   const [aba, setAba] = useState<'vendas' | 'config'>('vendas')
+  const [dataDe, setDataDe] = useState('')
+  const [dataAte, setDataAte] = useState('')
   const [pctVend, setPctVend] = useState('')
   const [pctSup, setPctSup] = useState('')
   const [aplicando, setAplicando] = useState(false)
@@ -96,10 +98,18 @@ export default function ComissoesPage() {
     setImportando(false)
   }
 
-  const totalLR = vendas.reduce((s, v) => s + v.comissao_lr, 0)
-  const totalRecebido = vendas.reduce((s, v) => s + (v.comissao_recebida_rs || 0), 0)
+  const vendasFiltradas = vendas.filter(v => {
+    if (!dataDe && !dataAte) return true
+    const d = (v as any).criado_em ? new Date((v as any).criado_em) : null
+    if (!d) return true
+    if (dataDe && d < new Date(dataDe + 'T00:00:00')) return false
+    if (dataAte && d > new Date(dataAte + 'T23:59:59')) return false
+    return true
+  })
+  const totalLR = vendasFiltradas.reduce((s, v) => s + v.comissao_lr, 0)
+  const totalRecebido = vendasFiltradas.reduce((s, v) => s + (v.comissao_recebida_rs || 0), 0)
   const totalFalta = totalLR - totalRecebido
-  const emRisco = vendas.filter(v => v.em_risco).length
+  const emRisco = vendasFiltradas.filter(v => v.em_risco).length
   const inputStyle = { background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }
 
   if (semAcesso) {
@@ -150,6 +160,19 @@ export default function ComissoesPage() {
               {importando ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}{importando ? 'Importando...' : 'Importar mapa de comissão (PDF)'}
             </button>
             {resultImport && <span className="text-xs" style={{ color: resultImport.startsWith('Erro') ? '#ef4444' : '#22c55e' }}>{resultImport}</span>}
+          </div>
+
+          {/* Filtro por data */}
+          <div className="flex items-end gap-2 mb-4 flex-wrap">
+            <div>
+              <label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>De</label>
+              <input type="date" value={dataDe} onChange={(e) => setDataDe(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={inputStyle} />
+            </div>
+            <div>
+              <label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>Até</label>
+              <input type="date" value={dataAte} onChange={(e) => setDataAte(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={inputStyle} />
+            </div>
+            {(dataDe || dataAte) && <button onClick={() => { setDataDe(''); setDataAte('') }} className="rounded-lg px-3 py-1.5 text-xs" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>Limpar</button>}
           </div>
 
           {/* Abas */}
@@ -216,7 +239,7 @@ export default function ComissoesPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {vendas.map(v => {
+                        {vendasFiltradas.map(v => {
                           const faltaRs = v.comissao_lr - (v.comissao_recebida_rs || 0)
                           const recPct = v.comissao_recebida_percent || 0
                           return (
