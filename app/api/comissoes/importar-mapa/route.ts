@@ -102,6 +102,16 @@ export async function POST(req: NextRequest) {
       }, { status: 400 })
     }
 
+    // Remove mapas anteriores do mesmo período de encerramento (evita duplicar ao reimportar)
+    if (dataEnc) {
+      const { data: mapasAntigos } = await supabaseAdmin.from('mapas_comissao').select('id').eq('data_encerramento', dataEnc)
+      if (mapasAntigos && mapasAntigos.length > 0) {
+        const ids = mapasAntigos.map((mp: any) => mp.id)
+        await supabaseAdmin.from('mapa_linhas').delete().in('mapa_id', ids)
+        await supabaseAdmin.from('mapas_comissao').delete().in('id', ids)
+      }
+    }
+
     // Cria o registro do mapa
     const totalComissao = linhas.reduce((s, l) => s + l.valor_comissao, 0)
     const contratosUnicos = new Set(linhas.map(l => l.contrato))
@@ -133,7 +143,15 @@ export async function POST(req: NextRequest) {
       recebidoPorContrato.set(l.contrato, (recebidoPorContrato.get(l.contrato) || 0) + l.valor_comissao)
       return { ...l, mapa_id: mapa.id, empresa_id: me.role === 'master' ? null : me.empresa_id, venda_id: venda?.id || null }
     })
-    await supabaseAdmin.from('mapa_linhas').insert(linhasInsert)
+    // dedup: remove linhas idênticas (mesmo contrato + parcela + valor)
+    const vistas = new Set<string>()
+    const linhasUnicas = linhasInsert.filter(l => {
+      const chave = `${l.contrato}|${l.parcela_de}|${l.parcela_ate}|${l.valor_comissao}`
+      if (vistas.has(chave)) return false
+      vistas.add(chave)
+      return true
+    })
+    await supabaseAdmin.from('mapa_linhas').insert(linhasUnicas)
 
     // RECALCULA DO ZERO: varre TODAS as linhas de TODOS os mapas e recruza com TODAS as vendas
     // Assim funciona mesmo que a venda tenha sido cadastrada depois do mapa
