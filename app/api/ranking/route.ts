@@ -82,9 +82,18 @@ export async function GET(req: NextRequest) {
     const mapa = new Map<string, { nome: string; foto?: string; valor: number; qtd: number }>()
     for (const v of lista as any[]) {
       let chave = '', nome = '', foto = undefined
-      if (modo === 'vendedor') { chave = v.vendedor_id || 'sem'; nome = v.usuarios?.nome || 'Sem vendedor'; foto = v.usuarios?.foto_url }
-      else if (modo === 'equipe') { chave = v.equipe_id || 'sem'; nome = v.equipes?.nome || 'Sem equipe' }
-      else { chave = v.empresa_id || 'sem'; nome = v.empresas?.nome || 'Sem empresa' }
+      if (modo === 'vendedor') {
+        const u = Array.isArray(v.usuarios) ? v.usuarios[0] : v.usuarios
+        chave = v.vendedor_id || 'sem'; nome = u?.nome || 'Sem vendedor'; foto = u?.foto_url
+      }
+      else if (modo === 'equipe') {
+        const e = Array.isArray(v.equipes) ? v.equipes[0] : v.equipes
+        chave = v.equipe_id || 'sem'; nome = e?.nome || 'Sem equipe'
+      }
+      else {
+        const emp = Array.isArray(v.empresas) ? v.empresas[0] : v.empresas
+        chave = v.empresa_id || 'sem'; nome = emp?.nome || 'Sem empresa'
+      }
       if (!mapa.has(chave)) mapa.set(chave, { nome, foto, valor: 0, qtd: 0 })
       const item = mapa.get(chave)!
       item.valor += v.valor_credito || 0
