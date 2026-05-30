@@ -23,6 +23,11 @@ export default function ComissoesPage() {
   const [aba, setAba] = useState<'vendas' | 'config'>('vendas')
   const [dataDe, setDataDe] = useState('')
   const [dataAte, setDataAte] = useState('')
+  const [filtros, setFiltros] = useState<{ empresas: any[]; equipes: any[]; vendedores: any[] }>({ empresas: [], equipes: [], vendedores: [] })
+  const [meuRole, setMeuRole] = useState('')
+  const [fEmpresa, setFEmpresa] = useState('')
+  const [fEquipe, setFEquipe] = useState('')
+  const [fVendedor, setFVendedor] = useState('')
   const [pctVend, setPctVend] = useState('')
   const [pctSup, setPctSup] = useState('')
   const [aplicando, setAplicando] = useState(false)
@@ -47,6 +52,8 @@ export default function ComissoesPage() {
     if (res.status === 403) { setSemAcesso(true); setLoading(false); return }
     const data = await res.json()
     if (data.vendas) setVendas(data.vendas)
+    if (data.filtros) setFiltros(data.filtros)
+    if (data.meu_role) setMeuRole(data.meu_role)
     if (data.config_categorias) {
       const map: Record<string, { vend: string; sup: string }> = {}
       for (const c of data.config_categorias) {
@@ -99,11 +106,17 @@ export default function ComissoesPage() {
   }
 
   const vendasFiltradas = vendas.filter(v => {
-    if (!dataDe && !dataAte) return true
-    const d = (v as any).criado_em ? new Date((v as any).criado_em) : null
-    if (!d) return true
-    if (dataDe && d < new Date(dataDe + 'T00:00:00')) return false
-    if (dataAte && d > new Date(dataAte + 'T23:59:59')) return false
+    const va = v as any
+    if (fEmpresa && va.empresa_id !== fEmpresa) return false
+    if (fEquipe && va.equipe_id !== fEquipe) return false
+    if (fVendedor && va.vendedor_id !== fVendedor) return false
+    if (dataDe || dataAte) {
+      const d = va.criado_em ? new Date(va.criado_em) : null
+      if (d) {
+        if (dataDe && d < new Date(dataDe + 'T00:00:00')) return false
+        if (dataAte && d > new Date(dataAte + 'T23:59:59')) return false
+      }
+    }
     return true
   })
   const totalLR = vendasFiltradas.reduce((s, v) => s + v.comissao_lr, 0)
@@ -172,7 +185,34 @@ export default function ComissoesPage() {
               <label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>Até</label>
               <input type="date" value={dataAte} onChange={(e) => setDataAte(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={inputStyle} />
             </div>
-            {(dataDe || dataAte) && <button onClick={() => { setDataDe(''); setDataAte('') }} className="rounded-lg px-3 py-1.5 text-xs" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>Limpar</button>}
+            {meuRole === 'master' && (
+              <div>
+                <label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>Empresa</label>
+                <select value={fEmpresa} onChange={(e) => { setFEmpresa(e.target.value); setFEquipe(''); setFVendedor('') }} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={inputStyle}>
+                  <option value="" style={{ background: '#131313' }}>Todas</option>
+                  {filtros.empresas.map(e => <option key={e.id} value={e.id} style={{ background: '#131313' }}>{e.nome}</option>)}
+                </select>
+              </div>
+            )}
+            {['master', 'representante', 'adm'].includes(meuRole) && (
+              <div>
+                <label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>Supervisor (equipe)</label>
+                <select value={fEquipe} onChange={(e) => { setFEquipe(e.target.value); setFVendedor('') }} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={inputStyle}>
+                  <option value="" style={{ background: '#131313' }}>Todas</option>
+                  {filtros.equipes.filter(eq => !fEmpresa || eq.empresa_id === fEmpresa).map(eq => <option key={eq.id} value={eq.id} style={{ background: '#131313' }}>{eq.nome}</option>)}
+                </select>
+              </div>
+            )}
+            {['master', 'representante', 'adm', 'supervisor'].includes(meuRole) && (
+              <div>
+                <label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>Vendedor</label>
+                <select value={fVendedor} onChange={(e) => setFVendedor(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={inputStyle}>
+                  <option value="" style={{ background: '#131313' }}>Todos</option>
+                  {filtros.vendedores.filter(vd => (!fEmpresa || vd.empresa_id === fEmpresa) && (!fEquipe || vd.equipe_id === fEquipe)).map(vd => <option key={vd.id} value={vd.id} style={{ background: '#131313' }}>{vd.nome}</option>)}
+                </select>
+              </div>
+            )}
+            {(dataDe || dataAte || fEmpresa || fEquipe || fVendedor) && <button onClick={() => { setDataDe(''); setDataAte(''); setFEmpresa(''); setFEquipe(''); setFVendedor('') }} className="rounded-lg px-3 py-1.5 text-xs self-end" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>Limpar</button>}
           </div>
 
           {/* Abas */}
