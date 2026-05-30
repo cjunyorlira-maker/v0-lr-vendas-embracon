@@ -6,7 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import { BookOpen, Loader2, Home, Car, Truck, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react'
 
-interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number; estorno_ate_pgto: number | null }
+interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number; estorno_ate_pgto: number | null; parcelas_nao_estornar: number | null }
 interface Faixa { credito: number; primeira_parcela: number; demais_parcela: number; mais_7: number; total_nao_estornar: number; taxa_antecip: number }
 
 const fmtMoeda = (v: number | null) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
@@ -23,7 +23,7 @@ export default function TabelasPage() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.from('planos').select('id, sigla, nome_completo, bem, adesao_percent, estorno_ate_pgto').eq('ativo', true).order('bem').then(({ data, error }) => {
+    supabase.from('planos').select('id, sigla, nome_completo, bem, adesao_percent, estorno_ate_pgto, parcelas_nao_estornar').eq('ativo', true).order('bem').then(({ data, error }) => {
       if (error) console.error('Erro ao buscar planos:', error)
       if (data) setPlanos(data as Plano[])
       setLoading(false)
@@ -92,8 +92,17 @@ export default function TabelasPage() {
                                           <th className="p-2 text-left" style={{ color: 'var(--muted-color)' }}>Crédito</th>
                                           <th className="p-2 text-right" style={{ color: 'var(--muted-color)' }}>1ª parcela</th>
                                           <th className="p-2 text-right" style={{ color: 'var(--muted-color)' }}>Demais (cada)</th>
-                                          <th className="p-2 text-right" style={{ color: '#22c55e' }}>Garantir comissão<br/><span className="text-[9px]" style={{ color: 'var(--muted-color)' }}>(1ª + {(p.estorno_ate_pgto || 8) - 1} = {p.estorno_ate_pgto || 8}x)</span></th>
-                                          <th className="p-2 text-right" style={{ color: '#f59e0b' }}>Não estornar<br/><span className="text-[9px]" style={{ color: 'var(--muted-color)' }}>(1ª + {(p.estorno_ate_pgto || 8) - 1} = {p.estorno_ate_pgto || 8}x)</span></th>
+                                          {p.sigla === 'SP' ? (
+                                            <>
+                                              <th className="p-2 text-right" style={{ color: '#22c55e' }}>Garantir comissão<br/><span className="text-[9px]" style={{ color: 'var(--muted-color)' }}>(1ª + 3 = 4x)</span></th>
+                                              <th className="p-2 text-right" style={{ color: '#f59e0b' }}>Não estornar<br/><span className="text-[9px]" style={{ color: 'var(--muted-color)' }}>(1ª + 5 = 6x)</span></th>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <th className="p-2 text-right" style={{ color: 'var(--muted-color)' }}>Soma das demais<br/><span className="text-[9px]" style={{ color: 'var(--muted-color)' }}>(antecipação)</span></th>
+                                              <th className="p-2 text-right" style={{ color: '#f59e0b' }}>Total p/ não estornar<br/><span className="text-[9px]" style={{ color: 'var(--muted-color)' }}>(1ª + {(p.parcelas_nao_estornar || 8) - 1} = {p.parcelas_nao_estornar || 8}x)</span></th>
+                                            </>
+                                          )}
                                         </tr>
                                       </thead>
                                       <tbody>
@@ -102,8 +111,17 @@ export default function TabelasPage() {
                                             <td className="p-2 font-medium" style={{ color: 'var(--text)' }}>{fmtMoeda(f.credito)}</td>
                                             <td className="p-2 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda2(f.primeira_parcela)}</td>
                                             <td className="p-2 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda2(f.demais_parcela)}</td>
-                                            <td className="p-2 text-right" style={{ color: '#22c55e' }}>{fmtMoeda2(f.total_nao_estornar)}</td>
-                                            <td className="p-2 text-right" style={{ color: '#f59e0b' }}>{fmtMoeda2(f.primeira_parcela + f.demais_parcela * ((p.estorno_ate_pgto || 8) - 1))}</td>
+                                            {p.sigla === 'SP' ? (
+                                              <>
+                                                <td className="p-2 text-right" style={{ color: '#22c55e' }}>{fmtMoeda2(f.total_nao_estornar)}</td>
+                                                <td className="p-2 text-right" style={{ color: '#f59e0b' }}>{fmtMoeda2(f.primeira_parcela + f.demais_parcela * 5)}</td>
+                                              </>
+                                            ) : (
+                                              <>
+                                                <td className="p-2 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda2(f.mais_7)}</td>
+                                                <td className="p-2 text-right" style={{ color: '#f59e0b' }}>{fmtMoeda2(f.total_nao_estornar)}</td>
+                                              </>
+                                            )}
                                           </tr>
                                         ))}
                                       </tbody>
