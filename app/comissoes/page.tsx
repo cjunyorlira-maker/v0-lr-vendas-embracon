@@ -126,7 +126,7 @@ export default function ComissoesPage() {
           {/* Resumo: LR total, Recebido, A receber, Risco */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             <div className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
-              <div className="flex items-center gap-2 mb-1"><TrendingUp size={14} style={{ color: 'var(--accent)' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Comissão LR (total)</p></div>
+              <div className="flex items-center gap-2 mb-1"><TrendingUp size={14} style={{ color: 'var(--accent)' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Comissão Rep. (total)</p></div>
               <p className="text-xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(totalLR)}</p>
             </div>
             <div className="rounded-xl p-4" style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.12) 0%, rgba(34,197,94,0.04) 100%)', border: '1px solid rgba(34,197,94,0.25)' }}>
@@ -207,7 +207,7 @@ export default function ComissoesPage() {
                           <th className="p-3 text-left text-xs" style={{ color: 'var(--muted-color)' }}>Cliente</th>
                           <th className="p-3 text-left text-xs" style={{ color: 'var(--muted-color)' }}>Plano</th>
                           <th className="p-3 text-right text-xs" style={{ color: 'var(--muted-color)' }}>Crédito</th>
-                          <th className="p-3 text-right text-xs" style={{ color: 'var(--accent)' }}>Com. LR</th>
+                          <th className="p-3 text-right text-xs" style={{ color: 'var(--accent)' }}>Com. Rep.</th>
                           <th className="p-3 text-right text-xs" style={{ color: '#22c55e' }}>Recebido</th>
                           <th className="p-3 text-right text-xs" style={{ color: '#f59e0b' }}>Falta</th>
                           <th className="p-3 text-right text-xs" style={{ color: 'var(--muted-color)' }}>Vend.</th>
