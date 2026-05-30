@@ -75,7 +75,7 @@ export async function GET() {
       const emRisco = pgtosCobertos < pgtoSeg
       const estorno = plano?.estorno_percent ? credito * (plano.estorno_percent / 100) : 0
       return {
-        id: v.id, cliente: cliente?.nome || '-', vendedor: vendedor?.nome || '-',
+        id: v.id, criado_em: v.criado_em, cliente: cliente?.nome || '-', vendedor: vendedor?.nome || '-',
         plano: plano?.sigla || '-', credito,
         comissao_lr: comLR, percentual_vendedor: pVend, comissao_vendedor: comVend,
         percentual_supervisor: pSup, comissao_supervisor: comSup,
