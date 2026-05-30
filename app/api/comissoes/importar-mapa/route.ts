@@ -135,21 +135,33 @@ export async function POST(req: NextRequest) {
     })
     await supabaseAdmin.from('mapa_linhas').insert(linhasInsert)
 
-    // Atualiza comissao recebida nas vendas encontradas
+    // RECALCULA DO ZERO: varre TODAS as linhas de TODOS os mapas e recruza com TODAS as vendas
+    // Assim funciona mesmo que a venda tenha sido cadastrada depois do mapa
+    const { data: todasLinhas } = await supabaseAdmin.from('mapa_linhas').select('contrato, valor_comissao')
+
+    // soma o recebido por contrato (todos os mapas)
+    const recebidoTotalPorContrato = new Map<string, number>()
+    for (const l of (todasLinhas || []) as any[]) {
+      const c = String(l.contrato).trim()
+      recebidoTotalPorContrato.set(c, (recebidoTotalPorContrato.get(c) || 0) + (l.valor_comissao || 0))
+    }
+
+    // zera todas as vendas primeiro
+    await supabaseAdmin.from('vendas').update({ comissao_recebida_rs: 0, comissao_recebida_percent: 0 }).gt('valor_credito', 0)
+
+    // aplica o recebido em cada venda que tem contrato correspondente
     const naoEncontrados: string[] = []
-    for (const [contrato, recebidoNesseMapa] of recebidoPorContrato) {
+    for (const [contrato, recebido] of recebidoTotalPorContrato) {
       const venda = vendaPorContrato.get(contrato)
       if (!venda) { naoEncontrados.push(contrato); continue }
-      // soma o que já tinha + o desse mapa
-      const { data: vendaAtual } = await supabaseAdmin.from('vendas').select('comissao_recebida_rs, valor_credito').eq('id', venda.id).single()
-      const jaTinha = vendaAtual?.comissao_recebida_rs || 0
-      const novoTotal = jaTinha + recebidoNesseMapa
-      const credito = vendaAtual?.valor_credito || 0
-      const percentRecebido = credito > 0 ? (novoTotal / credito) * 100 : 0
+      const credito = venda.valor_credito || 0
+      const percentRecebido = credito > 0 ? (recebido / credito) * 100 : 0
       await supabaseAdmin.from('vendas').update({
-        comissao_recebida_rs: novoTotal,
+        comissao_recebida_rs: recebido,
         comissao_recebida_percent: percentRecebido,
       }).eq('id', venda.id)
+      // vincula as linhas desse contrato à venda
+      await supabaseAdmin.from('mapa_linhas').update({ venda_id: venda.id }).eq('contrato', contrato)
     }
 
     return NextResponse.json({
