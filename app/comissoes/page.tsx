@@ -1,14 +1,15 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { DollarSign, Loader2, AlertTriangle, Settings, Check, TrendingUp, Lock } from 'lucide-react'
+import { DollarSign, Loader2, AlertTriangle, Settings, Check, TrendingUp, Lock, Upload, FileText } from 'lucide-react'
 
 interface VendaComissao {
   id: string; cliente: string; vendedor: string; plano: string; credito: number
   comissao_lr: number; percentual_vendedor: number; comissao_vendedor: number
   percentual_supervisor: number; comissao_supervisor: number
+  comissao_recebida_rs: number; comissao_recebida_percent: number
   em_risco: boolean; valor_estorno: number; faltam: number; pgto_seguranca: number
 }
 
@@ -23,10 +24,12 @@ export default function ComissoesPage() {
   const [pctVend, setPctVend] = useState('')
   const [pctSup, setPctSup] = useState('')
   const [aplicando, setAplicando] = useState(false)
-  // config padrão
   const [padraoVend, setPadraoVend] = useState('')
   const [padraoSup, setPadraoSup] = useState('')
   const [salvandoConfig, setSalvandoConfig] = useState(false)
+  const [importando, setImportando] = useState(false)
+  const [resultImport, setResultImport] = useState<string | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { loadData() }, [])
 
@@ -41,9 +44,7 @@ export default function ComissoesPage() {
   }
 
   function toggle(id: string) {
-    const nova = new Set(selecionadas)
-    nova.has(id) ? nova.delete(id) : nova.add(id)
-    setSelecionadas(nova)
+    const nova = new Set(selecionadas); nova.has(id) ? nova.delete(id) : nova.add(id); setSelecionadas(nova)
   }
   function toggleTodas() {
     if (selecionadas.size === vendas.length) setSelecionadas(new Set())
@@ -55,20 +56,32 @@ export default function ComissoesPage() {
     if (!pctVend && !pctSup) { alert('Informe ao menos um percentual'); return }
     setAplicando(true)
     await fetch('/api/comissoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'aplicar', venda_ids: Array.from(selecionadas), percentual_vendedor: pctVend || undefined, percentual_supervisor: pctSup || undefined }) })
-    setSelecionadas(new Set()); setPctVend(''); setPctSup('')
-    await loadData()
-    setAplicando(false)
+    setSelecionadas(new Set()); setPctVend(''); setPctSup(''); await loadData(); setAplicando(false)
   }
 
   async function salvarConfig() {
     setSalvandoConfig(true)
     await fetch('/api/comissoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'salvar_config', percentual_vendedor_padrao: parseFloat(padraoVend) || 0, percentual_supervisor_padrao: parseFloat(padraoSup) || 0 }) })
-    await loadData()
-    setSalvandoConfig(false)
+    await loadData(); setSalvandoConfig(false)
+  }
+
+  async function importarMapa(file: File) {
+    setImportando(true); setResultImport(null)
+    try {
+      const fd = new FormData(); fd.append('file', file)
+      const res = await fetch('/api/comissoes/importar-mapa', { method: 'POST', body: fd })
+      const data = await res.json()
+      if (!res.ok) { setResultImport('Erro: ' + (data.error || 'falhou')); setImportando(false); return }
+      const naoEnc = data.contratos_nao_encontrados?.length || 0
+      setResultImport(`Mapa importado! ${data.total_contratos} contratos, ${fmtMoeda(data.total_comissao)} em comissão.${naoEnc > 0 ? ` ${naoEnc} contrato(s) não encontrado(s) nas vendas.` : ''}`)
+      await loadData()
+    } catch { setResultImport('Erro de conexão') }
+    setImportando(false)
   }
 
   const totalLR = vendas.reduce((s, v) => s + v.comissao_lr, 0)
-  const totalVend = vendas.reduce((s, v) => s + v.comissao_vendedor, 0)
+  const totalRecebido = vendas.reduce((s, v) => s + (v.comissao_recebida_rs || 0), 0)
+  const totalFalta = totalLR - totalRecebido
   const emRisco = vendas.filter(v => v.em_risco).length
   const inputStyle = { background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }
 
@@ -93,20 +106,33 @@ export default function ComissoesPage() {
       <div className="relative lg:ml-60" style={{ zIndex: 1 }}>
         <Header title="Comissões" />
         <main className="mx-auto max-w-[1400px] px-6 py-8 lg:px-8">
-          {/* Resumo */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
-            <div className="rounded-xl p-4" style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.12) 0%, rgba(34,197,94,0.04) 100%)', border: '1px solid rgba(34,197,94,0.25)' }}>
-              <div className="flex items-center gap-2 mb-1"><TrendingUp size={14} style={{ color: '#22c55e' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Comissão LR (total)</p></div>
-              <p className="text-xl font-bold" style={{ color: '#22c55e' }}>{fmtMoeda(totalLR)}</p>
-            </div>
+          {/* Resumo: LR total, Recebido, A receber, Risco */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             <div className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
-              <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Comissão vendedores</p>
-              <p className="text-xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(totalVend)}</p>
+              <div className="flex items-center gap-2 mb-1"><TrendingUp size={14} style={{ color: 'var(--accent)' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Comissão LR (total)</p></div>
+              <p className="text-xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(totalLR)}</p>
+            </div>
+            <div className="rounded-xl p-4" style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.12) 0%, rgba(34,197,94,0.04) 100%)', border: '1px solid rgba(34,197,94,0.25)' }}>
+              <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Já recebido</p>
+              <p className="text-xl font-bold" style={{ color: '#22c55e' }}>{fmtMoeda(totalRecebido)}</p>
+            </div>
+            <div className="rounded-xl p-4" style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)' }}>
+              <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>A receber</p>
+              <p className="text-xl font-bold" style={{ color: '#f59e0b' }}>{fmtMoeda(totalFalta)}</p>
             </div>
             <div className="rounded-xl p-4" style={{ background: emRisco > 0 ? 'rgba(239,68,68,0.08)' : 'rgba(0,0,0,0.12)', border: `1px solid ${emRisco > 0 ? 'rgba(239,68,68,0.3)' : 'var(--border)'}` }}>
-              <div className="flex items-center gap-2 mb-1"><AlertTriangle size={14} style={{ color: emRisco > 0 ? '#ef4444' : 'var(--muted-color)' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Vendas em risco de estorno</p></div>
+              <div className="flex items-center gap-2 mb-1"><AlertTriangle size={14} style={{ color: emRisco > 0 ? '#ef4444' : 'var(--muted-color)' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Em risco de estorno</p></div>
               <p className="text-xl font-bold" style={{ color: emRisco > 0 ? '#ef4444' : 'var(--text)' }}>{emRisco}</p>
             </div>
+          </div>
+
+          {/* Importar mapa */}
+          <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) importarMapa(f) }} />
+          <div className="flex items-center gap-3 mb-5 flex-wrap">
+            <button onClick={() => fileRef.current?.click()} disabled={importando} className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50 transition-transform hover:scale-105 active:scale-95" style={{ background: 'rgba(59,130,246,0.15)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.3)' }}>
+              {importando ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}{importando ? 'Importando...' : 'Importar mapa de comissão (PDF)'}
+            </button>
+            {resultImport && <span className="text-xs" style={{ color: resultImport.startsWith('Erro') ? '#ef4444' : '#22c55e' }}>{resultImport}</span>}
           </div>
 
           {/* Abas */}
@@ -120,7 +146,7 @@ export default function ComissoesPage() {
           ) : aba === 'config' ? (
             <div className="rounded-xl p-5 max-w-md" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
               <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text)' }}>Percentuais padrão</h3>
-              <p className="text-xs mb-4" style={{ color: 'var(--muted-color)' }}>Aplicados automaticamente nas vendas que não têm % definida.</p>
+              <p className="text-xs mb-4" style={{ color: 'var(--muted-color)' }}>Aplicados nas vendas sem % definida.</p>
               <div className="space-y-3">
                 <div><label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>% padrão do vendedor</label><input value={padraoVend} onChange={(e) => setPadraoVend(e.target.value)} placeholder="0,5" className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} /></div>
                 <div><label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>% padrão do supervisor</label><input value={padraoSup} onChange={(e) => setPadraoSup(e.target.value)} placeholder="0,2" className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} /></div>
@@ -129,7 +155,6 @@ export default function ComissoesPage() {
             </div>
           ) : (
             <>
-              {/* Barra de aplicar em lote */}
               {selecionadas.size > 0 && (
                 <div className="rounded-xl p-4 mb-4 flex items-end gap-3 flex-wrap" style={{ background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.25)' }}>
                   <span className="text-sm font-medium self-center" style={{ color: 'var(--accent)' }}>{selecionadas.size} selecionada{selecionadas.size !== 1 ? 's' : ''}</span>
@@ -151,27 +176,33 @@ export default function ComissoesPage() {
                           <th className="p-3 text-left text-xs" style={{ color: 'var(--muted-color)' }}>Cliente</th>
                           <th className="p-3 text-left text-xs" style={{ color: 'var(--muted-color)' }}>Plano</th>
                           <th className="p-3 text-right text-xs" style={{ color: 'var(--muted-color)' }}>Crédito</th>
-                          <th className="p-3 text-right text-xs" style={{ color: '#22c55e' }}>Com. LR</th>
-                          <th className="p-3 text-right text-xs" style={{ color: 'var(--muted-color)' }}>Vend. %</th>
-                          <th className="p-3 text-right text-xs" style={{ color: 'var(--muted-color)' }}>Com. Vend.</th>
+                          <th className="p-3 text-right text-xs" style={{ color: 'var(--accent)' }}>Com. LR</th>
+                          <th className="p-3 text-right text-xs" style={{ color: '#22c55e' }}>Recebido</th>
+                          <th className="p-3 text-right text-xs" style={{ color: '#f59e0b' }}>Falta</th>
+                          <th className="p-3 text-right text-xs" style={{ color: 'var(--muted-color)' }}>Vend.</th>
+                          <th className="p-3 text-right text-xs" style={{ color: 'var(--muted-color)' }}>Superv.</th>
                           <th className="p-3 text-center text-xs" style={{ color: 'var(--muted-color)' }}>Estorno</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {vendas.map(v => (
-                          <tr key={v.id} style={{ borderBottom: '1px solid var(--border)', background: selecionadas.has(v.id) ? 'rgba(212,175,55,0.05)' : 'transparent' }}>
-                            <td className="p-3"><input type="checkbox" checked={selecionadas.has(v.id)} onChange={() => toggle(v.id)} className="accent-yellow-500" /></td>
-                            <td className="p-3" style={{ color: 'var(--text)' }}>{v.cliente}<br /><span className="text-[10px]" style={{ color: 'var(--muted-color)' }}>{v.vendedor}</span></td>
-                            <td className="p-3"><span className="font-mono text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)' }}>{v.plano}</span></td>
-                            <td className="p-3 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda(v.credito)}</td>
-                            <td className="p-3 text-right font-semibold" style={{ color: '#22c55e' }}>{fmtMoeda(v.comissao_lr)}</td>
-                            <td className="p-3 text-right" style={{ color: 'var(--text2)' }}>{v.percentual_vendedor}%</td>
-                            <td className="p-3 text-right" style={{ color: 'var(--text)' }}>{fmtMoeda(v.comissao_vendedor)}</td>
-                            <td className="p-3 text-center">
-                              {v.em_risco ? <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }} title={`Faltam ${v.faltam} pgtos`}>{'\u25cf'} risco</span> : <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e' }}>{'\u2713'} seguro</span>}
-                            </td>
-                          </tr>
-                        ))}
+                        {vendas.map(v => {
+                          const faltaRs = v.comissao_lr - (v.comissao_recebida_rs || 0)
+                          const recPct = v.comissao_recebida_percent || 0
+                          return (
+                            <tr key={v.id} style={{ borderBottom: '1px solid var(--border)', background: selecionadas.has(v.id) ? 'rgba(212,175,55,0.05)' : 'transparent' }}>
+                              <td className="p-3"><input type="checkbox" checked={selecionadas.has(v.id)} onChange={() => toggle(v.id)} className="accent-yellow-500" /></td>
+                              <td className="p-3" style={{ color: 'var(--text)' }}>{v.cliente}<br /><span className="text-[10px]" style={{ color: 'var(--muted-color)' }}>{v.vendedor}</span></td>
+                              <td className="p-3"><span className="font-mono text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)' }}>{v.plano}</span></td>
+                              <td className="p-3 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda(v.credito)}</td>
+                              <td className="p-3 text-right font-semibold" style={{ color: 'var(--accent)' }}>{fmtMoeda(v.comissao_lr)}</td>
+                              <td className="p-3 text-right" style={{ color: '#22c55e' }}>{fmtMoeda(v.comissao_recebida_rs || 0)}<br /><span className="text-[10px]">{recPct.toFixed(1)}%</span></td>
+                              <td className="p-3 text-right" style={{ color: faltaRs > 1 ? '#f59e0b' : '#22c55e' }}>{faltaRs > 1 ? fmtMoeda(faltaRs) : `${'\u2713'} 100%`}</td>
+                              <td className="p-3 text-right" style={{ color: 'var(--text2)' }}>{v.percentual_vendedor}%<br /><span className="text-[10px]">{fmtMoeda(v.comissao_vendedor)}</span></td>
+                              <td className="p-3 text-right" style={{ color: 'var(--text2)' }}>{v.percentual_supervisor}%<br /><span className="text-[10px]">{fmtMoeda(v.comissao_supervisor)}</span></td>
+                              <td className="p-3 text-center">{v.em_risco ? <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}>{'\u25cf'} {v.valor_estorno > 0 ? fmtMoeda(v.valor_estorno) : 'risco'}</span> : <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e' }}>{'\u2713'} seguro</span>}</td>
+                            </tr>
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>
