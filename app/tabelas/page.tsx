@@ -6,7 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import { BookOpen, Loader2, Home, Car, Truck, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react'
 
-interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number }
+interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number; estorno_ate_pgto: number | null }
 interface Faixa { credito: number; primeira_parcela: number; demais_parcela: number; total_nao_estornar: number; taxa_antecip: number }
 
 const fmtMoeda = (v: number | null) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
@@ -23,7 +23,7 @@ export default function TabelasPage() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.from('planos').select('id, sigla, nome_completo, bem, adesao_percent').eq('ativo', true).order('bem').then(({ data, error }) => {
+    supabase.from('planos').select('id, sigla, nome_completo, bem, adesao_percent, estorno_ate_pgto').eq('ativo', true).order('bem').then(({ data, error }) => {
       if (error) console.error('Erro ao buscar planos:', error)
       if (data) setPlanos(data as Plano[])
       setLoading(false)
@@ -92,7 +92,7 @@ export default function TabelasPage() {
                                           <th className="p-2 text-left" style={{ color: 'var(--muted-color)' }}>Crédito</th>
                                           <th className="p-2 text-right" style={{ color: 'var(--muted-color)' }}>1ª parcela</th>
                                           <th className="p-2 text-right" style={{ color: 'var(--muted-color)' }}>Demais</th>
-                                          <th className="p-2 text-right" style={{ color: 'var(--muted-color)' }}>Total p/ não estornar</th>
+                                          <th className="p-2 text-right" style={{ color: 'var(--muted-color)' }}>Total p/ não estornar<br/><span className="text-[9px]" style={{ color: '#f59e0b' }}>(1ª + {(p.estorno_ate_pgto || 8) - 1} parcelas = {p.estorno_ate_pgto || 8}x)</span></th>
                                         </tr>
                                       </thead>
                                       <tbody>
