@@ -111,7 +111,7 @@ export default function ComissoesPage() {
     if (fEquipe && va.equipe_id !== fEquipe) return false
     if (fVendedor && va.vendedor_id !== fVendedor) return false
     if (dataDe || dataAte) {
-      const d = va.criado_em ? new Date(va.criado_em) : null
+      const d = va.data_venda ? new Date(va.data_venda) : (va.criado_em ? new Date(va.criado_em) : null)
       if (d) {
         if (dataDe && d < new Date(dataDe + 'T00:00:00')) return false
         if (dataAte && d > new Date(dataAte + 'T23:59:59')) return false
