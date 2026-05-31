@@ -44,6 +44,12 @@ export default function ClientesPage() {
   const [fAdesao, setFAdesao] = useState('')
   const [fLance, setFLance] = useState('')
   const [baixando, setBaixando] = useState<string | null>(null)
+  const [lanceModal, setLanceModal] = useState<Cota | null>(null)
+  const [tipoLance, setTipoLance] = useState<'fixo25' | 'valor' | 'livre'>('fixo25')
+  const [valorLance, setValorLance] = useState('')
+  const [obsLance, setObsLance] = useState('')
+  const [recorrente, setRecorrente] = useState(false)
+  const [salvandoLance, setSalvandoLance] = useState(false)
 
   useEffect(() => { load() }, [])
   async function load() {
@@ -62,6 +68,17 @@ export default function ClientesPage() {
     const { data } = await supabase.storage.from('propostas-pdf').createSignedUrl(cota.pdf_proposta_url, 60)
     if (data?.signedUrl) window.open(data.signedUrl, '_blank')
     setBaixando(null)
+  }
+
+  async function criarLance() {
+    if (!lanceModal) return
+    setSalvandoLance(true)
+    const payload: any = { acao: 'criar', cliente_id: lanceModal.cliente_id, venda_id: lanceModal.venda_id, tipo: tipoLance, observacao: obsLance, recorrente }
+    if (tipoLance !== 'fixo25') payload.valor_percentual = parseFloat(valorLance.replace(',', '.')) || 0
+    const res = await fetch('/api/lances/acao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    setSalvandoLance(false)
+    if (res.ok) { setLanceModal(null); setValorLance(''); setObsLance(''); setRecorrente(false); setTipoLance('fixo25'); load() }
+    else alert('Erro ao criar lance')
   }
 
   async function toggleChecado(cota: Cota) {
@@ -150,7 +167,12 @@ export default function ClientesPage() {
                           <span className="text-xs" style={{ color: 'var(--muted-color)' }}>{cl.cpf}</span>
                           <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)' }}>{cl.cotas.length} cota(s)</span>
                         </div>
-                        {aberto ? <ChevronUp size={16} style={{ color: 'var(--muted-color)' }} /> : <ChevronDown size={16} style={{ color: 'var(--muted-color)' }} />}
+                        <div className="flex items-center gap-2">
+                          {cl.cotas.length === 1 && !cl.cotas[0].status_lance && (
+                            <button onClick={(e) => { e.stopPropagation(); setLanceModal(cl.cotas[0]) }} className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] font-medium" style={{ background: 'rgba(168,85,247,0.15)', color: '#a855f7', border: '1px solid rgba(168,85,247,0.3)' }}><Target size={11} />Criar lance</button>
+                          )}
+                          {aberto ? <ChevronUp size={16} style={{ color: 'var(--muted-color)' }} /> : <ChevronDown size={16} style={{ color: 'var(--muted-color)' }} />}
+                        </div>
                       </div>
                       {/* Alertas resumo (antes de expandir) */}
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
@@ -182,6 +204,7 @@ export default function ClientesPage() {
                                 <div className="flex items-center gap-2">
                                   <button onClick={() => toggleChecado(c)} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px]" style={{ background: c.checado ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.04)', color: c.checado ? '#22c55e' : 'var(--muted-color)', border: `1px solid ${c.checado ? 'rgba(34,197,94,0.3)' : 'var(--border)'}` }}><Check size={11} />{c.checado ? 'Checado' : 'Marcar checado'}</button>
                                   <button onClick={() => baixarProposta(c)} disabled={baixando === c.venda_id} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px]" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text2)', border: '1px solid var(--border)' }}>{baixando === c.venda_id ? <Loader2 size={11} className="animate-spin" /> : <FileText size={11} />}Proposta</button>
+                                  {!c.status_lance && <button onClick={() => setLanceModal(c)} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px]" style={{ background: 'rgba(168,85,247,0.15)', color: '#a855f7', border: '1px solid rgba(168,85,247,0.3)' }}><Target size={11} />Criar lance</button>}
                                 </div>
                               </div>
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
@@ -204,6 +227,44 @@ export default function ClientesPage() {
           )}
         </main>
       </div>
+
+      {lanceModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }} onClick={() => setLanceModal(null)} />
+          <div className="relative w-full max-w-md rounded-xl p-6" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+            <h3 className="text-base font-semibold mb-1" style={{ color: 'var(--text)' }}>Criar lance</h3>
+            <p className="text-xs mb-4" style={{ color: 'var(--muted-color)' }}>{lanceModal.nome} · Grupo {lanceModal.grupo}/{lanceModal.cota}</p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Tipo de lance</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {([['fixo25','Fixo 25%'],['valor','Valor R$'],['livre','Livre %']] as const).map(([k, lbl]) => (
+                    <button key={k} onClick={() => setTipoLance(k)} className="rounded-lg py-2 text-xs font-medium" style={{ background: tipoLance === k ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${tipoLance === k ? 'var(--accent)' : 'var(--border)'}`, color: tipoLance === k ? 'var(--accent)' : 'var(--muted-color)' }}>{lbl}</button>
+                  ))}
+                </div>
+              </div>
+              {tipoLance !== 'fixo25' && (
+                <div>
+                  <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>{tipoLance === 'valor' ? 'Valor (R$)' : 'Percentual (%)'}</label>
+                  <input value={valorLance} onChange={(e) => setValorLance(e.target.value)} placeholder={tipoLance === 'valor' ? '50000' : '30'} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
+                </div>
+              )}
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Observação (opcional)</label>
+                <input value={obsLance} onChange={(e) => setObsLance(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
+              </div>
+              <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: 'var(--text2)' }}>
+                <input type="checkbox" checked={recorrente} onChange={(e) => setRecorrente(e.target.checked)} className="accent-yellow-500" />
+                Lance recorrente (renova todo mês até contemplar)
+              </label>
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => setLanceModal(null)} className="flex-1 rounded-lg py-2.5 text-sm" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text2)' }}>Cancelar</button>
+                <button onClick={criarLance} disabled={salvandoLance} className="flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #d4af37 0%, #c9a227 50%, #b8941f 100%)', color: '#0a0a0a' }}>{salvandoLance ? <Loader2 size={14} className="animate-spin" /> : 'Criar lance'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
