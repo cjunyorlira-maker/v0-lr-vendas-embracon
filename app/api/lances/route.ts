@@ -40,6 +40,7 @@ export async function GET() {
       .eq('ativo', true)
       .is('status_final', null)
 
+    const hojeStr = new Date().toISOString().slice(0, 10)
     for (const cfg of (configsRecorrentes || [])) {
       const { data: existe } = await supabaseAdmin
         .from('lances_mensais')
@@ -48,16 +49,23 @@ export async function GET() {
         .eq('mes_referencia', mesRef)
         .maybeSingle()
       if (!existe) {
-        // busca a assembleia atual do cliente (da venda)
+        // busca a assembleia do cliente
         let dataAssembleia: string | null = null
         if (cfg.venda_id) {
           const { data: venda } = await supabaseAdmin.from('vendas').select('data_assembleia_entrada').eq('id', cfg.venda_id).single()
           dataAssembleia = venda?.data_assembleia_entrada || null
         }
+        // REGRA: só renova/gera o lance do novo mês se o cliente JÁ participou da assembleia
+        // (se a assembleia ainda não passou, mantém o lance do mês anterior, não gera novo)
+        const participou = dataAssembleia ? (dataAssembleia < hojeStr) : true
+        if (!participou) continue
+
+        // Recorrente nasce SOLICITADO (valor já definido); não-recorrente nasceria pendente
+        const statusInicial = cfg.recorrente ? 'solicitado' : 'pendente'
         await supabaseAdmin.from('lances_mensais').insert({
           lance_config_id: cfg.id, empresa_id: cfg.empresa_id, cliente_id: cfg.cliente_id,
           vendedor_id: cfg.vendedor_id, equipe_id: cfg.equipe_id,
-          mes_referencia: mesRef, data_assembleia: dataAssembleia, status: 'pendente',
+          mes_referencia: mesRef, data_assembleia: dataAssembleia, status: statusInicial,
         })
       }
     }
