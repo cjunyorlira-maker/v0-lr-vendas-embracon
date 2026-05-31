@@ -56,28 +56,13 @@ export default function BoletosPage() {
     if (!user) return
     const { data: cu } = await supabase.from('usuarios').select('role, empresa_id, equipe_id').eq('auth_user_id', user.id).single()
     if (cu) setRole(cu.role)
-    // descobre a empresa matriz (onde está o master) pra dar escopo global ao adm da matriz
-    let escopoGlobalBol = false
-    if (cu) {
-      const { data: masterU } = await supabase.from('usuarios').select('empresa_id').eq('role', 'master').limit(1).single()
-      escopoGlobalBol = cu.role === 'master' || (cu.role === 'adm' && masterU?.empresa_id === cu.empresa_id)
-    }
-    // opções de filtro conforme role
-    if (cu) {
-      if (escopoGlobalBol) {
-        const { data: emp } = await supabase.from('empresas').select('id, nome').order('nome')
-        const { data: eq } = await supabase.from('equipes').select('id, nome, empresa_id').order('nome')
-        const { data: vd } = await supabase.from('usuarios').select('id, nome, empresa_id, equipe_id').in('role', ['vendedor', 'supervisor']).order('nome')
-        setFiltrosOpc({ empresas: emp || [], equipes: eq || [], vendedores: vd || [] })
-      } else if (['representante', 'adm'].includes(cu.role)) {
-        const { data: eq } = await supabase.from('equipes').select('id, nome, empresa_id').eq('empresa_id', cu.empresa_id).order('nome')
-        const { data: vd } = await supabase.from('usuarios').select('id, nome, empresa_id, equipe_id').in('role', ['vendedor', 'supervisor']).eq('empresa_id', cu.empresa_id).order('nome')
-        setFiltrosOpc({ empresas: [], equipes: eq || [], vendedores: vd || [] })
-      } else if (cu.role === 'supervisor') {
-        const { data: vd } = await supabase.from('usuarios').select('id, nome, empresa_id, equipe_id').in('role', ['vendedor', 'supervisor']).eq('equipe_id', cu.equipe_id).order('nome')
-        setFiltrosOpc({ empresas: [], equipes: [], vendedores: vd || [] })
-      }
-    }
+    // opções de filtro via API admin (ignora RLS, respeita escopo)
+    try {
+      const rOpc = await fetch('/api/usuarios/listar')
+      const dOpc = await rOpc.json()
+      const vendedores = (dOpc.usuarios || []).filter((u: any) => ['vendedor', 'supervisor'].includes(u.role)).map((u: any) => ({ id: u.id, nome: u.nome, empresa_id: u.empresa_id, equipe_id: u.equipe_id }))
+      setFiltrosOpc({ empresas: dOpc.empresas || [], equipes: dOpc.equipes || [], vendedores })
+    } catch {}
     // carrega config de produção
     try { const rp = await fetch('/api/config-producao'); const dp = await rp.json(); if (dp.data_inicio) setProdInicio(dp.data_inicio); if (dp.data_fim) setProdFim(dp.data_fim) } catch {}
     const { data } = await supabase
