@@ -24,7 +24,7 @@ export async function GET() {
 
     // busca vendas com escopo
     let q = supabaseAdmin.from('vendas')
-      .select('id, cliente_id, numero_proposta, numero_contrato, grupo, cota, valor_credito, adesao_percent, data_assembleia_entrada, data_venda, empresa_id, equipe_id, vendedor_id, checado, pdf_proposta_url, planos(sigla, nome_completo, bem, adesao_percent), clientes(id, nome, cpf_cnpj, telefone), usuarios:vendedor_id(nome), boletos(status, qtd_parcelas, data_proxima_cobranca)')
+      .select('id, cliente_id, numero_proposta, numero_contrato, grupo, cota, valor_credito, adesao_percent, data_assembleia_entrada, data_venda, empresa_id, equipe_id, vendedor_id, checado, pdf_proposta_url, planos(sigla, nome_completo, bem, adesao_percent), clientes(id, nome, cpf_cnpj, telefone), usuarios:vendedor_id(nome), equipes(nome), boletos(status, qtd_parcelas, data_proxima_cobranca)')
       .order('data_assembleia_entrada', { ascending: true })
 
     if (me.role === 'representante' || me.role === 'adm') q = q.eq('empresa_id', me.empresa_id)
@@ -57,7 +57,7 @@ export async function GET() {
         bem: plano?.bem || '-', adesao: v.adesao_percent ?? plano?.adesao_percent ?? null,
         plano: plano?.sigla || '-',
         data_assembleia: v.data_assembleia_entrada, data_venda: v.data_venda,
-        vendedor: vendedor?.nome || null, vendedor_id: v.vendedor_id, equipe_id: v.equipe_id, empresa_id: v.empresa_id,
+        vendedor: vendedor?.nome || null, equipe_nome: (Array.isArray(v.equipes) ? v.equipes[0]?.nome : v.equipes?.nome) || null, vendedor_id: v.vendedor_id, equipe_id: v.equipe_id, empresa_id: v.empresa_id,
         status_boleto: boleto?.status || 'pendente', qtd_parcelas: boleto?.qtd_parcelas || 0,
         proxima_cobranca: boleto?.data_proxima_cobranca || null,
         status_lance: statusLance, checado: v.checado || false,

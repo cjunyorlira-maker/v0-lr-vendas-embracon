@@ -10,7 +10,7 @@ interface Cota {
   venda_id: string; cliente_id: string; nome: string; cpf: string; telefone: string
   grupo: string; cota: string; numero_proposta: string | null; numero_contrato: string | null; credito: number; bem: string; adesao: number | null; plano: string
   data_assembleia: string | null; data_venda: string | null
-  vendedor: string | null; vendedor_id: string; equipe_id: string; empresa_id: string
+  vendedor: string | null; equipe_nome: string | null; vendedor_id: string; equipe_id: string; empresa_id: string
   status_boleto: string; qtd_parcelas: number; proxima_cobranca: string | null
   status_lance: string | null; checado: boolean; pdf_proposta_url: string | null
 }
@@ -200,6 +200,12 @@ export default function ClientesPage() {
                         {cl.cotas.map((c, i) => { const sb = STATUS_BOLETO[c.status_boleto]; return sb ? <span key={'b'+i} className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: `${sb.cor}20`, color: sb.cor }}>{sb.label}</span> : null })}
                         {!algumNaoChecado && <span className="text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1" style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e' }}><Check size={10} />Checado</span>}
                       </div>
+                      {(cl.cotas[0]?.vendedor || cl.cotas[0]?.equipe_nome) && (
+                        <div className="flex items-center gap-3 mt-1.5 text-[11px]" style={{ color: 'var(--muted-color)' }}>
+                          {cl.cotas[0]?.vendedor && <span>Vendedor: <span style={{ color: 'var(--text2)' }}>{cl.cotas[0].vendedor}</span></span>}
+                          {cl.cotas[0]?.equipe_nome && <span>Equipe: <span style={{ color: 'var(--text2)' }}>{cl.cotas[0].equipe_nome}</span></span>}
+                        </div>
+                      )}
                     </div>
 
                     {aberto && (
