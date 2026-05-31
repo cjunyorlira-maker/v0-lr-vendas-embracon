@@ -6,7 +6,7 @@ import Header from '@/components/Header'
 import { DollarSign, Loader2, AlertTriangle, Settings, Check, TrendingUp, Lock, Upload, FileText } from 'lucide-react'
 
 interface VendaComissao {
-  id: string; cliente: string; vendedor: string; plano: string; credito: number
+  id: string; cliente: string; vendedor: string; plano: string; adesao: number | null; bem: string; credito: number
   comissao_lr: number; percentual_vendedor: number; comissao_vendedor: number
   percentual_supervisor: number; comissao_supervisor: number
   comissao_recebida_rs: number; comissao_recebida_percent: number
@@ -298,7 +298,7 @@ export default function ComissoesPage() {
                         <tr style={{ borderBottom: '1px solid var(--border)' }}>
                           <th className="p-3 text-left"><input type="checkbox" checked={selecionadas.size === vendas.length && vendas.length > 0} onChange={toggleTodas} className="accent-yellow-500" /></th>
                           <th className="p-3 text-left text-xs" style={{ color: 'var(--muted-color)' }}>Cliente</th>
-                          <th className="p-3 text-left text-xs" style={{ color: 'var(--muted-color)' }}>Plano</th>
+                          <th className="p-3 text-left text-xs" style={{ color: 'var(--muted-color)' }}>Adesão</th>
                           <th className="p-3 text-right text-xs" style={{ color: 'var(--muted-color)' }}>Crédito</th>
                           <th className="p-3 text-right text-xs" style={{ color: 'var(--accent)' }}>Com. Rep.</th>
                           <th className="p-3 text-right text-xs" style={{ color: '#22c55e' }}>Recebido</th>
@@ -316,7 +316,7 @@ export default function ComissoesPage() {
                             <tr key={v.id} style={{ borderBottom: '1px solid var(--border)', background: selecionadas.has(v.id) ? 'rgba(212,175,55,0.05)' : 'transparent' }}>
                               <td className="p-3"><input type="checkbox" checked={selecionadas.has(v.id)} onChange={() => toggle(v.id)} className="accent-yellow-500" /></td>
                               <td className="p-3" style={{ color: 'var(--text)' }}>{v.cliente}<br /><span className="text-[10px]" style={{ color: 'var(--muted-color)' }}>{v.vendedor}</span></td>
-                              <td className="p-3"><span className="font-mono text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)' }}>{v.plano}</span></td>
+                              <td className="p-3"><span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)' }}>{v.adesao != null ? `${v.adesao}%` : '-'}</span><br/><span className="text-[10px]" style={{ color: 'var(--muted-color)' }}>{v.bem}</span></td>
                               <td className="p-3 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda(v.credito)}</td>
                               <td className="p-3 text-right font-semibold" style={{ color: 'var(--accent)' }}>{fmtMoeda(v.comissao_lr)}</td>
                               <td className="p-3 text-right" style={{ color: '#22c55e' }}>{fmtMoeda(v.comissao_recebida_rs || 0)}<br /><span className="text-[10px]">{recPct.toFixed(1)}%</span></td>

@@ -48,7 +48,7 @@ export async function GET() {
     // vendas com dados de comissão + plano + estorno
     let q = supabaseAdmin
       .from('vendas')
-      .select('id, valor_credito, empresa_id, equipe_id, vendedor_id, comissao_vendedor_percent, comissao_supervisor_percent, comissao_recebida_rs, comissao_recebida_percent, criado_em, clientes(nome), usuarios:vendedor_id(nome), planos(sigla, comissao_total, estorno_percent, estorno_ate_pgto, categoria_comissao), boletos(qtd_parcelas, status)')
+      .select('id, valor_credito, empresa_id, equipe_id, vendedor_id, comissao_vendedor_percent, comissao_supervisor_percent, comissao_recebida_rs, comissao_recebida_percent, criado_em, clientes(nome), usuarios:vendedor_id(nome), planos(sigla, comissao_total, estorno_percent, estorno_ate_pgto, categoria_comissao, adesao_percent, bem), boletos(qtd_parcelas, status)')
       .order('criado_em', { ascending: false })
 
     if (me.role !== 'master') q = q.eq('empresa_id', me.empresa_id)
@@ -76,7 +76,7 @@ export async function GET() {
       const estorno = plano?.estorno_percent ? credito * (plano.estorno_percent / 100) : 0
       return {
         id: v.id, criado_em: v.criado_em, empresa_id: v.empresa_id, equipe_id: v.equipe_id, vendedor_id: v.vendedor_id, cliente: cliente?.nome || '-', vendedor: vendedor?.nome || '-',
-        plano: plano?.sigla || '-', credito,
+        plano: plano?.sigla || '-', adesao: plano?.adesao_percent ?? null, bem: plano?.bem || '-', credito,
         comissao_lr: comLR, percentual_vendedor: pVend, comissao_vendedor: comVend,
         percentual_supervisor: pSup, comissao_supervisor: comSup,
         comissao_recebida_rs: v.comissao_recebida_rs || 0,
