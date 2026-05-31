@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextRequest, NextResponse } from "next/server"
+import { getEscopo } from '@/lib/escopo'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -74,6 +75,7 @@ export async function GET(req: NextRequest) {
       .lte('data_venda', fim)
 
     if (me.role === 'master') { /* tudo */ }
+    else if ((await getEscopo(me)).escopoGlobal) { /* adm matriz vê tudo */ }
     else if (['representante', 'adm'].includes(me.role)) q = q.eq('empresa_id', me.empresa_id)
     else if (me.role === 'supervisor') q = q.eq('equipe_id', me.equipe_id)
     // vendedor vê o ranking todo da empresa dele (pra se comparar)
