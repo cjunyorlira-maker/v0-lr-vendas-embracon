@@ -223,7 +223,11 @@ function SidebarContent({ userNome, userEmail, userRole, empresaNome, empresaLog
 
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         <div className="flex flex-col gap-1">
-          {mainNav.map((item) => (<NavLink key={item.label} item={item} />))}
+          {mainNav.filter((item) => {
+            // Equipe: não aparece para vendedor (ele não gerencia ninguém)
+            if (item.href === '/equipe') return userRole !== 'vendedor'
+            return true
+          }).map((item) => (<NavLink key={item.label} item={item} />))}
         </div>
         <div className="my-4 px-3" style={{ borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
           {adminNav.filter((item) => {
