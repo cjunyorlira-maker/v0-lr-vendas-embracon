@@ -247,7 +247,7 @@ export default function ComissoesPage() {
             )}
             {['master', 'representante', 'adm'].includes(meuRole) && (
               <div>
-                <label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>Supervisor (equipe)</label>
+                <label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>Equipe</label>
                 <select value={fEquipe} onChange={(e) => { setFEquipe(e.target.value); setFVendedor('') }} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={inputStyle}>
                   <option value="" style={{ background: '#131313' }}>Todas</option>
                   {filtros.equipes.filter(eq => !fEmpresa || eq.empresa_id === fEmpresa).map(eq => <option key={eq.id} value={eq.id} style={{ background: '#131313' }}>{eq.nome}</option>)}

@@ -92,15 +92,15 @@ export async function GET() {
       empresasOpc = emp || []
       const { data: eq } = await supabaseAdmin.from('equipes').select('id, nome, empresa_id').order('nome')
       equipesOpc = eq || []
-      const { data: vd } = await supabaseAdmin.from('usuarios').select('id, nome, empresa_id, equipe_id').eq('role', 'vendedor').order('nome')
+      const { data: vd } = await supabaseAdmin.from('usuarios').select('id, nome, empresa_id, equipe_id').in('role', ['vendedor', 'supervisor']).order('nome')
       vendedoresOpc = vd || []
     } else if (['representante', 'adm'].includes(me.role)) {
       const { data: eq } = await supabaseAdmin.from('equipes').select('id, nome, empresa_id').eq('empresa_id', me.empresa_id).order('nome')
       equipesOpc = eq || []
-      const { data: vd } = await supabaseAdmin.from('usuarios').select('id, nome, empresa_id, equipe_id').eq('role', 'vendedor').eq('empresa_id', me.empresa_id).order('nome')
+      const { data: vd } = await supabaseAdmin.from('usuarios').select('id, nome, empresa_id, equipe_id').in('role', ['vendedor', 'supervisor']).eq('empresa_id', me.empresa_id).order('nome')
       vendedoresOpc = vd || []
     } else if (me.role === 'supervisor') {
-      const { data: vd } = await supabaseAdmin.from('usuarios').select('id, nome, empresa_id, equipe_id').eq('role', 'vendedor').eq('equipe_id', me.equipe_id).order('nome')
+      const { data: vd } = await supabaseAdmin.from('usuarios').select('id, nome, empresa_id, equipe_id').in('role', ['vendedor', 'supervisor']).eq('equipe_id', me.equipe_id).order('nome')
       vendedoresOpc = vd || []
     }
 
