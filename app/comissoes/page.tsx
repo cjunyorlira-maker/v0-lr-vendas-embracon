@@ -454,10 +454,18 @@ export default function ComissoesPage() {
                           {p.estorno_ate_pgto && <div><p className="text-[10px] uppercase tracking-wide mb-0.5" style={{ color: 'var(--muted-color)' }}>Estorno</p><p className="text-sm font-medium" style={{ color: '#ef4444' }}>{p.estorno_percent}% até {p.estorno_ate_pgto}º pgto</p></div>}
                         </div>
                         <div className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)' }}>
-                          <div className="flex items-center gap-2 flex-wrap mb-3">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
                             <span className="text-xs" style={{ color: 'var(--muted-color)' }}>Crédito:</span>
                             <input value={creditoCalc} onChange={(e) => { const num = e.target.value.replace(/\D/g, ''); setCreditoCalc(num ? (parseInt(num) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '') }} placeholder="200.000,00" className="rounded-lg px-2 py-1 text-xs outline-none w-32" style={inputStyle} />
+                            <span className="text-[10px]" style={{ color: 'var(--muted-color)' }}>Faixa: {fmtMoeda(p.faixa_credito_min)} a {fmtMoeda(p.faixa_credito_max)}</span>
                           </div>
+                          {(() => {
+                            const c = parseFloat(creditoCalc.replace(/\./g, '').replace(',', '.')) || 0
+                            if (c > 0 && (c < p.faixa_credito_min || c > p.faixa_credito_max)) {
+                              return <p className="text-[10px] mb-2" style={{ color: '#f59e0b' }}>Fora da faixa deste plano ({fmtMoeda(p.faixa_credito_min)} a {fmtMoeda(p.faixa_credito_max)})</p>
+                            }
+                            return null
+                          })()}
                           <label className="block text-xs mb-2" style={{ color: 'var(--muted-color)' }}>Antecipou quantas parcelas?</label>
                           <div className="flex items-center gap-2 flex-wrap mb-3">
                             {[0, 1, 2, 3, 4, 5, 6, 7, 8].slice(0, parcelas.length + 1).map(n => (
