@@ -259,14 +259,20 @@ export default function EquipePage() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-2">
+                            {['master','representante','adm'].includes(currentUserRole || '') && ['vendedor','supervisor'].includes(u.role) && u.id !== currentUserId && (
+                              <button onClick={() => { setMudarEquipeModal(u); setNovaEquipe(u.equipe_id || '') }} className="flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors" style={{ color: '#a855f7', background: 'rgba(168,85,247,0.08)' }} title="Mudar equipe">
+                                <Users2 size={14} />
+                                <span className="hidden sm:inline">Equipe</span>
+                              </button>
+                            )}
+                            {u.id === currentUserId && (
+                              <button onClick={() => setConfirmReset(u)} className="flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors" style={{ color: '#f59e0b', background: 'rgba(245,158,11,0.08)' }} title="Trocar minha senha">
+                                <KeyRound size={14} />
+                                <span className="hidden sm:inline">Trocar senha</span>
+                              </button>
+                            )}
                             {podeDesativarAlvo(u) && (
                               <>
-                                {['master','representante','adm'].includes(currentUserRole || '') && ['vendedor','supervisor'].includes(u.role) && (
-                                  <button onClick={() => { setMudarEquipeModal(u); setNovaEquipe(u.equipe_id || '') }} className="flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors" style={{ color: '#a855f7', background: 'rgba(168,85,247,0.08)' }} title="Mudar equipe">
-                                    <Users2 size={14} />
-                                    <span className="hidden sm:inline">Equipe</span>
-                                  </button>
-                                )}
                                 <button
                                   onClick={() => setConfirmReset(u)}
                                   className="flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors"
