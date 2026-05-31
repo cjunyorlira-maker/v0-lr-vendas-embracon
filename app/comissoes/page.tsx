@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { DollarSign, Loader2, AlertTriangle, Settings, Check, TrendingUp, Lock, Upload, FileText } from 'lucide-react'
+import { DollarSign, Loader2, AlertTriangle, Settings, Check, TrendingUp, Lock, Upload, FileText, Calculator, ChevronRight, Download } from 'lucide-react'
 
 interface VendaComissao {
   id: string; cliente: string; vendedor: string; plano: string; adesao: number | null; bem: string; credito: number
@@ -20,7 +20,13 @@ export default function ComissoesPage() {
   const [loading, setLoading] = useState(true)
   const [semAcesso, setSemAcesso] = useState(false)
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set())
-  const [aba, setAba] = useState<'vendas' | 'config'>('vendas')
+  const [aba, setAba] = useState<'vendas' | 'config' | 'mapa' | 'calculo'>('vendas')
+  const [mapas, setMapas] = useState<any[]>([])
+  const [mapaSel, setMapaSel] = useState<string | null>(null)
+  const [mapaDetalhe, setMapaDetalhe] = useState<any>(null)
+  const [logoEmpresa, setLogoEmpresa] = useState<string | null>(null)
+  const [empresaNome, setEmpresaNome] = useState('')
+  const [carregandoMapa, setCarregandoMapa] = useState(false)
   const [dataDe, setDataDe] = useState('')
   const [dataAte, setDataAte] = useState('')
   const [filtros, setFiltros] = useState<{ empresas: any[]; equipes: any[]; vendedores: any[] }>({ empresas: [], equipes: [], vendedores: [] })
@@ -48,6 +54,7 @@ export default function ComissoesPage() {
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { loadData() }, [])
+  useEffect(() => { if (aba === 'mapa') carregarMapas() }, [aba])
 
   async function loadData() {
     setLoading(true)
@@ -105,6 +112,25 @@ export default function ComissoesPage() {
     }))
     await fetch('/api/comissoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'salvar_config_categoria', categorias }) })
     await loadData(); setSalvandoConfig(false)
+  }
+
+  async function baixarMapaPdf() { alert('Gerando PDF...') }
+
+  async function carregarMapas() {
+    const res = await fetch('/api/comissoes/mapas')
+    const data = await res.json()
+    if (data.mapas) setMapas(data.mapas)
+    if (data.logo_url) setLogoEmpresa(data.logo_url)
+    if (data.empresa_nome) setEmpresaNome(data.empresa_nome)
+  }
+  async function abrirMapa(mapaId: string) {
+    setCarregandoMapa(true); setMapaSel(mapaId)
+    const res = await fetch(`/api/comissoes/mapas?mapa_id=${mapaId}`)
+    const data = await res.json()
+    if (data.detalhe) setMapaDetalhe(data.detalhe)
+    if (data.logo_url) setLogoEmpresa(data.logo_url)
+    if (data.empresa_nome) setEmpresaNome(data.empresa_nome)
+    setCarregandoMapa(false)
   }
 
   async function importarMapa(file: File) {
@@ -278,11 +304,65 @@ export default function ComissoesPage() {
           {/* Abas */}
           <div className="flex gap-2 mb-5">
             <button onClick={() => setAba('vendas')} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: aba === 'vendas' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${aba === 'vendas' ? 'var(--accent)' : 'var(--border)'}`, color: aba === 'vendas' ? 'var(--accent)' : 'var(--muted-color)' }}><DollarSign size={14} />Vendas</button>
+            <button onClick={() => setAba('mapa')} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: aba === 'mapa' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${aba === 'mapa' ? 'var(--accent)' : 'var(--border)'}`, color: aba === 'mapa' ? 'var(--accent)' : 'var(--muted-color)' }}><FileText size={14} />Mapa de Comissão</button>
+            <button onClick={() => setAba('calculo')} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: aba === 'calculo' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${aba === 'calculo' ? 'var(--accent)' : 'var(--border)'}`, color: aba === 'calculo' ? 'var(--accent)' : 'var(--muted-color)' }}><Calculator size={14} />Cálculo de Comissão</button>
             <button onClick={() => setAba('config')} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: aba === 'config' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${aba === 'config' ? 'var(--accent)' : 'var(--border)'}`, color: aba === 'config' ? 'var(--accent)' : 'var(--muted-color)' }}><Settings size={14} />Configurar padrão</button>
           </div>
 
           {loading ? (
             <div className="flex items-center justify-center py-12"><Loader2 size={20} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
+          ) : aba === 'mapa' ? (
+            <div>
+              {!mapaSel ? (
+                <div className="space-y-2">
+                  <p className="text-sm mb-3" style={{ color: 'var(--muted-color)' }}>Mapas de comissão importados. Clique para ver e baixar.</p>
+                  {mapas.length === 0 ? <p className="text-xs py-8 text-center" style={{ color: 'var(--muted-color)' }}>Nenhum mapa importado ainda. Importe no botão acima.</p> : mapas.map(m => (
+                    <div key={m.id} onClick={() => abrirMapa(m.id)} className="flex items-center justify-between rounded-xl p-4 cursor-pointer" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+                      <div>
+                        <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Mapa de {m.data_encerramento ? new Date(m.data_encerramento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</p>
+                        <p className="text-xs" style={{ color: 'var(--muted-color)' }}>{m.total_contratos} contratos · {fmtMoeda(m.total_comissao)}</p>
+                      </div>
+                      <ChevronRight size={16} style={{ color: 'var(--muted-color)' }} />
+                    </div>
+                  ))}
+                </div>
+              ) : carregandoMapa ? (
+                <div className="flex justify-center py-12"><Loader2 size={20} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
+              ) : (
+                <div>
+                  <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                    <button onClick={() => { setMapaSel(null); setMapaDetalhe(null) }} className="text-xs" style={{ color: 'var(--accent)' }}>← Voltar aos mapas</button>
+                    <button onClick={baixarMapaPdf} className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold" style={{ background: 'var(--accent)', color: '#0a0a0a' }}><Download size={14} />Baixar PDF</button>
+                  </div>
+                  <div id="mapa-conteudo" className="rounded-xl p-5" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+                    {mapaDetalhe?.clientes?.map((cl: any, i: number) => (
+                      <div key={i} className="mb-4 pb-3" style={{ borderBottom: '1px solid var(--border)' }}>
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{cl.cliente}</p>
+                          <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Contrato {cl.contrato}</p>
+                        </div>
+                        {cl.linhas.map((ln: any, j: number) => (
+                          <div key={j} className="flex items-center justify-between text-xs py-0.5">
+                            <span style={{ color: 'var(--muted-color)' }}>Parcela {ln.parcela_de}{ln.parcela_ate !== ln.parcela_de ? `-${ln.parcela_ate}` : ''} · {ln.percentual}%</span>
+                            <span style={{ color: 'var(--text2)' }}>{fmtMoeda(ln.valor)}</span>
+                          </div>
+                        ))}
+                        <div className="flex justify-between mt-1 text-xs font-semibold">
+                          <span style={{ color: 'var(--text)' }}>Total do cliente</span>
+                          <span style={{ color: '#22c55e' }}>{fmtMoeda(cl.total)}</span>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="flex justify-between pt-2 text-base font-bold">
+                      <span style={{ color: 'var(--text)' }}>VALOR TOTAL</span>
+                      <span style={{ color: 'var(--accent)' }}>{fmtMoeda(mapaDetalhe?.totalGeral || 0)}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : aba === 'calculo' ? (
+            <div className="py-8 text-center" style={{ color: 'var(--muted-color)' }}>Cálculo de comissão (em construção)</div>
           ) : aba === 'config' ? (
             <>
             {meuRole === 'master' && (
