@@ -171,7 +171,7 @@ export default function LancesPage() {
         {lance.lances_config?.observacao && <p className="text-xs mb-3 italic" style={{ color: 'var(--muted-color)' }}>{'"'}{lance.lances_config.observacao}{'"'}</p>}
 
         {lance.status === 'pendente' && (
-          <button onClick={() => { setDefinirModal(lance); setDefTipo((lance.lances_config?.tipo as 'fixo25' | 'valor' | 'livre') || 'fixo25'); setDefValor(lance.lances_config?.valor_percentual ? String(lance.lances_config.valor_percentual) : ''); setDefObs(lance.lances_config?.observacao || ''); setDefRecorrente(lance.lances_config?.recorrente || false) }} disabled={processando === lance.id} className="w-full flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold transition-transform hover:scale-105 active:scale-95" style={{ background: 'rgba(234,179,8,0.15)', color: '#eab308', border: '1px solid #eab308' }}>
+          <button onClick={() => { setDefinirModal(lance); setDefTipo((lance.lances_config?.tipo as 'fixo25' | 'valor' | 'livre') || 'fixo25'); setDefValor(lance.lances_config?.valor_percentual ? (lance.lances_config?.tipo === 'valor' ? Number(lance.lances_config.valor_percentual).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : String(lance.lances_config.valor_percentual)) : ''); setDefObs(lance.lances_config?.observacao || ''); setDefRecorrente(lance.lances_config?.recorrente || false) }} disabled={processando === lance.id} className="w-full flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold transition-transform hover:scale-105 active:scale-95" style={{ background: 'rgba(234,179,8,0.15)', color: '#eab308', border: '1px solid #eab308' }}>
             <Target size={13} />Definir lance pra ofertar
           </button>
         )}
@@ -181,7 +181,7 @@ export default function LancesPage() {
           </button>
         )}
         {lance.status === 'solicitado' && (
-          <button onClick={() => { setDefinirModal(lance); setDefTipo((lance.lances_config?.tipo as 'fixo25' | 'fixo50' | 'valor' | 'livre') || 'fixo25'); setDefValor(lance.lances_config?.valor_percentual ? String(lance.lances_config.valor_percentual) : ''); setDefObs(lance.lances_config?.observacao || ''); setDefRecorrente(lance.lances_config?.recorrente || false) }} className="w-full flex items-center justify-center gap-2 rounded-lg py-1.5 text-[11px] mt-1" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>
+          <button onClick={() => { setDefinirModal(lance); setDefTipo((lance.lances_config?.tipo as 'fixo25' | 'fixo50' | 'valor' | 'livre') || 'fixo25'); setDefValor(lance.lances_config?.valor_percentual ? (lance.lances_config?.tipo === 'valor' ? Number(lance.lances_config.valor_percentual).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : String(lance.lances_config.valor_percentual)) : ''); setDefObs(lance.lances_config?.observacao || ''); setDefRecorrente(lance.lances_config?.recorrente || false) }} className="w-full flex items-center justify-center gap-2 rounded-lg py-1.5 text-[11px] mt-1" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>
             Editar lance
           </button>
         )}
@@ -189,7 +189,7 @@ export default function LancesPage() {
           const hoje = new Date().toISOString().slice(0,10)
           const podeTrocar = !lance.data_assembleia || lance.data_assembleia >= hoje
           return podeTrocar ? (
-            <button onClick={() => { if (confirm('Trocar este lance? Ele já foi ofertado — a ADM precisa trocar também no sistema da Embracon. O lance voltará para Solicitado.')) { setDefinirModal(lance); setDefTipo((lance.lances_config?.tipo as 'fixo25' | 'fixo50' | 'valor' | 'livre') || 'fixo25'); setDefValor(lance.lances_config?.valor_percentual ? String(lance.lances_config.valor_percentual) : ''); setDefObs(lance.lances_config?.observacao || ''); setDefRecorrente(lance.lances_config?.recorrente || false) } }} className="w-full flex items-center justify-center gap-2 rounded-lg py-1.5 text-[11px] mt-1" style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}>
+            <button onClick={() => { if (confirm('Trocar este lance? Ele já foi ofertado — a ADM precisa trocar também no sistema da Embracon. O lance voltará para Solicitado.')) { setDefinirModal(lance); setDefTipo((lance.lances_config?.tipo as 'fixo25' | 'fixo50' | 'valor' | 'livre') || 'fixo25'); setDefValor(lance.lances_config?.valor_percentual ? (lance.lances_config?.tipo === 'valor' ? Number(lance.lances_config.valor_percentual).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : String(lance.lances_config.valor_percentual)) : ''); setDefObs(lance.lances_config?.observacao || ''); setDefRecorrente(lance.lances_config?.recorrente || false) } }} className="w-full flex items-center justify-center gap-2 rounded-lg py-1.5 text-[11px] mt-1" style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}>
               Trocar lance
             </button>
           ) : null
