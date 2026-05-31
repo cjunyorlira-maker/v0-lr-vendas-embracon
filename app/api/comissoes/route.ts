@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextRequest, NextResponse } from "next/server"
+import { getEscopo } from '@/lib/escopo'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -51,7 +52,8 @@ export async function GET() {
       .select('id, valor_credito, empresa_id, equipe_id, vendedor_id, comissao_vendedor_percent, comissao_supervisor_percent, comissao_recebida_rs, comissao_recebida_percent, criado_em, data_venda, clientes(nome), usuarios:vendedor_id(nome, role), planos(sigla, comissao_total, estorno_percent, estorno_ate_pgto, categoria_comissao, adesao_percent, bem), boletos(qtd_parcelas, status)')
       .order('criado_em', { ascending: false })
 
-    if (me.role !== 'master') q = q.eq('empresa_id', me.empresa_id)
+    const { escopoGlobal } = await getEscopo(me)
+    if (!escopoGlobal) q = q.eq('empresa_id', me.empresa_id)
     const { data: vendas } = await q
 
     const lista = (vendas || []).map((v: any) => {
