@@ -24,6 +24,7 @@ interface Usuario {
 interface Equipe {
   id: string
   nome: string
+  empresa_id?: string | null
 }
 
 const roleLabels: Record<string, string> = {
@@ -106,7 +107,7 @@ export default function EquipePage() {
 
     const { data: equipesData } = await supabase
       .from('equipes')
-      .select('id, nome')
+      .select('id, nome, empresa_id')
       .order('nome')
 
     if (equipesData) setEquipes(equipesData)
