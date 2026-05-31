@@ -42,10 +42,11 @@ export default function LancesPage() {
   const [processando, setProcessando] = useState<string | null>(null)
   const [ofertarModal, setOfertarModal] = useState<Lance | null>(null)
   const [definirModal, setDefinirModal] = useState<Lance | null>(null)
-  const [defTipo, setDefTipo] = useState<'fixo25' | 'valor' | 'livre'>('fixo25')
+  const [defTipo, setDefTipo] = useState<'fixo25' | 'fixo50' | 'valor' | 'livre'>('fixo25')
   const [defValor, setDefValor] = useState('')
   const [defObs, setDefObs] = useState('')
   const [defRecorrente, setDefRecorrente] = useState(false)
+  const [editarLanceModal, setEditarLanceModal] = useState<any>(null)
   const [pdfAnexo, setPdfAnexo] = useState<{ base64: string; nome: string } | null>(null)
   const [fGrupo, setFGrupo] = useState('')
   const [busca, setBusca] = useState('')
@@ -127,7 +128,9 @@ export default function LancesPage() {
   async function confirmarDefinir() {
     if (!definirModal) return
     setProcessando(definirModal.id)
-    const payload: any = { acao: 'solicitar', lance_id: definirModal.id, tipo: defTipo, observacao: defObs, recorrente: defRecorrente }
+    // se o lance já está solicitado ou ofertado, é uma EDIÇÃO; se pendente, é solicitar
+    const ehEdicao = definirModal.status === 'solicitado' || definirModal.status === 'ofertado'
+    const payload: any = { acao: ehEdicao ? 'editar' : 'solicitar', lance_id: definirModal.id, tipo: defTipo, observacao: defObs, recorrente: defRecorrente }
     if (defTipo !== 'fixo25') payload.valor_percentual = parseFloat(defValor.replace(',', '.')) || 0
     await fetch('/api/lances/acao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
     setDefinirModal(null)
@@ -167,6 +170,20 @@ export default function LancesPage() {
             <Upload size={13} />Ofertar lance
           </button>
         )}
+        {lance.status === 'solicitado' && (
+          <button onClick={() => { setDefinirModal(lance); setDefTipo((lance.lances_config?.tipo as 'fixo25' | 'fixo50' | 'valor' | 'livre') || 'fixo25'); setDefValor(lance.lances_config?.valor_percentual ? String(lance.lances_config.valor_percentual) : ''); setDefObs(lance.lances_config?.observacao || ''); setDefRecorrente(lance.lances_config?.recorrente || false) }} className="w-full flex items-center justify-center gap-2 rounded-lg py-1.5 text-[11px] mt-1" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>
+            Editar lance
+          </button>
+        )}
+        {lance.status === 'ofertado' && (() => {
+          const hoje = new Date().toISOString().slice(0,10)
+          const podeTrocar = !lance.data_assembleia || lance.data_assembleia >= hoje
+          return podeTrocar ? (
+            <button onClick={() => { if (confirm('Trocar este lance? Ele já foi ofertado — a ADM precisa trocar também no sistema da Embracon. O lance voltará para Solicitado.')) { setDefinirModal(lance); setDefTipo((lance.lances_config?.tipo as 'fixo25' | 'fixo50' | 'valor' | 'livre') || 'fixo25'); setDefValor(lance.lances_config?.valor_percentual ? String(lance.lances_config.valor_percentual) : ''); setDefObs(lance.lances_config?.observacao || ''); setDefRecorrente(lance.lances_config?.recorrente || false) } }} className="w-full flex items-center justify-center gap-2 rounded-lg py-1.5 text-[11px] mt-1" style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}>
+              Trocar lance
+            </button>
+          ) : null
+        })()}
 
         {lance.status === 'ofertado' && (
           <div className="space-y-2">
@@ -266,8 +283,8 @@ export default function LancesPage() {
             <div className="space-y-3">
               <div>
                 <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Tipo de lance</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {([['fixo25','Fixo 25%'],['valor','Valor R$'],['livre','Livre %']] as const).map(([k, lbl]) => (
+                <div className="grid grid-cols-2 gap-2">
+                  {([['fixo25','Fixo 25%'],['fixo50','Fixo 50%'],['valor','Valor R$'],['livre','Livre %']] as const).map(([k, lbl]) => (
                     <button key={k} onClick={() => setDefTipo(k)} className="rounded-lg py-2 text-xs font-medium" style={{ background: defTipo === k ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${defTipo === k ? 'var(--accent)' : 'var(--border)'}`, color: defTipo === k ? 'var(--accent)' : 'var(--muted-color)' }}>{lbl}</button>
                   ))}
                 </div>
