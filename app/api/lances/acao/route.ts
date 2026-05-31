@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
       }).select('id').single()
       if (cfgErr || !cfg) return NextResponse.json({ error: cfgErr?.message || 'Erro' }, { status: 500 })
 
-      // cria o lance do mês atual
+      // cria o lance do mês atual JÁ como solicitado (o vendedor já definiu o valor na criação)
       await supabaseAdmin.from('lances_mensais').insert({
         lance_config_id: cfg.id, empresa_id: cliente.empresa_id, cliente_id,
         vendedor_id: cliente.vendedor_id, equipe_id: cliente.equipe_id,
