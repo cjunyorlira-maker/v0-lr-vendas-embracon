@@ -128,6 +128,7 @@ export default function ComissoesPage() {
   // Master: 0,25% sobre toda a produção (crédito) do filtro atual
   const producaoTotal = vendasFiltradas.reduce((s, v) => s + (v.credito || 0), 0)
   const comissaoMaster = producaoTotal * 0.0025
+  const liquidoRep = totalLR - totalVendedores - totalSupervisores
   const inputStyle = { background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }
 
   if (semAcesso) {
@@ -188,6 +189,11 @@ export default function ComissoesPage() {
                 <p className="text-[10px] mt-0.5" style={{ color: 'var(--muted-color)' }}>sobre {fmtMoeda(producaoTotal)} de produção</p>
               </div>
             )}
+            <div className="rounded-xl p-4" style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.12) 0%, rgba(34,197,94,0.04) 100%)', border: '1px solid rgba(34,197,94,0.25)' }}>
+              <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Líquido Representante</p>
+              <p className="text-xl font-bold" style={{ color: '#22c55e' }}>{fmtMoeda(liquidoRep)}</p>
+              <p className="text-[10px] mt-0.5" style={{ color: 'var(--muted-color)' }}>após vendedor e supervisor</p>
+            </div>
           </div>
 
           {/* Importar mapa */}
