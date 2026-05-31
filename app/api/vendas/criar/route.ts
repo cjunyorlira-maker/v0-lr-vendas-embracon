@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const {
       nome_cliente, cpf_cnpj, telefone, email,
-      numero_proposta, numero_contrato, grupo, cota,
+      numero_proposta, numero_contrato, grupo, cota, data_venda,
       valor_credito, valor_primeira_parcela, valor_demais_parcelas,
       adesao_percent, plano_id,
       qtd_parcelas, valor_boleto,
@@ -126,6 +126,7 @@ export async function POST(req: NextRequest) {
         pdf_proposta_nome: pdf_nome || null,
         observacoes: observacoes || null,
         data_assembleia_entrada: data_assembleia_entrada || null,
+        data_venda: data_venda || null,
       })
       .select('id')
       .single()
