@@ -19,8 +19,12 @@ interface Lance {
   grupo?: string | null
   cota?: string | null
   numero_proposta?: string | null
+  empresa_id?: string | null
+  equipe_id?: string | null
+  vendedor_id?: string | null
   clientes?: { nome: string }
   usuarios?: { nome: string }
+  equipes?: { nome: string }
   lances_config?: { tipo: string; valor_percentual: number; observacao: string; recorrente: boolean }
 }
 
@@ -50,6 +54,10 @@ export default function LancesPage() {
   const [pdfAnexo, setPdfAnexo] = useState<{ base64: string; nome: string } | null>(null)
   const [fGrupo, setFGrupo] = useState('')
   const [busca, setBusca] = useState('')
+  const [filtrosOpc, setFiltrosOpc] = useState<{ empresas: any[]; equipes: any[]; vendedores: any[] }>({ empresas: [], equipes: [], vendedores: [] })
+  const [fEmpresa, setFEmpresa] = useState('')
+  const [fEquipe, setFEquipe] = useState('')
+  const [fVendedor, setFVendedor] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { loadData() }, [])
@@ -61,6 +69,7 @@ export default function LancesPage() {
     const res = await fetch('/api/lances')
     const data = await res.json()
     if (data.lances) { setLances(data.lances); setMesRef(data.mes_referencia); setRole(data.meu_role) }
+    if (data.filtros) setFiltrosOpc(data.filtros)
     setLoading(false)
   }
 
@@ -72,6 +81,9 @@ export default function LancesPage() {
   const gruposOrdenados = Object.entries(gruposContagem).sort((a, b) => b[1] - a[1])
 
   const lancesFiltrados = lances.filter(l => {
+    if (fEmpresa && l.empresa_id !== fEmpresa) return false
+    if (fEquipe && l.equipe_id !== fEquipe) return false
+    if (fVendedor && l.vendedor_id !== fVendedor) return false
     if (fGrupo && String(l.grupo) !== fGrupo) return false
     if (busca) {
       const b = busca.toLowerCase()
@@ -165,6 +177,8 @@ export default function LancesPage() {
         <div className="flex flex-wrap gap-2 text-xs mb-3" style={{ color: 'var(--muted-color)' }}>
           <span className="px-2 py-0.5 rounded" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)' }}>{descTipo(lance.lances_config)}</span>
           {lance.grupo && <span className="flex items-center gap-1">Grupo {lance.grupo}/{lance.cota}</span>}
+          {lance.usuarios?.nome && <span className="flex items-center gap-1">Vend: {lance.usuarios.nome}</span>}
+          {lance.equipes?.nome && <span className="flex items-center gap-1">Equipe: {lance.equipes.nome}</span>}
           {lance.data_assembleia && <span className="flex items-center gap-1"><Clock size={11} />Assemb: {fmtData(lance.data_assembleia)}</span>}
           {lance.lances_config?.recorrente && <span style={{ color: '#a855f7' }}>{'\u267b'} recorrente</span>}
         </div>
@@ -239,11 +253,29 @@ export default function LancesPage() {
                 <Search size={15} style={{ color: 'var(--muted-color)', position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
                 <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar cliente, grupo, proposta..." className="rounded-lg pl-8 pr-3 py-2 text-sm outline-none w-64" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }} />
               </div>
+              {role === 'master' && (
+                <select value={fEmpresa} onChange={(e) => { setFEmpresa(e.target.value); setFEquipe(''); setFVendedor('') }} className="rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                  <option value="" style={{ background: '#131313' }}>Todas empresas</option>
+                  {filtrosOpc.empresas.map(e => <option key={e.id} value={e.id} style={{ background: '#131313' }}>{e.nome}</option>)}
+                </select>
+              )}
+              {['master', 'representante', 'adm'].includes(role) && (
+                <select value={fEquipe} onChange={(e) => { setFEquipe(e.target.value); setFVendedor('') }} className="rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                  <option value="" style={{ background: '#131313' }}>Todos supervisores</option>
+                  {filtrosOpc.equipes.filter(eq => !fEmpresa || eq.empresa_id === fEmpresa).map(eq => <option key={eq.id} value={eq.id} style={{ background: '#131313' }}>{eq.nome}</option>)}
+                </select>
+              )}
+              {['master', 'representante', 'adm', 'supervisor'].includes(role) && (
+                <select value={fVendedor} onChange={(e) => setFVendedor(e.target.value)} className="rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                  <option value="" style={{ background: '#131313' }}>Todos vendedores</option>
+                  {filtrosOpc.vendedores.filter(vd => (!fEmpresa || vd.empresa_id === fEmpresa) && (!fEquipe || vd.equipe_id === fEquipe)).map(vd => <option key={vd.id} value={vd.id} style={{ background: '#131313' }}>{vd.nome}</option>)}
+                </select>
+              )}
               <select value={fGrupo} onChange={(e) => setFGrupo(e.target.value)} className="rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
                 <option value="" style={{ background: '#131313' }}>Todos os grupos</option>
                 {gruposOrdenados.map(([g, qt]) => <option key={g} value={g} style={{ background: '#131313' }}>Grupo {g} ({qt})</option>)}
               </select>
-              {(fGrupo || busca) && <button onClick={() => { setFGrupo(''); setBusca('') }} className="rounded-lg px-3 py-1.5 text-xs" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>Limpar</button>}
+              {(fGrupo || busca || fEmpresa || fEquipe || fVendedor) && <button onClick={() => { setFGrupo(''); setBusca(''); setFEmpresa(''); setFEquipe(''); setFVendedor('') }} className="rounded-lg px-3 py-1.5 text-xs" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>Limpar</button>}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
