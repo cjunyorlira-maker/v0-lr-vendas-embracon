@@ -25,6 +25,8 @@ export default function ComissoesPage() {
   const [dataAte, setDataAte] = useState('')
   const [filtros, setFiltros] = useState<{ empresas: any[]; equipes: any[]; vendedores: any[] }>({ empresas: [], equipes: [], vendedores: [] })
   const [meuRole, setMeuRole] = useState('')
+  const [diaProducao, setDiaProducao] = useState(21)
+  const [salvandoProducao, setSalvandoProducao] = useState(false)
   const [fEmpresa, setFEmpresa] = useState('')
   const [fEquipe, setFEquipe] = useState('')
   const [fVendedor, setFVendedor] = useState('')
@@ -48,6 +50,7 @@ export default function ComissoesPage() {
 
   async function loadData() {
     setLoading(true)
+    try { const rp = await fetch('/api/config-producao'); const dp = await rp.json(); if (dp.dia_inicio) setDiaProducao(dp.dia_inicio) } catch {}
     const res = await fetch('/api/comissoes')
     if (res.status === 403) { setSemAcesso(true); setLoading(false); return }
     const data = await res.json()
@@ -70,6 +73,29 @@ export default function ComissoesPage() {
   function toggleTodas() {
     if (selecionadas.size === vendas.length) setSelecionadas(new Set())
     else setSelecionadas(new Set(vendas.map(v => v.id)))
+  }
+
+  function aplicarProducaoAtual() {
+    const hoje = new Date()
+    const dia = hoje.getDate()
+    let inicio: Date, fim: Date
+    if (dia >= diaProducao) {
+      // produção começou neste mês
+      inicio = new Date(hoje.getFullYear(), hoje.getMonth(), diaProducao)
+      fim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, diaProducao - 1)
+    } else {
+      // produção começou no mês passado
+      inicio = new Date(hoje.getFullYear(), hoje.getMonth() - 1, diaProducao)
+      fim = new Date(hoje.getFullYear(), hoje.getMonth(), diaProducao - 1)
+    }
+    const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+    setDataDe(iso(inicio)); setDataAte(iso(fim))
+  }
+
+  async function salvarDiaProducao(novoDia: number) {
+    setSalvandoProducao(true)
+    await fetch('/api/config-producao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dia_inicio: novoDia }) })
+    setDiaProducao(novoDia); setSalvandoProducao(false)
   }
 
   async function aplicar() {
@@ -255,6 +281,7 @@ export default function ComissoesPage() {
               const iso = (d: Date) => d.toISOString().slice(0, 10)
               setDataDe(iso(domingo)); setDataAte(iso(sabado))
             }} className="rounded-lg px-3 py-1.5 text-xs self-end" style={{ background: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.3)' }}>Semana</button>
+            <button onClick={aplicarProducaoAtual} className="rounded-lg px-3 py-1.5 text-xs self-end" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)', border: '1px solid rgba(212,175,55,0.3)' }}>Produção atual</button>
             {(dataDe || dataAte || fEmpresa || fEquipe || fVendedor) && <button onClick={() => { setDataDe(''); setDataAte(''); setFEmpresa(''); setFEquipe(''); setFVendedor('') }} className="rounded-lg px-3 py-1.5 text-xs self-end" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>Limpar</button>}
           </div>
 
