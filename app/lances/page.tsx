@@ -41,6 +41,7 @@ export default function LancesPage() {
   const [defTipo, setDefTipo] = useState<'fixo25' | 'valor' | 'livre'>('fixo25')
   const [defValor, setDefValor] = useState('')
   const [defObs, setDefObs] = useState('')
+  const [defRecorrente, setDefRecorrente] = useState(false)
   const [pdfAnexo, setPdfAnexo] = useState<{ base64: string; nome: string } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -106,7 +107,7 @@ export default function LancesPage() {
   async function confirmarDefinir() {
     if (!definirModal) return
     setProcessando(definirModal.id)
-    const payload: any = { acao: 'solicitar', lance_id: definirModal.id, tipo: defTipo, observacao: defObs }
+    const payload: any = { acao: 'solicitar', lance_id: definirModal.id, tipo: defTipo, observacao: defObs, recorrente: defRecorrente }
     if (defTipo !== 'fixo25') payload.valor_percentual = parseFloat(defValor.replace(',', '.')) || 0
     await fetch('/api/lances/acao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
     setDefinirModal(null)
@@ -136,7 +137,7 @@ export default function LancesPage() {
         {lance.lances_config?.observacao && <p className="text-xs mb-3 italic" style={{ color: 'var(--muted-color)' }}>{'"'}{lance.lances_config.observacao}{'"'}</p>}
 
         {lance.status === 'pendente' && (
-          <button onClick={() => { setDefinirModal(lance); setDefTipo((lance.lances_config?.tipo as 'fixo25' | 'valor' | 'livre') || 'fixo25'); setDefValor(lance.lances_config?.valor_percentual ? String(lance.lances_config.valor_percentual) : ''); setDefObs(lance.lances_config?.observacao || '') }} disabled={processando === lance.id} className="w-full flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold transition-transform hover:scale-105 active:scale-95" style={{ background: 'rgba(234,179,8,0.15)', color: '#eab308', border: '1px solid #eab308' }}>
+          <button onClick={() => { setDefinirModal(lance); setDefTipo((lance.lances_config?.tipo as 'fixo25' | 'valor' | 'livre') || 'fixo25'); setDefValor(lance.lances_config?.valor_percentual ? String(lance.lances_config.valor_percentual) : ''); setDefObs(lance.lances_config?.observacao || ''); setDefRecorrente(lance.lances_config?.recorrente || false) }} disabled={processando === lance.id} className="w-full flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold transition-transform hover:scale-105 active:scale-95" style={{ background: 'rgba(234,179,8,0.15)', color: '#eab308', border: '1px solid #eab308' }}>
             <Target size={13} />Definir lance pra ofertar
           </button>
         )}
@@ -246,6 +247,10 @@ export default function LancesPage() {
                 <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Observação (opcional)</label>
                 <input value={defObs} onChange={(e) => setDefObs(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }} />
               </div>
+              <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: 'var(--text2)' }}>
+                <input type="checkbox" checked={defRecorrente} onChange={(e) => setDefRecorrente(e.target.checked)} className="accent-yellow-500" />
+                Repetir lance todo mês (recorrente)
+              </label>
               <div className="flex gap-2">
                 <button onClick={() => setDefinirModal(null)} className="flex-1 rounded-lg py-2.5 text-sm" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text2)' }}>Cancelar</button>
                 <button onClick={() => confirmarDefinir()} disabled={processando === definirModal.id} className="flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #d4af37 0%, #c9a227 50%, #b8941f 100%)', color: '#0a0a0a' }}>{processando === definirModal.id ? <Loader2 size={14} className="animate-spin" /> : 'Solicitar lance'}</button>
