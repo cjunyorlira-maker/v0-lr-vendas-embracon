@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
       await supabaseAdmin.from('lances_mensais').insert({
         lance_config_id: cfg.id, empresa_id: cliente.empresa_id, cliente_id,
         vendedor_id: cliente.vendedor_id, equipe_id: cliente.equipe_id,
-        mes_referencia: mesAtualRef(), data_assembleia: dataAssembleia, status: 'pendente',
+        mes_referencia: mesAtualRef(), data_assembleia: dataAssembleia, status: 'solicitado',
       })
 
       // notifica ADM/representante (novo lance pra ofertar)
