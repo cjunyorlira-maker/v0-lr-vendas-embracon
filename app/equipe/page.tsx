@@ -146,6 +146,14 @@ export default function EquipePage() {
     return rolesPermitidos.includes(alvo.role)
   }
 
+  if (currentUserRole === 'vendedor') {
+    return (
+      <div className="flex items-center justify-center min-h-screen" style={{ color: 'var(--muted-color)' }}>
+        <p className="text-sm">Você não tem acesso a esta página.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="relative min-h-screen font-sans">
       <Sidebar />
