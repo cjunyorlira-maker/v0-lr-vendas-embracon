@@ -230,6 +230,15 @@ export default function ComissoesPage() {
   const producaoTotal = vendasFiltradas.reduce((s, v) => s + (v.credito || 0), 0)
   const comissaoMaster = producaoTotal * 0.0025
   const liquidoRep = totalLR - totalVendedores - totalSupervisores
+  // helpers de papel
+  const ehGestao = ['master', 'representante'].includes(meuRole)
+  const ehAdm = meuRole === 'adm'
+  const ehSupervisor = meuRole === 'supervisor'
+  const ehVendedor = meuRole === 'vendedor'
+  // "minha comissão" pro vendedor/supervisor = soma da comissão de vendedor das vendas dele
+  const minhaComissao = vendasFiltradas.reduce((s, v) => s + (v.comissao_vendedor || 0), 0)
+  // comissão da equipe (supervisor) = soma das comissões de vendedor de toda a equipe que ele vê
+  const comissaoEquipe = vendasFiltradas.reduce((s, v) => s + (v.comissao_vendedor || 0) + (v.comissao_supervisor || 0), 0)
   const inputStyle = { background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }
 
   if (semAcesso) {
