@@ -125,13 +125,23 @@ export default function LancesPage() {
     } catch { alert('Erro ao baixar') }
   }
 
+  function formatarMoedaInput(v: string): string {
+    const num = v.replace(/\D/g, '')
+    if (!num) return ''
+    const n = parseInt(num) / 100
+    return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
+
   async function confirmarDefinir() {
     if (!definirModal) return
     setProcessando(definirModal.id)
     // se o lance já está solicitado ou ofertado, é uma EDIÇÃO; se pendente, é solicitar
     const ehEdicao = definirModal.status === 'solicitado' || definirModal.status === 'ofertado'
     const payload: any = { acao: ehEdicao ? 'editar' : 'solicitar', lance_id: definirModal.id, tipo: defTipo, observacao: defObs, recorrente: defRecorrente }
-    if (defTipo !== 'fixo25') payload.valor_percentual = parseFloat(defValor.replace(',', '.')) || 0
+    if (defTipo !== 'fixo25') {
+      const limpo = defTipo === 'valor' ? defValor.replace(/\./g, '').replace(',', '.') : defValor.replace(',', '.')
+      payload.valor_percentual = parseFloat(limpo) || 0
+    }
     await fetch('/api/lances/acao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
     setDefinirModal(null)
     await loadData()
@@ -292,7 +302,7 @@ export default function LancesPage() {
               {defTipo !== 'fixo25' && (
                 <div>
                   <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>{defTipo === 'valor' ? 'Valor (R$)' : 'Percentual (%)'}</label>
-                  <input value={defValor} onChange={(e) => setDefValor(e.target.value)} placeholder={defTipo === 'valor' ? '50000' : '30'} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+                  <input value={defValor} onChange={(e) => setDefValor(defTipo === 'valor' ? formatarMoedaInput(e.target.value) : e.target.value)} placeholder={defTipo === 'valor' ? '50.000,00' : '30'} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }} />
                 </div>
               )}
               <div>
