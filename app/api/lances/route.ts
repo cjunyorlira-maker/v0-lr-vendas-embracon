@@ -73,7 +73,7 @@ export async function GET() {
     // 2. LISTA os lances do mês atual (com escopo)
     let q = supabaseAdmin
       .from('lances_mensais')
-      .select('*, lances_config(tipo, valor_percentual, observacao, recorrente), clientes(nome), usuarios:vendedor_id(nome)')
+      .select('*, lances_config(tipo, valor_percentual, observacao, recorrente, venda_id), clientes(nome), usuarios:vendedor_id(nome)')
       .eq('mes_referencia', mesRef)
 
     if (me.role === 'master') { /* vê tudo */ }
@@ -83,7 +83,25 @@ export async function GET() {
 
     const { data: lances } = await q.order('criado_em', { ascending: false })
 
-    return NextResponse.json({ mes_referencia: mesRef, lances: lances || [], meu_role: me.role })
+    // enriquece com grupo/cota/proposta da venda
+    const vendaIds = (lances || []).map((l: any) => l.lances_config?.venda_id).filter(Boolean)
+    let vendasMap: Record<string, any> = {}
+    if (vendaIds.length > 0) {
+      const { data: vendas } = await supabaseAdmin.from('vendas').select('id, grupo, cota, numero_proposta, numero_contrato').in('id', vendaIds)
+      for (const v of (vendas || [])) vendasMap[v.id] = v
+    }
+    const lancesEnriq = (lances || []).map((l: any) => {
+      const venda = l.lances_config?.venda_id ? vendasMap[l.lances_config.venda_id] : null
+      return { ...l, grupo: venda?.grupo || null, cota: venda?.cota || null, numero_proposta: venda?.numero_proposta || venda?.numero_contrato || null }
+    })
+    // ordena por data de assembleia (mais próxima primeiro; sem data vai pro fim)
+    lancesEnriq.sort((a: any, b: any) => {
+      if (!a.data_assembleia) return 1
+      if (!b.data_assembleia) return -1
+      return new Date(a.data_assembleia).getTime() - new Date(b.data_assembleia).getTime()
+    })
+
+    return NextResponse.json({ mes_referencia: mesRef, lances: lancesEnriq, meu_role: me.role })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
