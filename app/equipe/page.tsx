@@ -75,58 +75,15 @@ export default function EquipePage() {
   useEffect(() => { loadData() }, [])
 
   async function loadData() {
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-
-    const { data: currentUser } = await supabase
-      .from('usuarios')
-      .select('id, empresa_id, role, equipe_id')
-      .eq('auth_user_id', user.id)
-      .single()
-
-    if (currentUser) {
-      setCurrentUserId(currentUser.id)
-      setEmpresaId(currentUser.empresa_id)
-      setCurrentUserRole(currentUser.role)
-      setCurrentUserEquipe(currentUser.equipe_id || null)
-    }
-
-    let queryUsuarios = supabase
-      .from('usuarios')
-      .select('*, empresa:empresas(nome)')
-      .order('criado_em', { ascending: false })
-
-    // escopo: master e adm da matriz veem todos; demais só a própria empresa
-    let ehGlobalUsuarios = currentUser?.role === 'master'
-    if (currentUser?.role === 'adm') {
-      const { data: masterU2 } = await supabase.from('usuarios').select('empresa_id').eq('role', 'master').limit(1).single()
-      ehGlobalUsuarios = masterU2?.empresa_id === currentUser.empresa_id
-    }
-    if (currentUser && !ehGlobalUsuarios && currentUser.empresa_id) {
-      queryUsuarios = queryUsuarios.eq('empresa_id', currentUser.empresa_id)
-    }
-    const { data: usuariosData } = await queryUsuarios
-
-    if (usuariosData) setUsuarios(usuariosData as Usuario[])
-
-    const { data: equipesData } = await supabase
-      .from('equipes')
-      .select('id, nome, empresa_id')
-      .order('nome')
-
-    if (equipesData) setEquipes(equipesData)
-
-    // descobre se é escopo global (master ou adm da matriz)
-    let ehGlobal = currentUser?.role === 'master'
-    if (currentUser?.role === 'adm') {
-      const { data: masterU } = await supabase.from('usuarios').select('empresa_id').eq('role', 'master').limit(1).single()
-      ehGlobal = masterU?.empresa_id === currentUser.empresa_id
-    }
-    if (ehGlobal) {
-      const { data: empData } = await supabase.from('empresas').select('id, nome').order('nome')
-      if (empData) setEmpresasLista(empData)
-    }
+    const res = await fetch('/api/usuarios/listar')
+    const data = await res.json()
+    if (data.usuarios) setUsuarios(data.usuarios as Usuario[])
+    if (data.equipes) setEquipes(data.equipes)
+    if (data.empresas) setEmpresasLista(data.empresas)
+    setCurrentUserId(data.meuId || '')
+    setCurrentUserRole(data.meuRole || '')
+    setCurrentUserEquipe(data.minhaEquipe || null)
+    setEmpresaId(data.minhaEmpresa || null)
     setLoading(false)
   }
 

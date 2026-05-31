@@ -42,7 +42,7 @@ export async function GET() {
       empresas = emp || []
     }
 
-    return NextResponse.json({ usuarios: usuarios || [], equipes: equipes || [], empresas, escopoGlobal, meuRole: me.role, meuId: me.id, minhaEquipe: me.equipe_id })
+    return NextResponse.json({ usuarios: usuarios || [], equipes: equipes || [], empresas, escopoGlobal, meuRole: me.role, meuId: me.id, minhaEquipe: me.equipe_id, minhaEmpresa: me.empresa_id })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
