@@ -194,6 +194,11 @@ export default function ComissoesPage() {
               <p className="text-xl font-bold" style={{ color: '#22c55e' }}>{fmtMoeda(liquidoRep)}</p>
               <p className="text-[10px] mt-0.5" style={{ color: 'var(--muted-color)' }}>após vendedor e supervisor</p>
             </div>
+            <div className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+              <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Total em Vendas</p>
+              <p className="text-xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(producaoTotal)}</p>
+              <p className="text-[10px] mt-0.5" style={{ color: 'var(--muted-color)' }}>{vendasFiltradas.length} venda(s)</p>
+            </div>
           </div>
 
           {/* Importar mapa */}
@@ -242,6 +247,14 @@ export default function ComissoesPage() {
                 </select>
               </div>
             )}
+            <button onClick={() => {
+              const hoje = new Date()
+              const dia = hoje.getDay() // 0 = domingo
+              const domingo = new Date(hoje); domingo.setDate(hoje.getDate() - dia)
+              const sabado = new Date(domingo); sabado.setDate(domingo.getDate() + 6)
+              const iso = (d: Date) => d.toISOString().slice(0, 10)
+              setDataDe(iso(domingo)); setDataAte(iso(sabado))
+            }} className="rounded-lg px-3 py-1.5 text-xs self-end" style={{ background: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.3)' }}>Semana</button>
             {(dataDe || dataAte || fEmpresa || fEquipe || fVendedor) && <button onClick={() => { setDataDe(''); setDataAte(''); setFEmpresa(''); setFEquipe(''); setFVendedor('') }} className="rounded-lg px-3 py-1.5 text-xs self-end" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>Limpar</button>}
           </div>
 
