@@ -47,6 +47,36 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     }
 
     const statusAtual = boleto.status
+
+    // Caso especial: pagou via TED (do pendente vai direto pra aguardando_baixa)
+    if (body.acao === 'pagou_ted') {
+      if (statusAtual !== 'pendente' && statusAtual !== 'solicitado' && statusAtual !== 'aguardando_pagamento') {
+        return NextResponse.json({ error: "Só pode marcar TED antes da baixa" }, { status: 400 })
+      }
+      await supabaseAdmin.from('boletos').update({
+        status: 'aguardando_baixa',
+        pago_via_ted: true,
+        data_ted: new Date().toISOString().slice(0, 10),
+        data_pagamento: new Date().toISOString(),
+        atualizado_em: new Date().toISOString(),
+      }).eq('id', boleto.id)
+      try {
+        await supabaseAdmin.from('status_log').insert({
+          empresa_id: boleto.empresa_id, boleto_id: boletoId,
+          status_anterior: statusAtual, status_novo: 'aguardando_baixa',
+          alterado_por: usuario.id, observacao: 'Pago via TED',
+        })
+      } catch {}
+      try {
+        const nomeCliente = boleto.clientes?.nome || 'Cliente'
+        await supabaseAdmin.from('notificacoes').insert([
+          { empresa_id: boleto.empresa_id, destinatario_role: 'adm', titulo: 'Cliente pagou (TED)', mensagem: `${nomeCliente} — pago via TED, aguardando baixa`, tipo: 'cliente_pagou', link_url: '/boletos', boleto_id: boletoId },
+          { empresa_id: boleto.empresa_id, destinatario_role: 'representante', titulo: 'Cliente pagou (TED)', mensagem: `${nomeCliente} — pago via TED, aguardando baixa`, tipo: 'cliente_pagou', link_url: '/boletos', boleto_id: boletoId },
+        ])
+      } catch {}
+      return NextResponse.json({ success: true, novo_status: 'aguardando_baixa' })
+    }
+
     const transicao = TRANSICOES[statusAtual]
     if (!transicao) return NextResponse.json({ error: `Boleto já está em status final` }, { status: 400 })
     if (!transicao.roles.includes(usuario.role)) return NextResponse.json({ error: "Seu cargo não pode fazer essa ação" }, { status: 403 })
