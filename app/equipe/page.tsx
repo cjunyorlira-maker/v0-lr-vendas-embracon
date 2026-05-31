@@ -201,7 +201,7 @@ export default function EquipePage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {currentUserRole === 'master' && empresasLista.length > 0 && (
+              {empresasLista.length > 0 && (
                 <select value={filtroEmpresa} onChange={(e) => setFiltroEmpresa(e.target.value)} className="rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
                   <option value="" style={{ background: '#131313' }}>Todas as empresas</option>
                   {empresasLista.map(e => <option key={e.id} value={e.id} style={{ background: '#131313' }}>{e.nome}</option>)}

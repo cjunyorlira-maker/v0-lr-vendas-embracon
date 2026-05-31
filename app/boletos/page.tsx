@@ -208,7 +208,7 @@ O boleto está em anexo.`
         <Header title="Boletos" />
         <main className="mx-auto max-w-[1400px] px-6 py-8 lg:px-8">
           <div className="flex items-end gap-2 mb-4 flex-wrap">
-            {role === 'master' && (
+            {filtrosOpc.empresas.length > 0 && (
               <div>
                 <label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>Empresa</label>
                 <select value={fEmpresa} onChange={(e) => { setFEmpresa(e.target.value); setFEquipe(''); setFVendedor('') }} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
