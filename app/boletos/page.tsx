@@ -50,7 +50,7 @@ export default function BoletosPage() {
     if (cu) setRole(cu.role)
     const { data } = await supabase
       .from('boletos')
-      .select('id, qtd_parcelas, valor_boleto, status, boleto_pdf_url, clientes(nome), vendas(numero_proposta, numero_contrato, grupo, cota, valor_credito), empresas(nome), usuarios:vendedor_id(nome)')
+      .select('id, qtd_parcelas, valor_boleto, status, boleto_pdf_url, data_solicitacao, data_anexo_boleto, data_pagamento, pago_via_ted, clientes(nome), vendas(numero_proposta, numero_contrato, grupo, cota, valor_credito), empresas(nome), usuarios:vendedor_id(nome)')
       .order('criado_em', { ascending: false })
     if (data) setBoletos(data as any)
     setLoading(false)
@@ -131,6 +131,17 @@ O boleto está em anexo.`
 
   const podeOperar = ['master', 'representante', 'adm'].includes(role)
   const podePagar = ['master', 'representante', 'adm', 'supervisor', 'vendedor'].includes(role)
+  function diasDesde(dataStr: string | null): number | null {
+    if (!dataStr) return null
+    const d = new Date(dataStr); const hoje = new Date()
+    return Math.floor((hoje.getTime() - d.getTime()) / (1000 * 60 * 60 * 24))
+  }
+  async function pagouViaTed(boletoId: string) {
+    if (!confirm('Confirmar pagamento via TED? O boleto vai direto para Aguardando Baixa.')) return
+    const res = await fetch(`/api/boletos/${boletoId}/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'pagou_ted' }) })
+    if (res.ok) location.reload(); else alert('Erro ao marcar TED')
+  }
+
   const filtrados = boletos.filter(b => b.status === abaAtiva)
   const contar = (k: string) => boletos.filter(b => b.status === k).length
   const statusAtual = STATUS.find(s => s.key === abaAtiva)
@@ -168,13 +179,21 @@ O boleto está em anexo.`
                       <span>{b.qtd_parcelas} parc.</span>
                       <span className="font-semibold" style={{ color: statusAtual?.cor }}>{fmtMoeda(b.valor_boleto)}</span>
                       {b.boleto_pdf_url && <span className="flex items-center gap-1" style={{ color: '#22c55e' }}><Paperclip size={11} />boleto anexado</span>}
+                      {b.status === 'solicitado' && diasDesde(b.data_solicitacao) !== null && <span style={{ color: (diasDesde(b.data_solicitacao) || 0) >= 3 ? '#ef4444' : '#f59e0b' }}>solicitado há {diasDesde(b.data_solicitacao)} dia(s)</span>}
+                      {b.status === 'aguardando_baixa' && diasDesde(b.data_pagamento) !== null && <span style={{ color: (diasDesde(b.data_pagamento) || 0) >= 1 ? '#a855f7' : 'var(--muted-color)' }}>aguardando baixa há {diasDesde(b.data_pagamento)} dia(s){(diasDesde(b.data_pagamento) || 0) >= 1 ? ' — verificar' : ''}</span>}
+                      {b.pago_via_ted && <span style={{ color: '#a855f7' }}>via TED</span>}
                     </div>
                   </div>
-                  {statusAtual?.proxLabel && podeAvancar(b.status) && (
-                    <button onClick={() => avancarStatus(b)} disabled={processando === b.id} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50 transition-transform hover:scale-105 active:scale-95" style={{ background: `${statusAtual.cor}20`, color: statusAtual.cor, border: `1px solid ${statusAtual.cor}` }}>
-                      {processando === b.id ? <Loader2 size={12} className="animate-spin" /> : <>{statusAtual.proxLabel}<ArrowRight size={12} /></>}
-                    </button>
-                  )}
+                  <div className="flex gap-2">
+                    {['pendente', 'solicitado', 'aguardando_pagamento'].includes(b.status) && podeOperar && (
+                      <button onClick={() => pagouViaTed(b.id)} className="rounded-lg px-3 py-2 text-xs font-medium" style={{ background: 'rgba(168,85,247,0.15)', color: '#a855f7', border: '1px solid rgba(168,85,247,0.3)' }}>Pagou via TED</button>
+                    )}
+                    {statusAtual?.proxLabel && podeAvancar(b.status) && (
+                      <button onClick={() => avancarStatus(b)} disabled={processando === b.id} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50 transition-transform hover:scale-105 active:scale-95" style={{ background: `${statusAtual.cor}20`, color: statusAtual.cor, border: `1px solid ${statusAtual.cor}` }}>
+                        {processando === b.id ? <Loader2 size={12} className="animate-spin" /> : <>{statusAtual.proxLabel}<ArrowRight size={12} /></>}
+                      </button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>
