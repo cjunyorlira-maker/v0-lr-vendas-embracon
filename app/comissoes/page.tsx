@@ -25,7 +25,8 @@ export default function ComissoesPage() {
   const [dataAte, setDataAte] = useState('')
   const [filtros, setFiltros] = useState<{ empresas: any[]; equipes: any[]; vendedores: any[] }>({ empresas: [], equipes: [], vendedores: [] })
   const [meuRole, setMeuRole] = useState('')
-  const [diaProducao, setDiaProducao] = useState(21)
+  const [prodInicio, setProdInicio] = useState('')
+  const [prodFim, setProdFim] = useState('')
   const [salvandoProducao, setSalvandoProducao] = useState(false)
   const [fEmpresa, setFEmpresa] = useState('')
   const [fEquipe, setFEquipe] = useState('')
@@ -50,7 +51,7 @@ export default function ComissoesPage() {
 
   async function loadData() {
     setLoading(true)
-    try { const rp = await fetch('/api/config-producao'); const dp = await rp.json(); if (dp.dia_inicio) setDiaProducao(dp.dia_inicio) } catch {}
+    try { const rp = await fetch('/api/config-producao'); const dp = await rp.json(); if (dp.data_inicio) setProdInicio(dp.data_inicio); if (dp.data_fim) setProdFim(dp.data_fim) } catch {}
     const res = await fetch('/api/comissoes')
     if (res.status === 403) { setSemAcesso(true); setLoading(false); return }
     const data = await res.json()
@@ -76,26 +77,15 @@ export default function ComissoesPage() {
   }
 
   function aplicarProducaoAtual() {
-    const hoje = new Date()
-    const dia = hoje.getDate()
-    let inicio: Date, fim: Date
-    if (dia >= diaProducao) {
-      // produção começou neste mês
-      inicio = new Date(hoje.getFullYear(), hoje.getMonth(), diaProducao)
-      fim = new Date(hoje.getFullYear(), hoje.getMonth() + 1, diaProducao - 1)
-    } else {
-      // produção começou no mês passado
-      inicio = new Date(hoje.getFullYear(), hoje.getMonth() - 1, diaProducao)
-      fim = new Date(hoje.getFullYear(), hoje.getMonth(), diaProducao - 1)
-    }
-    const iso = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
-    setDataDe(iso(inicio)); setDataAte(iso(fim))
+    if (prodInicio) setDataDe(prodInicio)
+    if (prodFim) setDataAte(prodFim)
   }
 
-  async function salvarDiaProducao(novoDia: number) {
+  async function salvarProducao() {
+    if (!prodInicio || !prodFim) { alert('Informe início e fim'); return }
     setSalvandoProducao(true)
-    await fetch('/api/config-producao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ dia_inicio: novoDia }) })
-    setDiaProducao(novoDia); setSalvandoProducao(false)
+    await fetch('/api/config-producao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data_inicio: prodInicio, data_fim: prodFim }) })
+    setSalvandoProducao(false)
   }
 
   async function aplicar() {
@@ -298,14 +288,17 @@ export default function ComissoesPage() {
             {meuRole === 'master' && (
               <div className="rounded-xl p-5 max-w-2xl mb-4" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
                 <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text)' }}>Período de produção</h3>
-                <p className="text-xs mb-3" style={{ color: 'var(--muted-color)' }}>Dia em que começa o ciclo de produção (vai desse dia até o dia anterior do mês seguinte).</p>
+                <p className="text-xs mb-3" style={{ color: 'var(--muted-color)' }}>Define o período de produção atual. Vale para Comissões, Ranking e relatórios.</p>
                 <div className="flex items-end gap-3 flex-wrap">
                   <div>
-                    <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Dia de início</label>
-                    <input type="number" min="1" max="28" value={diaProducao} onChange={(e) => setDiaProducao(parseInt(e.target.value) || 21)} className="rounded-lg px-3 py-2 text-sm outline-none w-24" style={inputStyle} />
+                    <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Data início</label>
+                    <input type="date" value={prodInicio} onChange={(e) => setProdInicio(e.target.value)} className="rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
                   </div>
-                  <button onClick={() => salvarDiaProducao(diaProducao)} disabled={salvandoProducao} className="rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50" style={{ background: 'var(--accent)', color: '#0a0a0a' }}>{salvandoProducao ? 'Salvando...' : 'Salvar'}</button>
-                  <span className="text-xs self-center" style={{ color: 'var(--muted-color)' }}>Ex: dia {diaProducao} → ciclo {diaProducao} a {diaProducao - 1} do mês seguinte</span>
+                  <div>
+                    <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Data fim</label>
+                    <input type="date" value={prodFim} onChange={(e) => setProdFim(e.target.value)} className="rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
+                  </div>
+                  <button onClick={salvarProducao} disabled={salvandoProducao} className="rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50" style={{ background: 'var(--accent)', color: '#0a0a0a' }}>{salvandoProducao ? 'Salvando...' : 'Salvar'}</button>
                 </div>
               </div>
             )}
