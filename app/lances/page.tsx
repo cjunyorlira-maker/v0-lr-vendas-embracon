@@ -37,6 +37,10 @@ export default function LancesPage() {
   const [mesRef, setMesRef] = useState('')
   const [processando, setProcessando] = useState<string | null>(null)
   const [ofertarModal, setOfertarModal] = useState<Lance | null>(null)
+  const [definirModal, setDefinirModal] = useState<Lance | null>(null)
+  const [defTipo, setDefTipo] = useState<'fixo25' | 'valor' | 'livre'>('fixo25')
+  const [defValor, setDefValor] = useState('')
+  const [defObs, setDefObs] = useState('')
   const [pdfAnexo, setPdfAnexo] = useState<{ base64: string; nome: string } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -99,9 +103,13 @@ export default function LancesPage() {
     } catch { alert('Erro ao baixar') }
   }
 
-  async function solicitarLance(lance: Lance) {
-    setProcessando(lance.id)
-    await fetch('/api/lances/acao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'solicitar', lance_id: lance.id }) })
+  async function confirmarDefinir() {
+    if (!definirModal) return
+    setProcessando(definirModal.id)
+    const payload: any = { acao: 'solicitar', lance_id: definirModal.id, tipo: defTipo, observacao: defObs }
+    if (defTipo !== 'fixo25') payload.valor_percentual = parseFloat(defValor.replace(',', '.')) || 0
+    await fetch('/api/lances/acao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    setDefinirModal(null)
     await loadData()
     setProcessando(null)
   }
@@ -128,7 +136,7 @@ export default function LancesPage() {
         {lance.lances_config?.observacao && <p className="text-xs mb-3 italic" style={{ color: 'var(--muted-color)' }}>{'"'}{lance.lances_config.observacao}{'"'}</p>}
 
         {lance.status === 'pendente' && (
-          <button onClick={() => solicitarLance(lance)} disabled={processando === lance.id} className="w-full flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold transition-transform hover:scale-105 active:scale-95" style={{ background: 'rgba(234,179,8,0.15)', color: '#eab308', border: '1px solid #eab308' }}>
+          <button onClick={() => { setDefinirModal(lance); setDefTipo((lance.lances_config?.tipo as 'fixo25' | 'valor' | 'livre') || 'fixo25'); setDefValor(lance.lances_config?.valor_percentual ? String(lance.lances_config.valor_percentual) : ''); setDefObs(lance.lances_config?.observacao || '') }} disabled={processando === lance.id} className="w-full flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold transition-transform hover:scale-105 active:scale-95" style={{ background: 'rgba(234,179,8,0.15)', color: '#eab308', border: '1px solid #eab308' }}>
             <Target size={13} />Definir lance pra ofertar
           </button>
         )}
@@ -211,6 +219,41 @@ export default function LancesPage() {
           )}
         </main>
       </div>
+
+      {/* Modal definir lance */}
+      {definirModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }} onClick={() => setDefinirModal(null)} />
+          <div className="relative w-full max-w-md rounded-xl p-6" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+            <h3 className="text-base font-semibold mb-1" style={{ color: 'var(--text)' }}>Definir lance</h3>
+            <p className="text-xs mb-4" style={{ color: 'var(--muted-color)' }}>{definirModal.clientes?.nome} · escolha o lance que quer ofertar este mês.</p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Tipo de lance</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {([['fixo25','Fixo 25%'],['valor','Valor R$'],['livre','Livre %']] as const).map(([k, lbl]) => (
+                    <button key={k} onClick={() => setDefTipo(k)} className="rounded-lg py-2 text-xs font-medium" style={{ background: defTipo === k ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${defTipo === k ? 'var(--accent)' : 'var(--border)'}`, color: defTipo === k ? 'var(--accent)' : 'var(--muted-color)' }}>{lbl}</button>
+                  ))}
+                </div>
+              </div>
+              {defTipo !== 'fixo25' && (
+                <div>
+                  <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>{defTipo === 'valor' ? 'Valor (R$)' : 'Percentual (%)'}</label>
+                  <input value={defValor} onChange={(e) => setDefValor(e.target.value)} placeholder={defTipo === 'valor' ? '50000' : '30'} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+                </div>
+              )}
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Observação (opcional)</label>
+                <input value={defObs} onChange={(e) => setDefObs(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => setDefinirModal(null)} className="flex-1 rounded-lg py-2.5 text-sm" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text2)' }}>Cancelar</button>
+                <button onClick={() => confirmarDefinir()} disabled={processando === definirModal.id} className="flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #d4af37 0%, #c9a227 50%, #b8941f 100%)', color: '#0a0a0a' }}>{processando === definirModal.id ? <Loader2 size={14} className="animate-spin" /> : 'Solicitar lance'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal ofertar */}
       {ofertarModal && (
