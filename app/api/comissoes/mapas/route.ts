@@ -38,15 +38,28 @@ export async function GET(req: NextRequest) {
     let detalhe = null
     if (mapaId) {
       const { data: linhas } = await supabaseAdmin.from('mapa_linhas').select('contrato, consorciado, percentual_comis, parcela_de, parcela_ate, valor_comissao').eq('mapa_id', mapaId)
-      // agrupa por contrato/cliente
+      // cruza os contratos com as vendas pra pegar o nome real do cliente
+      const contratos = [...new Set((linhas || []).map((l: any) => String(l.contrato)))]
+      const nomePorContrato: Record<string, string> = {}
+      if (contratos.length > 0) {
+        const { data: vendas } = await supabaseAdmin.from('vendas').select('numero_contrato, numero_proposta, clientes(nome)').or(`numero_contrato.in.(${contratos.join(',')}),numero_proposta.in.(${contratos.join(',')})`)
+        for (const v of (vendas || [])) {
+          const nome = Array.isArray(v.clientes) ? v.clientes[0]?.nome : (v.clientes as any)?.nome
+          if (v.numero_contrato) nomePorContrato[String(v.numero_contrato)] = nome || ''
+          if (v.numero_proposta) nomePorContrato[String(v.numero_proposta)] = nome || ''
+        }
+      }
+      // agrupa por contrato, montando uma linha resumo por cliente
       const porCliente: Record<string, any> = {}
       for (const l of (linhas || [])) {
-        const chave = l.contrato
-        if (!porCliente[chave]) porCliente[chave] = { contrato: l.contrato, cliente: l.consorciado, linhas: [], total: 0 }
-        porCliente[chave].linhas.push({ percentual: l.percentual_comis, parcela_de: l.parcela_de, parcela_ate: l.parcela_ate, valor: l.valor_comissao })
+        const chave = String(l.contrato)
+        if (!porCliente[chave]) porCliente[chave] = { contrato: l.contrato, cliente: nomePorContrato[chave] || l.consorciado || 'Não cadastrado', parcelas: [], percentualTotal: 0, total: 0 }
+        // lista de parcelas (de-ate)
+        for (let p = l.parcela_de; p <= l.parcela_ate; p++) porCliente[chave].parcelas.push(p)
+        porCliente[chave].percentualTotal += l.percentual_comis
         porCliente[chave].total += l.valor_comissao
       }
-      const clientes = Object.values(porCliente)
+      const clientes = Object.values(porCliente).map((c: any) => ({ ...c, parcelas: [...new Set(c.parcelas)].sort((a: any, b: any) => a - b) }))
       const totalGeral = clientes.reduce((s: number, c: any) => s + c.total, 0)
       detalhe = { clientes, totalGeral }
     }
