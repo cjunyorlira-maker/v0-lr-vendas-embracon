@@ -13,6 +13,7 @@ export interface DadosProposta {
   adesao_calculada: number | null
   bem_detectado: string | null
   plano_codigo: string | null
+  data_venda: string | null
   campos_encontrados: number
   campos_totais: number
 }
@@ -186,6 +187,17 @@ export function parseProposta(textoPdf: string): DadosProposta {
   else if (/autonac|motonac|autom[óo]vel|ve[íi]culo/.test(t)) bem_detectado = 'Veículo'
   else if (/servnac|servi[çc]o/.test(t)) bem_detectado = 'Serviços'
 
+  // Data de fechamento: "Dia 27 Mês maio Ano 2026"
+  const MESES_MAP: Record<string, number> = { janeiro:1, fevereiro:2, 'março':3, marco:3, abril:4, maio:5, junho:6, julho:7, agosto:8, setembro:9, outubro:10, novembro:11, dezembro:12 }
+  let dataVenda: string | null = null
+  const mData = texto.match(/Dia\s+(\d{1,2})\s+M[êe]s\s+(\w+)\s+Ano\s+(\d{4})/i)
+  if (mData) {
+    const dia = parseInt(mData[1])
+    const mes = MESES_MAP[mData[2].toLowerCase()] || 0
+    const ano = parseInt(mData[3])
+    if (mes > 0) dataVenda = `${ano}-${String(mes).padStart(2,'0')}-${String(dia).padStart(2,'0')}`
+  }
+
   const campos = [nome, cpf_cnpj, telefone, email, numero_proposta, grupo, cota, valor_credito, valor_primeira_parcela, bem_detectado]
   const campos_encontrados = campos.filter((c) => c !== null && c !== undefined).length
 
@@ -194,6 +206,7 @@ export function parseProposta(textoPdf: string): DadosProposta {
     numero_proposta, numero_contrato: numero_proposta,
     grupo, cota, valor_credito, valor_primeira_parcela, valor_demais_parcelas,
     adesao_calculada, bem_detectado, plano_codigo,
+    data_venda: dataVenda,
     campos_encontrados, campos_totais: 10,
   }
 }
