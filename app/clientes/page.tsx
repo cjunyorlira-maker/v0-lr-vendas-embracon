@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { Users, Loader2, ChevronDown, ChevronUp, Search, SlidersHorizontal, Home, Car, Truck, FileText, Target, Check, CalendarClock } from 'lucide-react'
+import { Users, Loader2, ChevronDown, ChevronUp, Search, SlidersHorizontal, Home, Car, Truck, FileText, Target, Check, CalendarClock, Pencil } from 'lucide-react'
 
 interface Cota {
   venda_id: string; cliente_id: string; nome: string; cpf: string; telefone: string
@@ -53,6 +53,10 @@ export default function ClientesPage() {
   const [dataDe, setDataDe] = useState('')
   const [dataAte, setDataAte] = useState('')
   const [baixando, setBaixando] = useState<string | null>(null)
+  const [editarModal, setEditarModal] = useState<Cota | null>(null)
+  const [edVendedor, setEdVendedor] = useState('')
+  const [edEquipe, setEdEquipe] = useState('')
+  const [salvandoEditar, setSalvandoEditar] = useState(false)
   const [lanceModal, setLanceModal] = useState<Cota | null>(null)
   const [tipoLance, setTipoLance] = useState<'fixo25' | 'fixo50' | 'valor' | 'livre'>('fixo25')
   const [valorLance, setValorLance] = useState('')
@@ -101,6 +105,14 @@ export default function ClientesPage() {
     setSalvandoLance(false)
     if (res.ok) { setLanceModal(null); setValorLance(''); setObsLance(''); setRecorrente(false); setClienteOfertou(false); setTipoLance('fixo25'); load() }
     else alert('Erro ao criar lance')
+  }
+
+  async function salvarEdicao() {
+    if (!editarModal) return
+    setSalvandoEditar(true)
+    await fetch('/api/clientes-lista/editar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ venda_id: editarModal.venda_id, vendedor_id: edVendedor || null, equipe_id: edEquipe || null }) })
+    setSalvandoEditar(false)
+    setEditarModal(null); load()
   }
 
   async function toggleChecado(cota: Cota) {
@@ -281,6 +293,7 @@ export default function ClientesPage() {
                                   {sl && <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: `${sl.cor}20`, color: sl.cor }}>{sl.label}</span>}
                                 </div>
                                 <div className="flex items-center gap-2">
+                                  {['master','representante','adm','supervisor'].includes(meuRole) && <button onClick={() => { setEditarModal(c); setEdVendedor(c.vendedor_id || ''); setEdEquipe(c.equipe_id || '') }} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px]" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text2)', border: '1px solid var(--border)' }}><Pencil size={11} />Editar</button>}
                                   <button onClick={() => toggleChecado(c)} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px]" style={{ background: c.checado ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.04)', color: c.checado ? '#22c55e' : 'var(--muted-color)', border: `1px solid ${c.checado ? 'rgba(34,197,94,0.3)' : 'var(--border)'}` }}><Check size={11} />{c.checado ? 'Checado' : 'Marcar checado'}</button>
                                   <button onClick={() => baixarProposta(c)} disabled={baixando === c.venda_id} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px]" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text2)', border: '1px solid var(--border)' }}>{baixando === c.venda_id ? <Loader2 size={11} className="animate-spin" /> : <FileText size={11} />}Proposta</button>
                                   {!c.status_lance && <button onClick={() => setLanceModal(c)} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px]" style={{ background: 'rgba(168,85,247,0.15)', color: '#a855f7', border: '1px solid rgba(168,85,247,0.3)' }}><Target size={11} />Criar lance</button>}
@@ -306,6 +319,38 @@ export default function ClientesPage() {
           )}
         </main>
       </div>
+
+      {editarModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }} onClick={() => setEditarModal(null)} />
+          <div className="relative w-full max-w-md rounded-xl p-6" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+            <h3 className="text-base font-semibold mb-1" style={{ color: 'var(--text)' }}>Editar atribuição</h3>
+            <p className="text-xs mb-4" style={{ color: 'var(--muted-color)' }}>{editarModal.nome} · Grupo {editarModal.grupo}/{editarModal.cota}</p>
+            <div className="space-y-3">
+              {['master','representante','adm'].includes(meuRole) && (
+                <div>
+                  <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Equipe</label>
+                  <select value={edEquipe} onChange={(e) => setEdEquipe(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle}>
+                    <option value="" style={{ background: '#131313' }}>Sem equipe</option>
+                    {filtrosOpc.equipes.map(eq => <option key={eq.id} value={eq.id} style={{ background: '#131313' }}>{eq.nome}</option>)}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Vendedor</label>
+                <select value={edVendedor} onChange={(e) => setEdVendedor(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle}>
+                  <option value="" style={{ background: '#131313' }}>Sem vendedor</option>
+                  {filtrosOpc.vendedores.map(vd => <option key={vd.id} value={vd.id} style={{ background: '#131313' }}>{vd.nome}</option>)}
+                </select>
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => setEditarModal(null)} className="flex-1 rounded-lg py-2.5 text-sm" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text2)' }}>Cancelar</button>
+                <button onClick={salvarEdicao} disabled={salvandoEditar} className="flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #d4af37 0%, #c9a227 50%, #b8941f 100%)', color: '#0a0a0a' }}>{salvandoEditar ? <Loader2 size={14} className="animate-spin" /> : 'Salvar'}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {lanceModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
