@@ -233,12 +233,6 @@ export default function ComissoesPage() {
   // helpers de papel
   const ehGestao = ['master', 'representante'].includes(meuRole)
   const ehAdm = meuRole === 'adm'
-  const ehSupervisor = meuRole === 'supervisor'
-  const ehVendedor = meuRole === 'vendedor'
-  // "minha comissão" pro vendedor/supervisor = soma da comissão de vendedor das vendas dele
-  const minhaComissao = vendasFiltradas.reduce((s, v) => s + (v.comissao_vendedor || 0), 0)
-  // comissão da equipe (supervisor) = soma das comissões de vendedor de toda a equipe que ele vê
-  const comissaoEquipe = vendasFiltradas.reduce((s, v) => s + (v.comissao_vendedor || 0) + (v.comissao_supervisor || 0), 0)
   const inputStyle = { background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }
 
   if (semAcesso) {
@@ -315,18 +309,6 @@ export default function ComissoesPage() {
               <p className="text-xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(producaoTotal)}</p>
               <p className="text-[10px] mt-0.5" style={{ color: 'var(--muted-color)' }}>{vendasFiltradas.length} venda(s)</p>
             </div>)}
-            {(ehVendedor || ehSupervisor) && (
-              <div className="rounded-xl p-4" style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.12) 0%, rgba(34,197,94,0.04) 100%)', border: '1px solid rgba(34,197,94,0.25)' }}>
-                <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Minha comissão a receber</p>
-                <p className="text-xl font-bold" style={{ color: '#22c55e' }}>{fmtMoeda(minhaComissao)}</p>
-              </div>
-            )}
-            {ehSupervisor && (
-              <div className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
-                <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Comissão da equipe</p>
-                <p className="text-xl font-bold" style={{ color: '#a855f7' }}>{fmtMoeda(comissaoEquipe)}</p>
-              </div>
-            )}
           </div>
 
           {/* Importar mapa */}
