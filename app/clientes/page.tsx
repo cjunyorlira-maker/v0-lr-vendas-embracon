@@ -8,7 +8,7 @@ import { Users, Loader2, ChevronDown, ChevronUp, Search, SlidersHorizontal, Home
 
 interface Cota {
   venda_id: string; cliente_id: string; nome: string; cpf: string; telefone: string
-  grupo: string; cota: string; credito: number; bem: string; adesao: number | null; plano: string
+  grupo: string; cota: string; numero_proposta: string | null; credito: number; bem: string; adesao: number | null; plano: string
   data_assembleia: string | null; data_venda: string | null
   vendedor: string | null; vendedor_id: string; equipe_id: string; empresa_id: string
   status_boleto: string; qtd_parcelas: number; proxima_cobranca: string | null
@@ -131,7 +131,7 @@ export default function ClientesPage() {
               <select value={fBem} onChange={(e) => setFBem(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={inputStyle}>
                 <option value="" style={{ background: '#131313' }}>Todos os bens</option>
                 <option value="Imóvel" style={{ background: '#131313' }}>Imóvel</option>
-                <option value="Veículo" style={{ background: '#131313' }}>Ve��culo</option>
+                <option value="Veículo" style={{ background: '#131313' }}>Ve����culo</option>
                 <option value="Pesados" style={{ background: '#131313' }}>Pesados</option>
               </select>
               <select value={fAdesao} onChange={(e) => setFAdesao(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={inputStyle}>
