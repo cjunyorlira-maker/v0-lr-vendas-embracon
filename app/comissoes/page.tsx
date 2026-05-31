@@ -114,7 +114,62 @@ export default function ComissoesPage() {
     await loadData(); setSalvandoConfig(false)
   }
 
-  async function baixarMapaPdf() { alert('Gerando PDF...') }
+  async function baixarMapaPdf() {
+    if (!mapaDetalhe) return
+    const { default: jsPDF } = await import('jspdf')
+    const autoTable = (await import('jspdf-autotable')).default
+    const doc = new jsPDF()
+    const pageW = doc.internal.pageSize.getWidth()
+    let y = 15
+
+    // logo (se houver)
+    if (logoEmpresa) {
+      try {
+        const img = await fetch(logoEmpresa).then(r => r.blob()).then(b => new Promise<string>((res) => { const fr = new FileReader(); fr.onload = () => res(fr.result as string); fr.readAsDataURL(b) }))
+        doc.addImage(img, 'PNG', 14, y, 40, 16, undefined, 'FAST')
+      } catch {}
+    }
+    // título
+    doc.setFontSize(14); doc.setTextColor(40)
+    doc.text('Mapa de Comissão', pageW - 14, y + 6, { align: 'right' })
+    doc.setFontSize(9); doc.setTextColor(120)
+    const mapaInfo = mapas.find(m => m.id === mapaSel)
+    if (mapaInfo?.data_encerramento) doc.text(`Encerramento: ${new Date(mapaInfo.data_encerramento + 'T00:00:00').toLocaleDateString('pt-BR')}`, pageW - 14, y + 12, { align: 'right' })
+    if (empresaNome) doc.text(empresaNome, pageW - 14, y + 17, { align: 'right' })
+    y += 26
+
+    // monta as linhas da tabela: cliente como cabeçalho, parcelas embaixo
+    const body: any[] = []
+    for (const cl of mapaDetalhe.clientes) {
+      body.push([{ content: `${cl.cliente}  (Contrato ${cl.contrato})`, colSpan: 3, styles: { fontStyle: 'bold', fillColor: [245, 240, 220] } }])
+      for (const ln of cl.linhas) {
+        body.push([
+          `Parcela ${ln.parcela_de}${ln.parcela_ate !== ln.parcela_de ? '-' + ln.parcela_ate : ''}`,
+          `${ln.percentual}%`,
+          `R$ ${Number(ln.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+        ])
+      }
+      body.push([{ content: 'Total do cliente', colSpan: 2, styles: { fontStyle: 'bold', halign: 'right' } }, { content: `R$ ${Number(cl.total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, styles: { fontStyle: 'bold', textColor: [34, 139, 34] } }])
+    }
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Detalhe', '% Comissão', 'Valor']],
+      body,
+      theme: 'grid',
+      headStyles: { fillColor: [201, 162, 39], textColor: 20 },
+      styles: { fontSize: 8 },
+      columnStyles: { 2: { halign: 'right' } },
+    })
+
+    const finalY = (doc as any).lastAutoTable.finalY || y
+    doc.setFontSize(12); doc.setTextColor(40)
+    doc.text('VALOR TOTAL:', 14, finalY + 10)
+    doc.setTextColor(201, 162, 39)
+    doc.text(`R$ ${Number(mapaDetalhe.totalGeral).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageW - 14, finalY + 10, { align: 'right' })
+
+    doc.save(`mapa-comissao-${mapaInfo?.data_encerramento || 'atual'}.pdf`)
+  }
 
   async function carregarMapas() {
     const res = await fetch('/api/comissoes/mapas')
