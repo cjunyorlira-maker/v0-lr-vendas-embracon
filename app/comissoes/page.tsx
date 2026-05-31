@@ -436,9 +436,13 @@ export default function ComissoesPage() {
                   <div key={p.id} className="rounded-xl overflow-hidden" style={{ background: 'rgba(0,0,0,0.12)', backdropFilter: 'blur(4px)', border: '1px solid var(--border)' }}>
                     <div className="flex items-center justify-between p-4 cursor-pointer" onClick={() => { setPlanoExpCalc(aberto ? null : p.id); setParcelasAntecip(0) }}>
                       <div className="flex items-center gap-3 flex-wrap">
-                        <span className="font-mono text-xs font-bold px-2 py-1 rounded" style={{ background: 'rgba(212,175,55,0.15)', color: 'var(--accent)' }}>{p.sigla}</span>
+                        {(() => {
+                          const cor = p.bem === 'Imóvel' ? '#3b82f6' : p.bem === 'Pesados' ? '#f97316' : '#22c55e'
+                          return <span className="text-xs font-bold px-2.5 py-1 rounded-lg" style={{ background: `${cor}20`, color: cor, border: `1px solid ${cor}40` }}>{p.bem} {p.adesao_percent}%</span>
+                        })()}
+                        <span className="font-mono text-[10px] px-1.5 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--muted-color)' }}>{p.sigla}</span>
                         <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{p.nome_completo}</span>
-                        <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}>Comissão {totalPct}%</span>
+                        <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)' }}>Comissão {totalPct}%</span>
                       </div>
                       {aberto ? <ChevronUp size={16} style={{ color: 'var(--muted-color)' }} /> : <ChevronDown size={16} style={{ color: 'var(--muted-color)' }} />}
                     </div>
