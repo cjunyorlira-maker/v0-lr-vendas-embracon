@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextRequest, NextResponse } from "next/server"
+import { getEscopo } from '@/lib/escopo'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -76,7 +77,8 @@ export async function GET() {
       .select('*, lances_config(tipo, valor_percentual, observacao, recorrente, venda_id), clientes(nome), usuarios:vendedor_id(nome), equipes(nome)')
       .eq('mes_referencia', mesRef)
 
-    if (me.role === 'master') { /* vê tudo */ }
+    const { escopoGlobal } = await getEscopo(me)
+    if (escopoGlobal) { /* master ou adm matriz: vê tudo */ }
     else if (['representante', 'adm'].includes(me.role)) q = q.eq('empresa_id', me.empresa_id)
     else if (me.role === 'supervisor') q = q.eq('equipe_id', me.equipe_id)
     else q = q.eq('vendedor_id', me.id)
@@ -103,7 +105,7 @@ export async function GET() {
 
     // opções de filtro conforme o role
     let empresasOpc: any[] = [], equipesOpc: any[] = [], vendedoresOpc: any[] = []
-    if (me.role === 'master') {
+    if (escopoGlobal) {
       const { data: emp } = await supabaseAdmin.from('empresas').select('id, nome').order('nome'); empresasOpc = emp || []
       const { data: eq } = await supabaseAdmin.from('equipes').select('id, nome, empresa_id').order('nome'); equipesOpc = eq || []
       const { data: vd } = await supabaseAdmin.from('usuarios').select('id, nome, empresa_id, equipe_id').in('role', ['vendedor', 'supervisor']).order('nome'); vendedoresOpc = vd || []
