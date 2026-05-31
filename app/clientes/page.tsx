@@ -131,7 +131,7 @@ export default function ClientesPage() {
               <select value={fBem} onChange={(e) => setFBem(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={inputStyle}>
                 <option value="" style={{ background: '#131313' }}>Todos os bens</option>
                 <option value="Imóvel" style={{ background: '#131313' }}>Imóvel</option>
-                <option value="Veículo" style={{ background: '#131313' }}>Veículo</option>
+                <option value="Veículo" style={{ background: '#131313' }}>Ve��culo</option>
                 <option value="Pesados" style={{ background: '#131313' }}>Pesados</option>
               </select>
               <select value={fAdesao} onChange={(e) => setFAdesao(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={inputStyle}>
@@ -164,8 +164,12 @@ export default function ClientesPage() {
                       <div className="flex items-center justify-between gap-3 flex-wrap">
                         <div className="flex items-center gap-3 flex-wrap">
                           <span className="text-base font-semibold" style={{ color: 'var(--text)' }}>{cl.nome}</span>
-                          <span className="text-xs" style={{ color: 'var(--muted-color)' }}>{cl.cpf}</span>
                           <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)' }}>{cl.cotas.length} cota(s)</span>
+                          {cl.cotas.map((c, i) => (
+                            <span key={'gc'+i} className="text-xs" style={{ color: 'var(--muted-color)' }}>
+                              Prop. {c.numero_proposta || '-'} · Grupo {c.grupo}/{c.cota}
+                            </span>
+                          ))}
                         </div>
                         <div className="flex items-center gap-2">
                           {cl.cotas.length === 1 && !cl.cotas[0].status_lance && (
