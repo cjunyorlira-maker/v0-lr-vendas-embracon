@@ -32,15 +32,24 @@ export async function GET() {
     else if (me.role === 'vendedor') q = q.eq('vendedor_id', me.id)
     const { data: vendas } = await q
 
-    // lances ativos por venda (pra saber pendente/ofertado)
-    const { data: lances } = await supabaseAdmin.from('lances_config').select('venda_id, ativo, status_final')
+    // lances ativos por venda + status do lance do mês atual
+    const { data: lancesConfig } = await supabaseAdmin.from('lances_config').select('id, venda_id, ativo, status_final')
+    const mesAtual = new Date().toISOString().slice(0, 7) // YYYY-MM
+    const { data: lancesMes } = await supabaseAdmin.from('lances_mensais').select('lance_config_id, status, contemplado').eq('mes_referencia', mesAtual)
 
     const cotas = (vendas || []).map((v: any) => {
       const plano = Array.isArray(v.planos) ? v.planos[0] : v.planos
       const cliente = Array.isArray(v.clientes) ? v.clientes[0] : v.clientes
       const vendedor = Array.isArray(v.usuarios) ? v.usuarios[0] : v.usuarios
       const boleto = Array.isArray(v.boletos) ? v.boletos[0] : v.boletos
-      const lance = (lances || []).find((l: any) => l.venda_id === v.id && l.ativo)
+      const lanceCfg = (lancesConfig || []).find((l: any) => l.venda_id === v.id && l.ativo)
+      let statusLance: string | null = null
+      if (lanceCfg) {
+        const lm = (lancesMes || []).find((m: any) => m.lance_config_id === lanceCfg.id)
+        if (lanceCfg.status_final === 'contemplado') statusLance = 'contemplado'
+        else if (lm?.status === 'ofertado') statusLance = 'solicitado'
+        else statusLance = 'pendente'
+      }
       return {
         venda_id: v.id, cliente_id: v.cliente_id,
         nome: cliente?.nome || '-', cpf: cliente?.cpf_cnpj || '-', telefone: cliente?.telefone || '',
@@ -51,7 +60,7 @@ export async function GET() {
         vendedor: vendedor?.nome || null, vendedor_id: v.vendedor_id, equipe_id: v.equipe_id, empresa_id: v.empresa_id,
         status_boleto: boleto?.status || 'pendente', qtd_parcelas: boleto?.qtd_parcelas || 0,
         proxima_cobranca: boleto?.data_proxima_cobranca || null,
-        tem_lance: !!lance, checado: v.checado || false,
+        status_lance: statusLance, checado: v.checado || false,
         pdf_proposta_url: v.pdf_proposta_url,
       }
     })
