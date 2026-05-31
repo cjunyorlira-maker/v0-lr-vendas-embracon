@@ -53,7 +53,7 @@ export default function ComissoesPage() {
     { key: 'auto_2', label: 'Auto 2%', planos: 'PE2' },
     { key: 'pesados_2', label: 'Pesados 2%', planos: 'SP' },
   ]
-  const [catConfig, setCatConfig] = useState<Record<string, { vend: string; sup: string }>>({})
+  const [catConfig, setCatConfig] = useState<Record<string, { vend: string; sup: string; supProprio: string }>>({})
   const [importando, setImportando] = useState(false)
   const [resultImport, setResultImport] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -74,9 +74,9 @@ export default function ComissoesPage() {
     if (data.filtros) setFiltros(data.filtros)
     if (data.meu_role) setMeuRole(data.meu_role)
     if (data.config_categorias) {
-      const map: Record<string, { vend: string; sup: string }> = {}
+      const map: Record<string, { vend: string; sup: string; supProprio: string }> = {}
       for (const c of data.config_categorias) {
-        map[c.categoria] = { vend: String(c.percentual_vendedor || ''), sup: String(c.percentual_supervisor || '') }
+        map[c.categoria] = { vend: String(c.percentual_vendedor || ''), sup: String(c.percentual_supervisor || ''), supProprio: String(c.percentual_supervisor_proprio || '') }
       }
       setCatConfig(map)
     }
@@ -117,6 +117,7 @@ export default function ComissoesPage() {
       categoria: c.key,
       percentual_vendedor: parseFloat(catConfig[c.key]?.vend || '0') || 0,
       percentual_supervisor: parseFloat(catConfig[c.key]?.sup || '0') || 0,
+      percentual_supervisor_proprio: parseFloat(catConfig[c.key]?.supProprio || '0') || 0,
     }))
     await fetch('/api/comissoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'salvar_config_categoria', categorias }) })
     await loadData(); setSalvandoConfig(false)
@@ -532,6 +533,10 @@ export default function ComissoesPage() {
                     <div>
                       <label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>% Supervisor</label>
                       <input value={catConfig[c.key]?.sup || ''} onChange={(e) => setCatConfig(prev => ({ ...prev, [c.key]: { ...prev[c.key], sup: e.target.value } }))} placeholder="0,2" className="rounded-lg px-2 py-1.5 text-sm outline-none w-24" style={inputStyle} />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] mb-1" style={{ color: '#a855f7' }}>% Superv. venda própria</label>
+                      <input value={catConfig[c.key]?.supProprio || ''} onChange={(e) => setCatConfig(prev => ({ ...prev, [c.key]: { ...prev[c.key], supProprio: e.target.value } }))} placeholder="0,8" className="rounded-lg px-2 py-1.5 text-sm outline-none w-24" style={{ ...inputStyle, borderColor: 'rgba(168,85,247,0.3)' }} />
                     </div>
                   </div>
                 ))}
