@@ -74,7 +74,23 @@ export async function GET() {
       porCliente[c.cliente_id].cotas.push(c)
     }
 
-    return NextResponse.json({ clientes: Object.values(porCliente), meu_role: me.role })
+    // opções de filtro conforme role (supervisor incluído na lista de vendedores)
+    let empresasOpc: any[] = [], equipesOpc: any[] = [], vendedoresOpc: any[] = []
+    if (me.role === 'master') {
+      const { data: emp } = await supabaseAdmin.from('empresas').select('id, nome').order('nome'); empresasOpc = emp || []
+      const { data: eq } = await supabaseAdmin.from('equipes').select('id, nome, empresa_id').order('nome'); equipesOpc = eq || []
+      const { data: vd } = await supabaseAdmin.from('usuarios').select('id, nome, empresa_id, equipe_id').in('role', ['vendedor','supervisor']).order('nome'); vendedoresOpc = vd || []
+    } else if (['representante','adm'].includes(me.role)) {
+      const { data: eq } = await supabaseAdmin.from('equipes').select('id, nome, empresa_id').eq('empresa_id', me.empresa_id).order('nome'); equipesOpc = eq || []
+      const { data: vd } = await supabaseAdmin.from('usuarios').select('id, nome, empresa_id, equipe_id').in('role', ['vendedor','supervisor']).eq('empresa_id', me.empresa_id).order('nome'); vendedoresOpc = vd || []
+    } else if (me.role === 'supervisor') {
+      const { data: vd } = await supabaseAdmin.from('usuarios').select('id, nome, empresa_id, equipe_id').in('role', ['vendedor','supervisor']).eq('equipe_id', me.equipe_id).order('nome'); vendedoresOpc = vd || []
+    }
+
+    return NextResponse.json({
+      clientes: Object.values(porCliente), meu_role: me.role,
+      filtros: { empresas: empresasOpc, equipes: equipesOpc, vendedores: vendedoresOpc },
+    })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
