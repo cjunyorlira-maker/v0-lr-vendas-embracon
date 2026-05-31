@@ -45,10 +45,11 @@ export default function ClientesPage() {
   const [fLance, setFLance] = useState('')
   const [baixando, setBaixando] = useState<string | null>(null)
   const [lanceModal, setLanceModal] = useState<Cota | null>(null)
-  const [tipoLance, setTipoLance] = useState<'fixo25' | 'valor' | 'livre'>('fixo25')
+  const [tipoLance, setTipoLance] = useState<'fixo25' | 'fixo50' | 'valor' | 'livre'>('fixo25')
   const [valorLance, setValorLance] = useState('')
   const [obsLance, setObsLance] = useState('')
   const [recorrente, setRecorrente] = useState(false)
+  const [clienteOfertou, setClienteOfertou] = useState(false)
   const [salvandoLance, setSalvandoLance] = useState(false)
 
   useEffect(() => { load() }, [])
@@ -73,11 +74,11 @@ export default function ClientesPage() {
   async function criarLance() {
     if (!lanceModal) return
     setSalvandoLance(true)
-    const payload: any = { acao: 'criar', cliente_id: lanceModal.cliente_id, venda_id: lanceModal.venda_id, tipo: tipoLance, observacao: obsLance, recorrente }
+    const payload: any = { acao: 'criar', cliente_id: lanceModal.cliente_id, venda_id: lanceModal.venda_id, tipo: tipoLance, observacao: obsLance, recorrente, cliente_ofertou: clienteOfertou }
     if (tipoLance !== 'fixo25') payload.valor_percentual = parseFloat(valorLance.replace(',', '.')) || 0
     const res = await fetch('/api/lances/acao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
     setSalvandoLance(false)
-    if (res.ok) { setLanceModal(null); setValorLance(''); setObsLance(''); setRecorrente(false); setTipoLance('fixo25'); load() }
+    if (res.ok) { setLanceModal(null); setValorLance(''); setObsLance(''); setRecorrente(false); setClienteOfertou(false); setTipoLance('fixo25'); load() }
     else alert('Erro ao criar lance')
   }
 
@@ -242,7 +243,7 @@ export default function ClientesPage() {
               <div>
                 <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Tipo de lance</label>
                 <div className="grid grid-cols-3 gap-2">
-                  {([['fixo25','Fixo 25%'],['valor','Valor R$'],['livre','Livre %']] as const).map(([k, lbl]) => (
+                  {([['fixo25','Fixo 25%'],['fixo50','Fixo 50%'],['valor','Valor R$'],['livre','Livre %']] as const).map(([k, lbl]) => (
                     <button key={k} onClick={() => setTipoLance(k)} className="rounded-lg py-2 text-xs font-medium" style={{ background: tipoLance === k ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${tipoLance === k ? 'var(--accent)' : 'var(--border)'}`, color: tipoLance === k ? 'var(--accent)' : 'var(--muted-color)' }}>{lbl}</button>
                   ))}
                 </div>
@@ -257,9 +258,18 @@ export default function ClientesPage() {
                 <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Observação (opcional)</label>
                 <input value={obsLance} onChange={(e) => setObsLance(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
               </div>
+              {(tipoLance === 'fixo50' || (tipoLance === 'livre' && parseFloat(valorLance.replace(',', '.')) > 25)) && (
+                <div className="flex items-start gap-2 rounded-lg p-2.5" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                  <span className="text-[11px]" style={{ color: '#f59e0b' }}>{'\u26A0\uFE0F O lance embutido cobre no máximo 25%. O valor que passar de 25% é recurso próprio do cliente caso ele seja contemplado.'}</span>
+                </div>
+              )}
               <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: 'var(--text2)' }}>
                 <input type="checkbox" checked={recorrente} onChange={(e) => setRecorrente(e.target.checked)} className="accent-yellow-500" />
                 Lance recorrente (renova todo mês até contemplar)
+              </label>
+              <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: 'var(--text2)' }}>
+                <input type="checkbox" checked={clienteOfertou} onChange={(e) => setClienteOfertou(e.target.checked)} className="accent-yellow-500" />
+                O próprio cliente já ofertou (vai direto para ofertado, sem comprovante)
               </label>
               <div className="flex gap-2 pt-1">
                 <button onClick={() => setLanceModal(null)} className="flex-1 rounded-lg py-2.5 text-sm" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text2)' }}>Cancelar</button>
