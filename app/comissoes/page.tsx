@@ -138,28 +138,23 @@ export default function ComissoesPage() {
     if (empresaNome) doc.text(empresaNome, pageW - 14, y + 17, { align: 'right' })
     y += 26
 
-    // monta as linhas da tabela: cliente como cabeçalho, parcelas embaixo
-    const body: any[] = []
-    for (const cl of mapaDetalhe.clientes) {
-      body.push([{ content: `${cl.cliente}  (Contrato ${cl.contrato})`, colSpan: 3, styles: { fontStyle: 'bold', fillColor: [245, 240, 220] } }])
-      for (const ln of cl.linhas) {
-        body.push([
-          `Parcela ${ln.parcela_de}${ln.parcela_ate !== ln.parcela_de ? '-' + ln.parcela_ate : ''}`,
-          `${ln.percentual}%`,
-          `R$ ${Number(ln.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-        ])
-      }
-      body.push([{ content: 'Total do cliente', colSpan: 2, styles: { fontStyle: 'bold', halign: 'right' } }, { content: `R$ ${Number(cl.total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, styles: { fontStyle: 'bold', textColor: [34, 139, 34] } }])
-    }
+    // uma linha por cliente
+    const body: any[] = mapaDetalhe.clientes.map((cl: any) => ([
+      cl.cliente,
+      String(cl.contrato),
+      `${cl.percentualTotal}%`,
+      cl.parcelas.join(', '),
+      `R$ ${Number(cl.total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+    ]))
 
     autoTable(doc, {
       startY: y,
-      head: [['Detalhe', '% Comissão', 'Valor']],
+      head: [['Cliente', 'Contrato', '% Total', 'Parcelas', 'Valor']],
       body,
-      theme: 'grid',
+      theme: 'striped',
       headStyles: { fillColor: [201, 162, 39], textColor: 20 },
       styles: { fontSize: 8 },
-      columnStyles: { 2: { halign: 'right' } },
+      columnStyles: { 4: { halign: 'right' } },
     })
 
     const finalY = (doc as any).lastAutoTable.finalY || y
@@ -390,25 +385,29 @@ export default function ComissoesPage() {
                     <button onClick={baixarMapaPdf} className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold" style={{ background: 'var(--accent)', color: '#0a0a0a' }}><Download size={14} />Baixar PDF</button>
                   </div>
                   <div id="mapa-conteudo" className="rounded-xl p-5" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
-                    {mapaDetalhe?.clientes?.map((cl: any, i: number) => (
-                      <div key={i} className="mb-4 pb-3" style={{ borderBottom: '1px solid var(--border)' }}>
-                        <div className="flex items-center justify-between mb-1">
-                          <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{cl.cliente}</p>
-                          <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Contrato {cl.contrato}</p>
-                        </div>
-                        {cl.linhas.map((ln: any, j: number) => (
-                          <div key={j} className="flex items-center justify-between text-xs py-0.5">
-                            <span style={{ color: 'var(--muted-color)' }}>Parcela {ln.parcela_de}{ln.parcela_ate !== ln.parcela_de ? `-${ln.parcela_ate}` : ''} · {ln.percentual}%</span>
-                            <span style={{ color: 'var(--text2)' }}>{fmtMoeda(ln.valor)}</span>
-                          </div>
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border)' }}>
+                          <th className="p-2 text-left" style={{ color: 'var(--muted-color)' }}>Cliente</th>
+                          <th className="p-2 text-left" style={{ color: 'var(--muted-color)' }}>Contrato</th>
+                          <th className="p-2 text-center" style={{ color: 'var(--muted-color)' }}>% Total</th>
+                          <th className="p-2 text-left" style={{ color: 'var(--muted-color)' }}>Parcelas</th>
+                          <th className="p-2 text-right" style={{ color: 'var(--muted-color)' }}>Valor</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {mapaDetalhe?.clientes?.map((cl: any, i: number) => (
+                          <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                            <td className="p-2 font-medium" style={{ color: 'var(--text)' }}>{cl.cliente}</td>
+                            <td className="p-2" style={{ color: 'var(--muted-color)' }}>{cl.contrato}</td>
+                            <td className="p-2 text-center" style={{ color: 'var(--text2)' }}>{cl.percentualTotal}%</td>
+                            <td className="p-2" style={{ color: 'var(--muted-color)' }}>{cl.parcelas.join(', ')}</td>
+                            <td className="p-2 text-right font-semibold" style={{ color: '#22c55e' }}>{fmtMoeda(cl.total)}</td>
+                          </tr>
                         ))}
-                        <div className="flex justify-between mt-1 text-xs font-semibold">
-                          <span style={{ color: 'var(--text)' }}>Total do cliente</span>
-                          <span style={{ color: '#22c55e' }}>{fmtMoeda(cl.total)}</span>
-                        </div>
-                      </div>
-                    ))}
-                    <div className="flex justify-between pt-2 text-base font-bold">
+                      </tbody>
+                    </table>
+                    <div className="flex justify-between pt-3 mt-2 text-base font-bold" style={{ borderTop: '1px solid var(--border)' }}>
                       <span style={{ color: 'var(--text)' }}>VALOR TOTAL</span>
                       <span style={{ color: 'var(--accent)' }}>{fmtMoeda(mapaDetalhe?.totalGeral || 0)}</span>
                     </div>
