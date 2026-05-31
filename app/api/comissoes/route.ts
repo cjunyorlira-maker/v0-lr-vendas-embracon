@@ -28,8 +28,8 @@ export async function GET() {
     const me = await getMe(authUser.id)
     if (!me) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 403 })
 
-    // só representante/adm/master veem comissões
-    if (!['master', 'representante', 'adm'].includes(me.role)) {
+    // só master e representante veem comissões
+    if (!['master', 'representante'].includes(me.role)) {
       return NextResponse.json({ error: "Sem permissão", sem_acesso: true }, { status: 403 })
     }
 
@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
     const { data: { user: authUser } } = await supabaseUser.auth.getUser()
     if (!authUser) return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
     const me = await getMe(authUser.id)
-    if (!me || !['master', 'representante', 'adm'].includes(me.role)) {
+    if (!me || !['master', 'representante'].includes(me.role)) {
       return NextResponse.json({ error: "Sem permissão" }, { status: 403 })
     }
 
