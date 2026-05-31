@@ -580,12 +580,12 @@ export default function ComissoesPage() {
                           <th className="p-3 text-left text-xs" style={{ color: 'var(--muted-color)' }}>Cliente</th>
                           <th className="p-3 text-left text-xs" style={{ color: 'var(--muted-color)' }}>Adesão</th>
                           <th className="p-3 text-right text-xs" style={{ color: 'var(--muted-color)' }}>Crédito</th>
-                          <th className="p-3 text-right text-xs" style={{ color: 'var(--accent)' }}>Com. Rep.</th>
-                          <th className="p-3 text-right text-xs" style={{ color: '#22c55e' }}>Recebido</th>
-                          <th className="p-3 text-right text-xs" style={{ color: '#f59e0b' }}>Falta</th>
+                          {ehGestao && <th className="p-3 text-right text-xs" style={{ color: 'var(--accent)' }}>Com. Rep.</th>}
+                          {ehGestao && <th className="p-3 text-right text-xs" style={{ color: '#22c55e' }}>Recebido</th>}
+                          {ehGestao && <th className="p-3 text-right text-xs" style={{ color: '#f59e0b' }}>Falta</th>}
                           <th className="p-3 text-right text-xs" style={{ color: 'var(--muted-color)' }}>Vend.</th>
                           <th className="p-3 text-right text-xs" style={{ color: 'var(--muted-color)' }}>Superv.</th>
-                          <th className="p-3 text-center text-xs" style={{ color: 'var(--muted-color)' }}>Estorno</th>
+                          {ehGestao && <th className="p-3 text-center text-xs" style={{ color: 'var(--muted-color)' }}>Estorno</th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -598,12 +598,12 @@ export default function ComissoesPage() {
                               <td className="p-3" style={{ color: 'var(--text)' }}>{v.cliente}<br /><span className="text-[10px]" style={{ color: 'var(--muted-color)' }}>{v.vendedor}</span></td>
                               <td className="p-3"><span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)' }}>{v.adesao != null ? `${v.adesao}%` : '-'}</span><br/><span className="text-[10px]" style={{ color: 'var(--muted-color)' }}>{v.bem}</span></td>
                               <td className="p-3 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda(v.credito)}</td>
-                              <td className="p-3 text-right font-semibold" style={{ color: 'var(--accent)' }}>{fmtMoeda(v.comissao_lr)}</td>
-                              <td className="p-3 text-right" style={{ color: '#22c55e' }}>{fmtMoeda(v.comissao_recebida_rs || 0)}<br /><span className="text-[10px]">{recPct.toFixed(1)}%</span></td>
-                              <td className="p-3 text-right" style={{ color: faltaRs > 1 ? '#f59e0b' : '#22c55e' }}>{faltaRs > 1 ? fmtMoeda(faltaRs) : `${'\u2713'} 100%`}</td>
+                              {ehGestao && <td className="p-3 text-right font-semibold" style={{ color: 'var(--accent)' }}>{fmtMoeda(v.comissao_lr)}</td>}
+                              {ehGestao && <td className="p-3 text-right" style={{ color: '#22c55e' }}>{fmtMoeda(v.comissao_recebida_rs || 0)}<br /><span className="text-[10px]">{recPct.toFixed(1)}%</span></td>}
+                              {ehGestao && <td className="p-3 text-right" style={{ color: faltaRs > 1 ? '#f59e0b' : '#22c55e' }}>{faltaRs > 1 ? fmtMoeda(faltaRs) : `${'\u2713'} 100%`}</td>}
                               <td className="p-3 text-right" style={{ color: 'var(--text2)' }}>{v.percentual_vendedor}%<br /><span className="text-[10px]">{fmtMoeda(v.comissao_vendedor)}</span></td>
                               <td className="p-3 text-right" style={{ color: 'var(--text2)' }}>{v.percentual_supervisor}%<br /><span className="text-[10px]">{fmtMoeda(v.comissao_supervisor)}</span></td>
-                              <td className="p-3 text-center">
+                              {ehGestao && <td className="p-3 text-center">
                                 {v.em_risco ? (
                                   <div className="flex flex-col items-center gap-0.5">
                                     <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}>{'\u25cf'} {fmtMoeda(v.valor_estorno)}</span>
@@ -612,7 +612,7 @@ export default function ComissoesPage() {
                                 ) : (
                                   <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e' }}>{'\u2713'} seguro</span>
                                 )}
-                              </td>
+                              </td>}
                             </tr>
                           )
                         })}
