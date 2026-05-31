@@ -56,9 +56,15 @@ export default function BoletosPage() {
     if (!user) return
     const { data: cu } = await supabase.from('usuarios').select('role, empresa_id, equipe_id').eq('auth_user_id', user.id).single()
     if (cu) setRole(cu.role)
+    // descobre a empresa matriz (onde está o master) pra dar escopo global ao adm da matriz
+    let escopoGlobalBol = false
+    if (cu) {
+      const { data: masterU } = await supabase.from('usuarios').select('empresa_id').eq('role', 'master').limit(1).single()
+      escopoGlobalBol = cu.role === 'master' || (cu.role === 'adm' && masterU?.empresa_id === cu.empresa_id)
+    }
     // opções de filtro conforme role
     if (cu) {
-      if (cu.role === 'master') {
+      if (escopoGlobalBol) {
         const { data: emp } = await supabase.from('empresas').select('id, nome').order('nome')
         const { data: eq } = await supabase.from('equipes').select('id, nome, empresa_id').order('nome')
         const { data: vd } = await supabase.from('usuarios').select('id, nome, empresa_id, equipe_id').in('role', ['vendedor', 'supervisor']).order('nome')
