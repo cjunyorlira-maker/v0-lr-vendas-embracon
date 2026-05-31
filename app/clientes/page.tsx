@@ -204,7 +204,7 @@ export default function ClientesPage() {
                 <option value="aguardando_baixa" style={{ background: '#131313' }}>Aguardando baixa</option>
                 <option value="efetivado" style={{ background: '#131313' }}>Efetivado</option>
               </select>
-              {meuRole === 'master' && (
+              {filtrosOpc.empresas.length > 0 && (
                 <select value={fEmpresa} onChange={(e) => { setFEmpresa(e.target.value); setFEquipe(''); setFVendedor('') }} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={inputStyle}>
                   <option value="" style={{ background: '#131313' }}>Todas empresas</option>
                   {filtrosOpc.empresas.map(e => <option key={e.id} value={e.id} style={{ background: '#131313' }}>{e.nome}</option>)}
