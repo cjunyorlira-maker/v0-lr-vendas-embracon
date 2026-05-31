@@ -11,7 +11,7 @@ export async function GET() {
   try {
     const { data, error } = await supabaseAdmin
       .from("planos")
-      .select("id, codigo, sigla, nome, nome_completo, bem, categoria, categoria_comissao, adesao_percent, comissao_total, comissao_parcelas, estorno_percent, estorno_ate_pgto, parcelas_nao_estornar, ativo, destaque, ordem")
+      .select("id, codigo, sigla, nome, nome_completo, bem, categoria, categoria_comissao, adesao_percent, comissao_total, comissao_parcelas, estorno_percent, estorno_ate_pgto, parcelas_nao_estornar, faixa_credito_min, faixa_credito_max, ativo, destaque, ordem")
       .order("ordem", { ascending: true })
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
