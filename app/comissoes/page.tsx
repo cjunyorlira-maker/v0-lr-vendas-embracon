@@ -313,12 +313,14 @@ export default function ComissoesPage() {
 
           {/* Importar mapa */}
           <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) importarMapa(f) }} />
+          {ehGestao && (
           <div className="flex items-center gap-3 mb-5 flex-wrap">
             <button onClick={() => fileRef.current?.click()} disabled={importando} className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50 transition-transform hover:scale-105 active:scale-95" style={{ background: 'rgba(59,130,246,0.15)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.3)' }}>
               {importando ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}{importando ? 'Importando...' : 'Importar mapa de comissão (PDF)'}
             </button>
             {resultImport && <span className="text-xs" style={{ color: resultImport.startsWith('Erro') ? '#ef4444' : '#22c55e' }}>{resultImport}</span>}
           </div>
+          )}
 
           {/* Filtro por data */}
           <div className="flex items-end gap-2 mb-4 flex-wrap">
@@ -372,9 +374,11 @@ export default function ComissoesPage() {
           {/* Abas */}
           <div className="flex gap-2 mb-5">
             <button onClick={() => setAba('vendas')} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: aba === 'vendas' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${aba === 'vendas' ? 'var(--accent)' : 'var(--border)'}`, color: aba === 'vendas' ? 'var(--accent)' : 'var(--muted-color)' }}><DollarSign size={14} />Vendas</button>
+            {ehGestao && (<>
             <button onClick={() => setAba('mapa')} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: aba === 'mapa' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${aba === 'mapa' ? 'var(--accent)' : 'var(--border)'}`, color: aba === 'mapa' ? 'var(--accent)' : 'var(--muted-color)' }}><FileText size={14} />Mapa de Comissão</button>
             <button onClick={() => setAba('calculo')} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: aba === 'calculo' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${aba === 'calculo' ? 'var(--accent)' : 'var(--border)'}`, color: aba === 'calculo' ? 'var(--accent)' : 'var(--muted-color)' }}><Calculator size={14} />Cálculo de Comissão</button>
             <button onClick={() => setAba('config')} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: aba === 'config' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${aba === 'config' ? 'var(--accent)' : 'var(--border)'}`, color: aba === 'config' ? 'var(--accent)' : 'var(--muted-color)' }}><Settings size={14} />Configurar padrão</button>
+            </>)}
           </div>
 
           {loading ? (
