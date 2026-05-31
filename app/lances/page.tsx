@@ -46,6 +46,8 @@ export default function LancesPage() {
   const [defObs, setDefObs] = useState('')
   const [defRecorrente, setDefRecorrente] = useState(false)
   const [pdfAnexo, setPdfAnexo] = useState<{ base64: string; nome: string } | null>(null)
+  const [fGrupo, setFGrupo] = useState('')
+  const [busca, setBusca] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { loadData() }, [])
@@ -61,10 +63,6 @@ export default function LancesPage() {
   }
 
   const podeOfertar = ['master', 'representante', 'adm'].includes(role)
-
-  // pisca se pendente (sempre, até ofertar)
-  const [fGrupo, setFGrupo] = useState('')
-  const [busca, setBusca] = useState('')
 
   // grupos disponíveis (ordenados por quantidade de clientes)
   const gruposContagem: Record<string, number> = {}
