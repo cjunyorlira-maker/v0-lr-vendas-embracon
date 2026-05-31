@@ -57,6 +57,7 @@ export default function EquipePage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [empresaId, setEmpresaId] = useState<string | null>(null)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+  const [currentUserEquipe, setCurrentUserEquipe] = useState<string | null>(null)
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
   const [mostrarInativos, setMostrarInativos] = useState(false)
   const [confirmDesativar, setConfirmDesativar] = useState<Usuario | null>(null)
@@ -74,7 +75,7 @@ export default function EquipePage() {
 
     const { data: currentUser } = await supabase
       .from('usuarios')
-      .select('id, empresa_id, role')
+      .select('id, empresa_id, role, equipe_id')
       .eq('auth_user_id', user.id)
       .single()
 
@@ -82,6 +83,7 @@ export default function EquipePage() {
       setCurrentUserId(currentUser.id)
       setEmpresaId(currentUser.empresa_id)
       setCurrentUserRole(currentUser.role)
+      setCurrentUserEquipe(currentUser.equipe_id || null)
     }
 
     const { data: usuariosData } = await supabase
@@ -292,6 +294,7 @@ export default function EquipePage() {
         empresaId={empresaId}
         equipes={equipes}
         currentUserRole={currentUserRole}
+        currentUserEquipe={currentUserEquipe}
         onSuccess={handleUsuarioCriado}
         onEquipeCriada={loadData}
       />
