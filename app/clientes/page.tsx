@@ -71,11 +71,21 @@ export default function ClientesPage() {
     setBaixando(null)
   }
 
+  function formatarMoedaInput(v: string): string {
+    const num = v.replace(/\D/g, '')
+    if (!num) return ''
+    const n = parseInt(num) / 100
+    return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
+
   async function criarLance() {
     if (!lanceModal) return
     setSalvandoLance(true)
     const payload: any = { acao: 'criar', cliente_id: lanceModal.cliente_id, venda_id: lanceModal.venda_id, tipo: tipoLance, observacao: obsLance, recorrente, cliente_ofertou: clienteOfertou }
-    if (tipoLance !== 'fixo25') payload.valor_percentual = parseFloat(valorLance.replace(',', '.')) || 0
+    if (tipoLance !== 'fixo25') {
+      const limpo = tipoLance === 'valor' ? valorLance.replace(/\./g, '').replace(',', '.') : valorLance.replace(',', '.')
+      payload.valor_percentual = parseFloat(limpo) || 0
+    }
     const res = await fetch('/api/lances/acao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
     setSalvandoLance(false)
     if (res.ok) { setLanceModal(null); setValorLance(''); setObsLance(''); setRecorrente(false); setClienteOfertou(false); setTipoLance('fixo25'); load() }
@@ -251,7 +261,7 @@ export default function ClientesPage() {
               {tipoLance !== 'fixo25' && (
                 <div>
                   <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>{tipoLance === 'valor' ? 'Valor (R$)' : 'Percentual (%)'}</label>
-                  <input value={valorLance} onChange={(e) => setValorLance(e.target.value)} placeholder={tipoLance === 'valor' ? '50000' : '30'} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
+                  <input value={valorLance} onChange={(e) => setValorLance(tipoLance === 'valor' ? formatarMoedaInput(e.target.value) : e.target.value)} placeholder={tipoLance === 'valor' ? '50.000,00' : '30'} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
                 </div>
               )}
               <div>
