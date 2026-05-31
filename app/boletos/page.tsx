@@ -33,6 +33,14 @@ export default function BoletosPage() {
   const [loading, setLoading] = useState(true)
   const [abaAtiva, setAbaAtiva] = useState('pendente')
   const [role, setRole] = useState('')
+  const [filtrosOpc, setFiltrosOpc] = useState<{ empresas: any[]; equipes: any[]; vendedores: any[] }>({ empresas: [], equipes: [], vendedores: [] })
+  const [fEmpresa, setFEmpresa] = useState('')
+  const [fEquipe, setFEquipe] = useState('')
+  const [fVendedor, setFVendedor] = useState('')
+  const [prodInicio, setProdInicio] = useState('')
+  const [prodFim, setProdFim] = useState('')
+  const [dataDe, setDataDe] = useState('')
+  const [dataAte, setDataAte] = useState('')
   const [processando, setProcessando] = useState<string | null>(null)
   const [msgModal, setMsgModal] = useState<{ texto: string; boletoId: string } | null>(null)
   const [anexoModal, setAnexoModal] = useState<{ boleto: Boleto } | null>(null)
@@ -46,11 +54,29 @@ export default function BoletosPage() {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    const { data: cu } = await supabase.from('usuarios').select('role').eq('auth_user_id', user.id).single()
+    const { data: cu } = await supabase.from('usuarios').select('role, empresa_id, equipe_id').eq('auth_user_id', user.id).single()
     if (cu) setRole(cu.role)
+    // opções de filtro conforme role
+    if (cu) {
+      if (cu.role === 'master') {
+        const { data: emp } = await supabase.from('empresas').select('id, nome').order('nome')
+        const { data: eq } = await supabase.from('equipes').select('id, nome, empresa_id').order('nome')
+        const { data: vd } = await supabase.from('usuarios').select('id, nome, empresa_id, equipe_id').in('role', ['vendedor', 'supervisor']).order('nome')
+        setFiltrosOpc({ empresas: emp || [], equipes: eq || [], vendedores: vd || [] })
+      } else if (['representante', 'adm'].includes(cu.role)) {
+        const { data: eq } = await supabase.from('equipes').select('id, nome, empresa_id').eq('empresa_id', cu.empresa_id).order('nome')
+        const { data: vd } = await supabase.from('usuarios').select('id, nome, empresa_id, equipe_id').in('role', ['vendedor', 'supervisor']).eq('empresa_id', cu.empresa_id).order('nome')
+        setFiltrosOpc({ empresas: [], equipes: eq || [], vendedores: vd || [] })
+      } else if (cu.role === 'supervisor') {
+        const { data: vd } = await supabase.from('usuarios').select('id, nome, empresa_id, equipe_id').in('role', ['vendedor', 'supervisor']).eq('equipe_id', cu.equipe_id).order('nome')
+        setFiltrosOpc({ empresas: [], equipes: [], vendedores: vd || [] })
+      }
+    }
+    // carrega config de produção
+    try { const rp = await fetch('/api/config-producao'); const dp = await rp.json(); if (dp.data_inicio) setProdInicio(dp.data_inicio); if (dp.data_fim) setProdFim(dp.data_fim) } catch {}
     const { data } = await supabase
       .from('boletos')
-      .select('id, qtd_parcelas, valor_boleto, status, boleto_pdf_url, data_solicitacao, data_anexo_boleto, data_pagamento, pago_via_ted, clientes(nome), vendas(numero_proposta, numero_contrato, grupo, cota, valor_credito), empresas(nome), usuarios:vendedor_id(nome)')
+      .select('id, qtd_parcelas, valor_boleto, status, boleto_pdf_url, data_solicitacao, data_anexo_boleto, data_pagamento, pago_via_ted, empresa_id, equipe_id, vendedor_id, clientes(nome), vendas(numero_proposta, numero_contrato, grupo, cota, valor_credito, data_venda), empresas(nome), equipes(nome), usuarios:vendedor_id(nome)')
       .order('criado_em', { ascending: false })
     if (data) setBoletos(data as any)
     setLoading(false)
