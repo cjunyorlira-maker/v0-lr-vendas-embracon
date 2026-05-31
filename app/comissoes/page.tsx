@@ -332,7 +332,7 @@ export default function ComissoesPage() {
               <label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>Até</label>
               <input type="date" value={dataAte} onChange={(e) => setDataAte(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={inputStyle} />
             </div>
-            {meuRole === 'master' && (
+            {filtros.empresas.length > 0 && (
               <div>
                 <label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>Empresa</label>
                 <select value={fEmpresa} onChange={(e) => { setFEmpresa(e.target.value); setFEquipe(''); setFVendedor('') }} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={inputStyle}>

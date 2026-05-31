@@ -97,8 +97,13 @@ export default function EquipePage() {
       .select('*, empresa:empresas(nome)')
       .order('criado_em', { ascending: false })
 
-    // escopo: master vê todos; demais veem só a própria empresa
-    if (currentUser && currentUser.role !== 'master' && currentUser.empresa_id) {
+    // escopo: master e adm da matriz veem todos; demais só a própria empresa
+    let ehGlobalUsuarios = currentUser?.role === 'master'
+    if (currentUser?.role === 'adm') {
+      const { data: masterU2 } = await supabase.from('usuarios').select('empresa_id').eq('role', 'master').limit(1).single()
+      ehGlobalUsuarios = masterU2?.empresa_id === currentUser.empresa_id
+    }
+    if (currentUser && !ehGlobalUsuarios && currentUser.empresa_id) {
       queryUsuarios = queryUsuarios.eq('empresa_id', currentUser.empresa_id)
     }
     const { data: usuariosData } = await queryUsuarios
@@ -112,8 +117,13 @@ export default function EquipePage() {
 
     if (equipesData) setEquipes(equipesData)
 
-    // empresas (pro filtro do master)
-    if (currentUser?.role === 'master') {
+    // descobre se é escopo global (master ou adm da matriz)
+    let ehGlobal = currentUser?.role === 'master'
+    if (currentUser?.role === 'adm') {
+      const { data: masterU } = await supabase.from('usuarios').select('empresa_id').eq('role', 'master').limit(1).single()
+      ehGlobal = masterU?.empresa_id === currentUser.empresa_id
+    }
+    if (ehGlobal) {
       const { data: empData } = await supabase.from('empresas').select('id, nome').order('nome')
       if (empData) setEmpresasLista(empData)
     }
@@ -201,7 +211,7 @@ export default function EquipePage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              {currentUserRole === 'master' && empresasLista.length > 0 && (
+              {empresasLista.length > 0 && (
                 <select value={filtroEmpresa} onChange={(e) => setFiltroEmpresa(e.target.value)} className="rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
                   <option value="" style={{ background: '#131313' }}>Todas as empresas</option>
                   {empresasLista.map(e => <option key={e.id} value={e.id} style={{ background: '#131313' }}>{e.nome}</option>)}
