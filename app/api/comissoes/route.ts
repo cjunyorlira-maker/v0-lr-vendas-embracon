@@ -48,7 +48,7 @@ export async function GET() {
     // vendas com dados de comissão + plano + estorno
     let q = supabaseAdmin
       .from('vendas')
-      .select('id, valor_credito, empresa_id, equipe_id, vendedor_id, comissao_vendedor_percent, comissao_supervisor_percent, comissao_recebida_rs, comissao_recebida_percent, criado_em, data_venda, clientes(nome), usuarios:vendedor_id(nome), planos(sigla, comissao_total, estorno_percent, estorno_ate_pgto, categoria_comissao, adesao_percent, bem), boletos(qtd_parcelas, status)')
+      .select('id, valor_credito, empresa_id, equipe_id, vendedor_id, comissao_vendedor_percent, comissao_supervisor_percent, comissao_recebida_rs, comissao_recebida_percent, criado_em, data_venda, clientes(nome), usuarios:vendedor_id(nome, role), planos(sigla, comissao_total, estorno_percent, estorno_ate_pgto, categoria_comissao, adesao_percent, bem), boletos(qtd_parcelas, status)')
       .order('criado_em', { ascending: false })
 
     if (me.role !== 'master') q = q.eq('empresa_id', me.empresa_id)
@@ -64,8 +64,16 @@ export async function GET() {
       // precedência: % individual da venda > padrão da categoria do plano > 0
       const catPlano = plano?.categoria_comissao
       const cfgCat = (configCategorias || []).find((cc: any) => cc.categoria === catPlano)
-      const pVend = v.comissao_vendedor_percent ?? cfgCat?.percentual_vendedor ?? 0
-      const pSup = v.comissao_supervisor_percent ?? cfgCat?.percentual_supervisor ?? 0
+      const vendedorObj = Array.isArray(v.usuarios) ? v.usuarios[0] : v.usuarios
+      const vendaPropriaSupervisor = vendedorObj?.role === 'supervisor'
+      let pVend: number, pSup: number
+      if (vendaPropriaSupervisor) {
+        pVend = v.comissao_vendedor_percent ?? cfgCat?.percentual_supervisor_proprio ?? 0
+        pSup = 0
+      } else {
+        pVend = v.comissao_vendedor_percent ?? cfgCat?.percentual_vendedor ?? 0
+        pSup = v.comissao_supervisor_percent ?? cfgCat?.percentual_supervisor ?? 0
+      }
       const comVend = credito * (pVend / 100)
       const comSup = credito * (pSup / 100)
       // risco de estorno
