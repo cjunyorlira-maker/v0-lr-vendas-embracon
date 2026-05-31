@@ -43,6 +43,15 @@ export default function ClientesPage() {
   const [fBem, setFBem] = useState('')
   const [fAdesao, setFAdesao] = useState('')
   const [fLance, setFLance] = useState('')
+  const [filtrosOpc, setFiltrosOpc] = useState<{ empresas: any[]; equipes: any[]; vendedores: any[] }>({ empresas: [], equipes: [], vendedores: [] })
+  const [fEmpresa, setFEmpresa] = useState('')
+  const [fEquipe, setFEquipe] = useState('')
+  const [fVendedor, setFVendedor] = useState('')
+  const [fStatusBoleto, setFStatusBoleto] = useState('')
+  const [prodInicio, setProdInicio] = useState('')
+  const [prodFim, setProdFim] = useState('')
+  const [dataDe, setDataDe] = useState('')
+  const [dataAte, setDataAte] = useState('')
   const [baixando, setBaixando] = useState<string | null>(null)
   const [lanceModal, setLanceModal] = useState<Cota | null>(null)
   const [tipoLance, setTipoLance] = useState<'fixo25' | 'fixo50' | 'valor' | 'livre'>('fixo25')
@@ -59,6 +68,8 @@ export default function ClientesPage() {
     const data = await res.json()
     if (data.clientes) setClientes(data.clientes)
     if (data.meu_role) setMeuRole(data.meu_role)
+    if (data.filtros) setFiltrosOpc(data.filtros)
+    try { const rp = await fetch('/api/config-producao'); const dp = await rp.json(); if (dp.data_inicio) setProdInicio(dp.data_inicio); if (dp.data_fim) setProdFim(dp.data_fim) } catch {}
     setLoading(false)
   }
 
@@ -111,9 +122,26 @@ export default function ClientesPage() {
       if (fBem && c.bem !== fBem) return false
       if (fAdesao && String(c.adesao) !== fAdesao) return false
       if (fLance && c.status_lance !== fLance) return false
+      if (fStatusBoleto && c.status_boleto !== fStatusBoleto) return false
+      if (fEmpresa && c.empresa_id !== fEmpresa) return false
+      if (fEquipe && c.equipe_id !== fEquipe) return false
+      if (fVendedor && c.vendedor_id !== fVendedor) return false
+      if (dataDe || dataAte) {
+        const dv = c.data_venda
+        if (dv) { if (dataDe && dv < dataDe) return false; if (dataAte && dv > dataAte) return false }
+      }
       return true
     })
   })
+
+  function aplicarProducao() { if (prodInicio) setDataDe(prodInicio); if (prodFim) setDataAte(prodFim) }
+  function aplicarSemana() {
+    const hoje = new Date(); const dia = hoje.getDay()
+    const dom = new Date(hoje); dom.setDate(hoje.getDate() - dia)
+    const sab = new Date(dom); sab.setDate(dom.getDate() + 6)
+    const iso = (d: Date) => d.toISOString().slice(0, 10)
+    setDataDe(iso(dom)); setDataAte(iso(sab))
+  }
 
   const inputStyle = { background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }
 
@@ -156,7 +184,37 @@ export default function ClientesPage() {
                 <option value="solicitado" style={{ background: '#131313' }}>Lance solicitado</option>
                 <option value="contemplado" style={{ background: '#131313' }}>Contemplado</option>
               </select>
-              {(fBem || fAdesao || fLance) && <button onClick={() => { setFBem(''); setFAdesao(''); setFLance('') }} className="rounded-lg px-3 py-1.5 text-xs" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>Limpar</button>}
+              <select value={fStatusBoleto} onChange={(e) => setFStatusBoleto(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={inputStyle}>
+                <option value="" style={{ background: '#131313' }}>Todo status boleto</option>
+                <option value="pendente" style={{ background: '#131313' }}>Boleto pendente</option>
+                <option value="solicitado" style={{ background: '#131313' }}>Boleto solicitado</option>
+                <option value="aguardando_pagamento" style={{ background: '#131313' }}>Aguardando pgto</option>
+                <option value="aguardando_baixa" style={{ background: '#131313' }}>Aguardando baixa</option>
+                <option value="efetivado" style={{ background: '#131313' }}>Efetivado</option>
+              </select>
+              {meuRole === 'master' && (
+                <select value={fEmpresa} onChange={(e) => { setFEmpresa(e.target.value); setFEquipe(''); setFVendedor('') }} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={inputStyle}>
+                  <option value="" style={{ background: '#131313' }}>Todas empresas</option>
+                  {filtrosOpc.empresas.map(e => <option key={e.id} value={e.id} style={{ background: '#131313' }}>{e.nome}</option>)}
+                </select>
+              )}
+              {['master','representante','adm'].includes(meuRole) && (
+                <select value={fEquipe} onChange={(e) => { setFEquipe(e.target.value); setFVendedor('') }} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={inputStyle}>
+                  <option value="" style={{ background: '#131313' }}>Todas equipes</option>
+                  {filtrosOpc.equipes.filter(eq => !fEmpresa || eq.empresa_id === fEmpresa).map(eq => <option key={eq.id} value={eq.id} style={{ background: '#131313' }}>{eq.nome}</option>)}
+                </select>
+              )}
+              {['master','representante','adm','supervisor'].includes(meuRole) && (
+                <select value={fVendedor} onChange={(e) => setFVendedor(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={inputStyle}>
+                  <option value="" style={{ background: '#131313' }}>Todos vendedores</option>
+                  {filtrosOpc.vendedores.filter(vd => (!fEmpresa || vd.empresa_id === fEmpresa) && (!fEquipe || vd.equipe_id === fEquipe)).map(vd => <option key={vd.id} value={vd.id} style={{ background: '#131313' }}>{vd.nome}</option>)}
+                </select>
+              )}
+              <button onClick={aplicarSemana} className="rounded-lg px-3 py-1.5 text-xs" style={{ background: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.3)' }}>Semana</button>
+              <button onClick={aplicarProducao} className="rounded-lg px-3 py-1.5 text-xs" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)', border: '1px solid rgba(212,175,55,0.3)' }}>Produção</button>
+              <input type="date" value={dataDe} onChange={(e) => setDataDe(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={inputStyle} />
+              <input type="date" value={dataAte} onChange={(e) => setDataAte(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={inputStyle} />
+              {(fBem || fAdesao || fLance || fStatusBoleto || fEmpresa || fEquipe || fVendedor || dataDe || dataAte) && <button onClick={() => { setFBem(''); setFAdesao(''); setFLance(''); setFStatusBoleto(''); setFEmpresa(''); setFEquipe(''); setFVendedor(''); setDataDe(''); setDataAte('') }} className="rounded-lg px-3 py-1.5 text-xs" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>Limpar</button>}
             </div>
           )}
 
