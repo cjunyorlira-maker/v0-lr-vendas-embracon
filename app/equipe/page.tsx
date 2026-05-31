@@ -24,6 +24,7 @@ interface Usuario {
 interface Equipe {
   id: string
   nome: string
+  empresa_id?: string | null
 }
 
 const roleLabels: Record<string, string> = {
@@ -106,7 +107,7 @@ export default function EquipePage() {
 
     const { data: equipesData } = await supabase
       .from('equipes')
-      .select('id, nome')
+      .select('id, nome, empresa_id')
       .order('nome')
 
     if (equipesData) setEquipes(equipesData)
@@ -434,7 +435,7 @@ export default function EquipePage() {
             <p className="text-xs mb-4" style={{ color: 'var(--muted-color)' }}>{mudarEquipeModal.nome}</p>
             <select value={novaEquipe} onChange={(e) => setNovaEquipe(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm outline-none mb-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
               <option value="" style={{ background: '#131313' }}>Sem equipe</option>
-              {equipes.map((eq) => (<option key={eq.id} value={eq.id} style={{ background: '#131313' }}>{eq.nome}</option>))}
+              {equipes.filter((eq) => !mudarEquipeModal?.empresa_id || eq.empresa_id === mudarEquipeModal.empresa_id).map((eq) => (<option key={eq.id} value={eq.id} style={{ background: '#131313' }}>{eq.nome}</option>))}
             </select>
             <div className="flex gap-2">
               <button onClick={() => setMudarEquipeModal(null)} className="flex-1 rounded-lg py-2.5 text-sm" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text2)' }}>Cancelar</button>

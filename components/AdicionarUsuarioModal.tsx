@@ -7,6 +7,7 @@ import { X, Copy, Check, Eye, EyeOff, Upload, Plus } from 'lucide-react'
 interface Equipe {
   id: string
   nome: string
+  empresa_id?: string | null
 }
 
 interface Empresa {
@@ -297,7 +298,10 @@ export default function AdicionarUsuarioModal({
                 {equipes.length > 0 ? (
                   <select value={equipeId} onChange={(e) => setEquipeId(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
                     <option value="" style={{ background: '#131313' }}>Sem equipe</option>
-                    {equipes.map((eq) => (<option key={eq.id} value={eq.id} style={{ background: '#131313' }}>{eq.nome}</option>))}
+                    {equipes.filter((eq) => {
+                      const empAlvo = currentUserRole === 'master' ? empresaIdAlvo : empresaId
+                      return !empAlvo || eq.empresa_id === empAlvo
+                    }).map((eq) => (<option key={eq.id} value={eq.id} style={{ background: '#131313' }}>{eq.nome}</option>))}
                   </select>
                 ) : (
                   <div className="rounded-lg p-3 text-xs" style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6' }}>Nenhuma equipe cadastrada. Clique em &quot;Criar equipe&quot; acima.</div>
