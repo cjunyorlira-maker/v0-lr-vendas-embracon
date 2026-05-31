@@ -153,6 +153,7 @@ export async function POST(req: NextRequest) {
           categoria: c.categoria,
           percentual_vendedor: c.percentual_vendedor || 0,
           percentual_supervisor: c.percentual_supervisor || 0,
+          percentual_supervisor_proprio: c.percentual_supervisor_proprio || 0,
           atualizado_em: new Date().toISOString(),
         }, { onConflict: 'empresa_id,categoria' })
       }
