@@ -332,7 +332,7 @@ export default function ClientesPage() {
                   <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Equipe</label>
                   <select value={edEquipe} onChange={(e) => setEdEquipe(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle}>
                     <option value="" style={{ background: '#131313' }}>Sem equipe</option>
-                    {filtrosOpc.equipes.map(eq => <option key={eq.id} value={eq.id} style={{ background: '#131313' }}>{eq.nome}</option>)}
+                    {filtrosOpc.equipes.filter(eq => !editarModal?.empresa_id || eq.empresa_id === editarModal.empresa_id).map(eq => <option key={eq.id} value={eq.id} style={{ background: '#131313' }}>{eq.nome}</option>)}
                   </select>
                 </div>
               )}
@@ -340,7 +340,7 @@ export default function ClientesPage() {
                 <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Vendedor</label>
                 <select value={edVendedor} onChange={(e) => setEdVendedor(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle}>
                   <option value="" style={{ background: '#131313' }}>Sem vendedor</option>
-                  {filtrosOpc.vendedores.map(vd => <option key={vd.id} value={vd.id} style={{ background: '#131313' }}>{vd.nome}</option>)}
+                  {filtrosOpc.vendedores.filter(vd => (!editarModal?.empresa_id || vd.empresa_id === editarModal.empresa_id) && (!edEquipe || vd.equipe_id === edEquipe)).map(vd => <option key={vd.id} value={vd.id} style={{ background: '#131313' }}>{vd.nome}</option>)}
                 </select>
               </div>
               <div className="flex gap-2 pt-1">
