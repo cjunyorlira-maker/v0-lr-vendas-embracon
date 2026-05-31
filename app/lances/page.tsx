@@ -27,6 +27,7 @@ interface Lance {
 function descTipo(c?: { tipo: string; valor_percentual: number }): string {
   if (!c) return ''
   if (c.tipo === 'fixo25') return 'Fixo 25%'
+  if (c.tipo === 'fixo50') return 'Fixo 50%'
   if (c.tipo === 'valor') return `R$ ${(c.valor_percentual || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
   if (c.tipo === 'livre') return `Livre ${c.valor_percentual || 0}%`
   return ''
