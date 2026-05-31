@@ -53,7 +53,7 @@ export async function GET() {
       return {
         venda_id: v.id, cliente_id: v.cliente_id,
         nome: cliente?.nome || '-', cpf: cliente?.cpf_cnpj || '-', telefone: cliente?.telefone || '',
-        grupo: v.grupo, cota: v.cota, numero_proposta: v.numero_proposta, credito: v.valor_credito,
+        grupo: v.grupo, cota: v.cota, numero_proposta: v.numero_proposta, numero_contrato: v.numero_contrato, credito: v.valor_credito,
         bem: plano?.bem || '-', adesao: v.adesao_percent ?? plano?.adesao_percent ?? null,
         plano: plano?.sigla || '-',
         data_assembleia: v.data_assembleia_entrada, data_venda: v.data_venda,

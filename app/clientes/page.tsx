@@ -8,7 +8,7 @@ import { Users, Loader2, ChevronDown, ChevronUp, Search, SlidersHorizontal, Home
 
 interface Cota {
   venda_id: string; cliente_id: string; nome: string; cpf: string; telefone: string
-  grupo: string; cota: string; numero_proposta: string | null; credito: number; bem: string; adesao: number | null; plano: string
+  grupo: string; cota: string; numero_proposta: string | null; numero_contrato: string | null; credito: number; bem: string; adesao: number | null; plano: string
   data_assembleia: string | null; data_venda: string | null
   vendedor: string | null; vendedor_id: string; equipe_id: string; empresa_id: string
   status_boleto: string; qtd_parcelas: number; proxima_cobranca: string | null
@@ -167,7 +167,7 @@ export default function ClientesPage() {
                           <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)' }}>{cl.cotas.length} cota(s)</span>
                           {cl.cotas.map((c, i) => (
                             <span key={'gc'+i} className="text-xs" style={{ color: 'var(--muted-color)' }}>
-                              Prop. {c.numero_proposta || '-'} · Grupo {c.grupo}/{c.cota}
+                              Prop. {c.numero_proposta || c.numero_contrato || '-'} · Grupo {c.grupo}/{c.cota}
                             </span>
                           ))}
                         </div>
