@@ -43,7 +43,7 @@ const roleColors: Record<string, string> = {
 }
 
 const PODE_DESATIVAR: Record<string, string[]> = {
-  master: ['representante'],
+  master: ['representante', 'adm', 'supervisor', 'vendedor'],
   representante: ['adm', 'supervisor', 'vendedor'],
   adm: ['supervisor', 'vendedor'],
   supervisor: ['vendedor'],
@@ -89,10 +89,16 @@ export default function EquipePage() {
       setCurrentUserEquipe(currentUser.equipe_id || null)
     }
 
-    const { data: usuariosData } = await supabase
+    let queryUsuarios = supabase
       .from('usuarios')
       .select('*, empresa:empresas(nome)')
       .order('criado_em', { ascending: false })
+
+    // escopo: master vê todos; demais veem só a própria empresa
+    if (currentUser && currentUser.role !== 'master' && currentUser.empresa_id) {
+      queryUsuarios = queryUsuarios.eq('empresa_id', currentUser.empresa_id)
+    }
+    const { data: usuariosData } = await queryUsuarios
 
     if (usuariosData) setUsuarios(usuariosData as Usuario[])
 
