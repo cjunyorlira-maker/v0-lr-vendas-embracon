@@ -20,6 +20,7 @@ interface Props {
   empresaId: string | null
   equipes: Equipe[]
   currentUserRole: string | null
+  currentUserEquipe?: string | null
   onSuccess: (usuario: any) => void
   onEquipeCriada?: () => void
 }
@@ -32,7 +33,7 @@ const TODOS_ROLES = [
 ]
 
 export default function AdicionarUsuarioModal({
-  open, onClose, empresaId, equipes, currentUserRole, onSuccess, onEquipeCriada,
+  open, onClose, empresaId, equipes, currentUserRole, currentUserEquipe, onSuccess, onEquipeCriada,
 }: Props) {
   const [nome, setNome] = useState('')
   const [email, setEmail] = useState('')
@@ -54,6 +55,13 @@ export default function AdicionarUsuarioModal({
   const [nomeNovaEquipe, setNomeNovaEquipe] = useState('')
   const [criandoEquipe, setCriandoEquipe] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (currentUserRole === 'supervisor') {
+      setRole('vendedor')
+      if (currentUserEquipe) setEquipeId(currentUserEquipe)
+    }
+  }, [currentUserRole, currentUserEquipe])
 
   // Master carrega lista de empresas
   useEffect(() => {
@@ -234,9 +242,13 @@ export default function AdicionarUsuarioModal({
 
             <div>
               <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--muted-color)' }}>Cargo</label>
-              <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
-                {rolesPermitidos.map((r) => (<option key={r.value} value={r.value} style={{ background: '#131313' }}>{r.label}</option>))}
-              </select>
+              {currentUserRole === 'supervisor' ? (
+                <input value="Vendedor" disabled className="w-full rounded-lg px-3 py-2.5 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--muted-color)' }} />
+              ) : (
+                <select value={role} onChange={(e) => setRole(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                  {rolesPermitidos.map((r) => (<option key={r.value} value={r.value} style={{ background: '#131313' }}>{r.label}</option>))}
+                </select>
+              )}
             </div>
 
             {mostraEmpresaNova && (
@@ -273,7 +285,10 @@ export default function AdicionarUsuarioModal({
               </div>
             )}
 
-            {mostraEquipe && !showCriarEquipe && (
+            {mostraEquipe && !showCriarEquipe && currentUserRole === 'supervisor' && (
+              <div className="rounded-lg p-3 text-xs" style={{ background: 'rgba(34,197,94,0.1)', color: '#22c55e' }}>O vendedor será adicionado à sua equipe automaticamente.</div>
+            )}
+            {mostraEquipe && !showCriarEquipe && currentUserRole !== 'supervisor' && (
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-medium" style={{ color: 'var(--muted-color)' }}>Equipe</label>
