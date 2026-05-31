@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
 
     // ── CRIAR lance (config + lance do mês atual) ──
     if (acao === 'criar') {
-      const { cliente_id, venda_id, tipo, valor_percentual, observacao, recorrente } = body
+      const { cliente_id, venda_id, tipo, valor_percentual, observacao, recorrente, cliente_ofertou } = body
       if (!cliente_id || !tipo) return NextResponse.json({ error: "Cliente e tipo são obrigatórios" }, { status: 400 })
 
       // pega dados do cliente/venda pra escopo
@@ -55,11 +55,13 @@ export async function POST(req: NextRequest) {
       }).select('id').single()
       if (cfgErr || !cfg) return NextResponse.json({ error: cfgErr?.message || 'Erro' }, { status: 500 })
 
-      // cria o lance do mês atual JÁ como solicitado (o vendedor já definiu o valor na criação)
+      // cria o lance do mês: se o cliente já ofertou, nasce 'ofertado'; senão 'solicitado'
       await supabaseAdmin.from('lances_mensais').insert({
         lance_config_id: cfg.id, empresa_id: cliente.empresa_id, cliente_id,
         vendedor_id: cliente.vendedor_id, equipe_id: cliente.equipe_id,
-        mes_referencia: mesAtualRef(), data_assembleia: dataAssembleia, status: 'solicitado',
+        mes_referencia: mesAtualRef(), data_assembleia: dataAssembleia,
+        status: cliente_ofertou ? 'ofertado' : 'solicitado',
+        data_oferta: cliente_ofertou ? new Date().toISOString() : null,
       })
 
       // notifica ADM/representante (novo lance pra ofertar)
