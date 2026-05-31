@@ -294,6 +294,21 @@ export default function ComissoesPage() {
           {loading ? (
             <div className="flex items-center justify-center py-12"><Loader2 size={20} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
           ) : aba === 'config' ? (
+            <>
+            {meuRole === 'master' && (
+              <div className="rounded-xl p-5 max-w-2xl mb-4" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+                <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text)' }}>Período de produção</h3>
+                <p className="text-xs mb-3" style={{ color: 'var(--muted-color)' }}>Dia em que começa o ciclo de produção (vai desse dia até o dia anterior do mês seguinte).</p>
+                <div className="flex items-end gap-3 flex-wrap">
+                  <div>
+                    <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Dia de início</label>
+                    <input type="number" min="1" max="28" value={diaProducao} onChange={(e) => setDiaProducao(parseInt(e.target.value) || 21)} className="rounded-lg px-3 py-2 text-sm outline-none w-24" style={inputStyle} />
+                  </div>
+                  <button onClick={() => salvarDiaProducao(diaProducao)} disabled={salvandoProducao} className="rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50" style={{ background: 'var(--accent)', color: '#0a0a0a' }}>{salvandoProducao ? 'Salvando...' : 'Salvar'}</button>
+                  <span className="text-xs self-center" style={{ color: 'var(--muted-color)' }}>Ex: dia {diaProducao} → ciclo {diaProducao} a {diaProducao - 1} do mês seguinte</span>
+                </div>
+              </div>
+            )}
             <div className="rounded-xl p-5 max-w-2xl" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
               <h3 className="text-sm font-semibold mb-1" style={{ color: 'var(--text)' }}>Comissão padrão por categoria</h3>
               <p className="text-xs mb-4" style={{ color: 'var(--muted-color)' }}>% sobre o crédito. Aplicado automaticamente conforme o plano da venda.</p>
@@ -317,6 +332,7 @@ export default function ComissoesPage() {
                 <button onClick={salvarConfig} disabled={salvandoConfig} className="w-full flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50 transition-transform hover:scale-105 active:scale-95" style={{ background: 'linear-gradient(135deg, #d4af37 0%, #c9a227 50%, #b8941f 100%)', color: '#0a0a0a' }}>{salvandoConfig ? <Loader2 size={14} className="animate-spin" /> : <><Check size={14} />Salvar comissões por categoria</>}</button>
               </div>
             </div>
+            </>
           ) : (
             <>
               {selecionadas.size > 0 && (
