@@ -6,7 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import AdicionarUsuarioModal from '@/components/AdicionarUsuarioModal'
 import ResetSenhaModal from '@/components/ResetSenhaModal'
-import { Plus, Users, UserX, UserCheck, Trash2, KeyRound, AlertTriangle, AlertOctagon } from 'lucide-react'
+import { Plus, Users, Users2, UserX, UserCheck, Trash2, KeyRound, AlertTriangle, AlertOctagon } from 'lucide-react'
 
 interface Usuario {
   id: string
@@ -65,6 +65,9 @@ export default function EquipePage() {
   const [textoConfirmDeletar, setTextoConfirmDeletar] = useState('')
   const [acaoLoading, setAcaoLoading] = useState(false)
   const [confirmReset, setConfirmReset] = useState<Usuario | null>(null)
+  const [mudarEquipeModal, setMudarEquipeModal] = useState<any>(null)
+  const [novaEquipe, setNovaEquipe] = useState('')
+  const [salvandoEquipe, setSalvandoEquipe] = useState(false)
 
   useEffect(() => { loadData() }, [])
 
@@ -137,6 +140,16 @@ export default function EquipePage() {
     setAcaoLoading(false)
     setConfirmDeletar(null)
     setTextoConfirmDeletar('')
+  }
+
+  async function salvarMudarEquipe() {
+    if (!mudarEquipeModal) return
+    setSalvandoEquipe(true)
+    const supabase = createClient()
+    await supabase.from('usuarios').update({ equipe_id: novaEquipe || null }).eq('id', mudarEquipeModal.id)
+    setSalvandoEquipe(false)
+    setMudarEquipeModal(null)
+    location.reload()
   }
 
   const canAddUsers = ['master', 'representante', 'adm', 'supervisor'].includes(currentUserRole || '')
@@ -248,6 +261,12 @@ export default function EquipePage() {
                           <div className="flex items-center justify-end gap-2">
                             {podeDesativarAlvo(u) && (
                               <>
+                                {['master','representante','adm'].includes(currentUserRole || '') && ['vendedor','supervisor'].includes(u.role) && (
+                                  <button onClick={() => { setMudarEquipeModal(u); setNovaEquipe(u.equipe_id || '') }} className="flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors" style={{ color: '#a855f7', background: 'rgba(168,85,247,0.08)' }} title="Mudar equipe">
+                                    <Users2 size={14} />
+                                    <span className="hidden sm:inline">Equipe</span>
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => setConfirmReset(u)}
                                   className="flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors"
@@ -375,6 +394,24 @@ export default function EquipePage() {
               >
                 {acaoLoading ? '...' : 'Deletar permanentemente'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mudarEquipeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }} onClick={() => setMudarEquipeModal(null)} />
+          <div className="relative w-full max-w-sm rounded-xl p-6" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+            <h3 className="text-base font-semibold mb-1" style={{ color: 'var(--text)' }}>Mudar equipe</h3>
+            <p className="text-xs mb-4" style={{ color: 'var(--muted-color)' }}>{mudarEquipeModal.nome}</p>
+            <select value={novaEquipe} onChange={(e) => setNovaEquipe(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm outline-none mb-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+              <option value="" style={{ background: '#131313' }}>Sem equipe</option>
+              {equipes.map((eq) => (<option key={eq.id} value={eq.id} style={{ background: '#131313' }}>{eq.nome}</option>))}
+            </select>
+            <div className="flex gap-2">
+              <button onClick={() => setMudarEquipeModal(null)} className="flex-1 rounded-lg py-2.5 text-sm" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text2)' }}>Cancelar</button>
+              <button onClick={salvarMudarEquipe} disabled={salvandoEquipe} className="flex-1 rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #d4af37 0%, #c9a227 50%, #b8941f 100%)', color: '#0a0a0a' }}>{salvandoEquipe ? 'Salvando...' : 'Salvar'}</button>
             </div>
           </div>
         </div>
