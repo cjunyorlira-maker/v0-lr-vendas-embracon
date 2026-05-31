@@ -148,6 +148,7 @@ export async function POST(req: NextRequest) {
 
       const { error } = await supabaseAdmin.from('lances_mensais').update({
         status: 'ofertado', comprovante_url: comprovante_url || null, comprovante_nome: comprovante_nome || null,
+        justificativa_sem_comprovante: body.justificativa || null,
         data_oferta: new Date().toISOString(),
       }).eq('id', lance_id)
       if (error) return NextResponse.json({ error: error.message }, { status: 500 })

@@ -52,6 +52,7 @@ export default function LancesPage() {
   const [defRecorrente, setDefRecorrente] = useState(false)
   const [editarLanceModal, setEditarLanceModal] = useState<any>(null)
   const [pdfAnexo, setPdfAnexo] = useState<{ base64: string; nome: string } | null>(null)
+  const [justificativa, setJustificativa] = useState('')
   const [fGrupo, setFGrupo] = useState('')
   const [busca, setBusca] = useState('')
   const [filtrosOpc, setFiltrosOpc] = useState<{ empresas: any[]; equipes: any[]; vendedores: any[] }>({ empresas: [], equipes: [], vendedores: [] })
@@ -105,20 +106,26 @@ export default function LancesPage() {
   }
 
   async function ofertar(lance: Lance) {
-    if (!pdfAnexo) { alert('Anexe o comprovante'); return }
+    if (!pdfAnexo && !justificativa.trim()) { alert('Anexe o comprovante ou escreva uma justificativa para ofertar sem ele.'); return }
     setProcessando(lance.id)
     try {
       const supabase = createClient()
-      const matches = pdfAnexo.base64.match(/^data:(.+);base64,(.+)$/)
-      if (!matches) { alert('Arquivo inválido'); setProcessando(null); return }
-      const buffer = Uint8Array.from(atob(matches[2]), c => c.charCodeAt(0))
-      const ext = pdfAnexo.nome.split('.').pop() || 'pdf'
-      const fileName = `${lance.id}-${Date.now()}.${ext}`
-      const { error: upErr } = await supabase.storage.from('comprovantes-lance').upload(fileName, buffer, { contentType: matches[1] })
-      if (upErr) { alert('Erro ao subir: ' + upErr.message); setProcessando(null); return }
-      const res = await fetch('/api/lances/acao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'ofertar', lance_id: lance.id, comprovante_url: fileName, comprovante_nome: pdfAnexo.nome }) })
+      let fileName: string | null = null
+      let nomeArquivo: string | null = null
+      // comprovante é OPCIONAL: só sobe se foi anexado
+      if (pdfAnexo) {
+        const matches = pdfAnexo.base64.match(/^data:(.+);base64,(.+)$/)
+        if (!matches) { alert('Arquivo inválido'); setProcessando(null); return }
+        const buffer = Uint8Array.from(atob(matches[2]), c => c.charCodeAt(0))
+        const ext = pdfAnexo.nome.split('.').pop() || 'pdf'
+        fileName = `${lance.id}-${Date.now()}.${ext}`
+        nomeArquivo = pdfAnexo.nome
+        const { error: upErr } = await supabase.storage.from('comprovantes-lance').upload(fileName, buffer, { contentType: matches[1] })
+        if (upErr) { alert('Erro ao subir: ' + upErr.message); setProcessando(null); return }
+      }
+      const res = await fetch('/api/lances/acao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'ofertar', lance_id: lance.id, comprovante_url: fileName, comprovante_nome: nomeArquivo, justificativa: !fileName ? justificativa.trim() : null }) })
       if (!res.ok) { const d = await res.json(); alert(d.error || 'Erro'); setProcessando(null); return }
-      setOfertarModal(null); setPdfAnexo(null)
+      setOfertarModal(null); setPdfAnexo(null); setJustificativa('')
       await loadData()
     } catch { alert('Erro ao ofertar') }
     setProcessando(null)
@@ -357,17 +364,23 @@ export default function LancesPage() {
       {/* Modal ofertar */}
       {ofertarModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }} onClick={() => { setOfertarModal(null); setPdfAnexo(null) }} />
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }} onClick={() => { setOfertarModal(null); setPdfAnexo(null); setJustificativa('') }} />
           <div className="relative w-full max-w-md rounded-xl p-6" style={{ background: 'var(--surface, #131313)', border: '1px solid var(--border)' }}>
             <h3 className="text-base font-semibold mb-1" style={{ color: 'var(--text)' }}>Ofertar lance</h3>
             <p className="text-xs mb-4" style={{ color: 'var(--muted-color)' }}>{ofertarModal.clientes?.nome} · {descTipo(ofertarModal.lances_config)}. Anexe o comprovante do lance ofertado.</p>
             <input ref={fileRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePdf(f) }} />
-            <div onClick={() => fileRef.current?.click()} className="flex flex-col items-center justify-center gap-2 py-6 rounded-lg cursor-pointer mb-4" style={{ border: '2px dashed var(--border)', background: 'rgba(255,255,255,0.02)' }}>
+            <div onClick={() => fileRef.current?.click()} className="flex flex-col items-center justify-center gap-2 py-6 rounded-lg cursor-pointer mb-3" style={{ border: '2px dashed var(--border)', background: 'rgba(255,255,255,0.02)' }}>
               {pdfAnexo ? <><Paperclip size={20} style={{ color: '#22c55e' }} /><span className="text-xs" style={{ color: '#22c55e' }}>{pdfAnexo.nome}</span></> : <><Upload size={20} style={{ color: 'var(--accent)' }} /><span className="text-xs" style={{ color: 'var(--muted-color)' }}>Clique para anexar comprovante (PDF ou imagem)</span></>}
             </div>
+            {!pdfAnexo && (
+              <div className="mb-4">
+                <label className="block text-xs mb-1" style={{ color: '#f59e0b' }}>Sem comprovante? Justifique:</label>
+                <textarea value={justificativa} onChange={(e) => setJustificativa(e.target.value)} rows={2} placeholder="Ex: ofertado no sistema mas o comprovante ainda não foi gerado pela Embracon" className="w-full rounded-lg px-3 py-2 text-xs outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(245,158,11,0.3)', color: 'var(--text)' }} />
+              </div>
+            )}
             <div className="flex gap-2">
-              <button onClick={() => { setOfertarModal(null); setPdfAnexo(null) }} className="flex-1 rounded-lg py-2.5 text-sm" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text2)' }}>Cancelar</button>
-              <button onClick={() => ofertar(ofertarModal)} disabled={processando === ofertarModal.id || !pdfAnexo} className="flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #d4af37 0%, #c9a227 50%, #b8941f 100%)', color: '#0a0a0a' }}>{processando === ofertarModal.id ? <Loader2 size={14} className="animate-spin" /> : 'Ofertar'}</button>
+              <button onClick={() => { setOfertarModal(null); setPdfAnexo(null); setJustificativa('') }} className="flex-1 rounded-lg py-2.5 text-sm" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text2)' }}>Cancelar</button>
+              <button onClick={() => ofertar(ofertarModal)} disabled={processando === ofertarModal.id || (!pdfAnexo && !justificativa.trim())} className="flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #d4af37 0%, #c9a227 50%, #b8941f 100%)', color: '#0a0a0a' }}>{processando === ofertarModal.id ? <Loader2 size={14} className="animate-spin" /> : (pdfAnexo ? 'Ofertar com comprovante' : 'Marcar como ofertado')}</button>
             </div>
           </div>
         </div>
