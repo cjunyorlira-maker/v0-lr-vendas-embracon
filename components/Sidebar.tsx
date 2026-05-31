@@ -226,7 +226,13 @@ function SidebarContent({ userNome, userEmail, userRole, empresaNome, empresaLog
           {mainNav.map((item) => (<NavLink key={item.label} item={item} />))}
         </div>
         <div className="my-4 px-3" style={{ borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
-          {adminNav.map((item) => (<NavLink key={item.label} item={item} />))}
+          {adminNav.filter((item) => {
+            // Comissões: só master, representante, adm
+            if (item.href === '/comissoes') return ['master', 'representante', 'adm'].includes(userRole)
+            // Planos: só master, representante (gestão)
+            if (item.href === '/planos') return ['master', 'representante', 'adm'].includes(userRole)
+            return true
+          }).map((item) => (<NavLink key={item.label} item={item} />))}
         </div>
       </nav>
 
