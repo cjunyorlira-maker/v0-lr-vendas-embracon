@@ -261,7 +261,7 @@ export default function LancesPage() {
               )}
               {['master', 'representante', 'adm'].includes(role) && (
                 <select value={fEquipe} onChange={(e) => { setFEquipe(e.target.value); setFVendedor('') }} className="rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
-                  <option value="" style={{ background: '#131313' }}>Todos supervisores</option>
+                  <option value="" style={{ background: '#131313' }}>Todas equipes</option>
                   {filtrosOpc.equipes.filter(eq => !fEmpresa || eq.empresa_id === fEmpresa).map(eq => <option key={eq.id} value={eq.id} style={{ background: '#131313' }}>{eq.nome}</option>)}
                 </select>
               )}
