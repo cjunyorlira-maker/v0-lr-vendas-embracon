@@ -74,6 +74,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, config_id: cfg.id })
     }
 
+    // ── SOLICITAR (vendedor define o valor do lance do mês: pendente -> solicitado) ──
+    if (acao === 'solicitar') {
+      const { lance_id } = body
+      if (!lance_id) return NextResponse.json({ error: "lance_id obrigatório" }, { status: 400 })
+      const upd: any = { status: 'solicitado' }
+      // se mandou tipo/valor novo, atualiza a config também
+      const { data: lanceM } = await supabaseAdmin.from('lances_mensais').select('lance_config_id').eq('id', lance_id).single()
+      if (lanceM && (body.tipo || body.valor_percentual !== undefined)) {
+        const updCfg: any = {}
+        if (body.tipo) updCfg.tipo = body.tipo
+        if (body.valor_percentual !== undefined) updCfg.valor_percentual = body.valor_percentual
+        if (body.observacao !== undefined) updCfg.observacao = body.observacao
+        await supabaseAdmin.from('lances_config').update(updCfg).eq('id', lanceM.lance_config_id)
+      }
+      await supabaseAdmin.from('lances_mensais').update(upd).eq('id', lance_id)
+      // notifica adm/rep que tem lance pra ofertar
+      const { data: lm } = await supabaseAdmin.from('lances_mensais').select('empresa_id, cliente_id').eq('id', lance_id).single()
+      if (lm) {
+        const { data: cli } = await supabaseAdmin.from('clientes').select('nome').eq('id', lm.cliente_id).single()
+        await supabaseAdmin.from('notificacoes').insert([
+          { empresa_id: lm.empresa_id, destinatario_role: 'adm', titulo: 'Lance solicitado', mensagem: `${cli?.nome || 'Cliente'} — pronto pra ofertar`, tipo: 'generico', link_url: '/lances' },
+          { empresa_id: lm.empresa_id, destinatario_role: 'representante', titulo: 'Lance solicitado', mensagem: `${cli?.nome || 'Cliente'} — pronto pra ofertar`, tipo: 'generico', link_url: '/lances' },
+        ])
+      }
+      return NextResponse.json({ success: true })
+    }
+
     // ── OFERTAR (anexa comprovante, marca ofertado) ──
     if (acao === 'ofertar') {
       const { lance_id, comprovante_url, comprovante_nome } = body
