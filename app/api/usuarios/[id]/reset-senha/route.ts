@@ -11,7 +11,7 @@ const supabaseAdmin = createClient(
 )
 
 const PODE_RESETAR: Record<string, string[]> = {
-  master: ['representante'],
+  master: ['representante', 'adm', 'supervisor', 'vendedor'],
   representante: ['adm', 'supervisor', 'vendedor'],
   adm: ['supervisor', 'vendedor'],
   supervisor: ['vendedor'],
@@ -57,8 +57,9 @@ export async function POST(
     if (!alvo) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 })
     if (!alvo.auth_user_id) return NextResponse.json({ error: "Usuário sem auth" }, { status: 400 })
 
+    const ehProprio = solicitante.id === alvo.id
     const rolesPermitidos = PODE_RESETAR[solicitante.role] || []
-    if (!rolesPermitidos.includes(alvo.role)) {
+    if (!ehProprio && !rolesPermitidos.includes(alvo.role)) {
       return NextResponse.json({
         error: `Você não pode resetar senha de '${alvo.role}'`
       }, { status: 403 })
