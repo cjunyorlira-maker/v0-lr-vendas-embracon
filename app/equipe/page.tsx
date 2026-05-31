@@ -58,6 +58,8 @@ export default function EquipePage() {
   const [empresaId, setEmpresaId] = useState<string | null>(null)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
   const [currentUserEquipe, setCurrentUserEquipe] = useState<string | null>(null)
+  const [empresasLista, setEmpresasLista] = useState<any[]>([])
+  const [filtroEmpresa, setFiltroEmpresa] = useState('')
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
   const [mostrarInativos, setMostrarInativos] = useState(false)
   const [confirmDesativar, setConfirmDesativar] = useState<Usuario | null>(null)
@@ -108,6 +110,12 @@ export default function EquipePage() {
       .order('nome')
 
     if (equipesData) setEquipes(equipesData)
+
+    // empresas (pro filtro do master)
+    if (currentUser?.role === 'master') {
+      const { data: empData } = await supabase.from('empresas').select('id, nome').order('nome')
+      if (empData) setEmpresasLista(empData)
+    }
     setLoading(false)
   }
 
@@ -160,7 +168,8 @@ export default function EquipePage() {
 
   const canAddUsers = ['master', 'representante', 'adm', 'supervisor'].includes(currentUserRole || '')
 
-  const usuariosFiltrados = mostrarInativos ? usuarios : usuarios.filter(u => u.ativo)
+  const usuariosFiltrados = (mostrarInativos ? usuarios : usuarios.filter(u => u.ativo))
+    .filter(u => !filtroEmpresa || u.empresa_id === filtroEmpresa)
 
   function podeDesativarAlvo(alvo: Usuario): boolean {
     if (!currentUserRole) return false
@@ -191,6 +200,12 @@ export default function EquipePage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              {currentUserRole === 'master' && empresasLista.length > 0 && (
+                <select value={filtroEmpresa} onChange={(e) => setFiltroEmpresa(e.target.value)} className="rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                  <option value="" style={{ background: '#131313' }}>Todas as empresas</option>
+                  {empresasLista.map(e => <option key={e.id} value={e.id} style={{ background: '#131313' }}>{e.nome}</option>)}
+                </select>
+              )}
               <label className="flex items-center gap-2 cursor-pointer text-xs" style={{ color: 'var(--muted-color)' }}>
                 <input type="checkbox" checked={mostrarInativos} onChange={(e) => setMostrarInativos(e.target.checked)} className="accent-yellow-600" />
                 Mostrar inativos
