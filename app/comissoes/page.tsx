@@ -313,12 +313,14 @@ export default function ComissoesPage() {
 
           {/* Importar mapa */}
           <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) importarMapa(f) }} />
+          {ehGestao && (
           <div className="flex items-center gap-3 mb-5 flex-wrap">
             <button onClick={() => fileRef.current?.click()} disabled={importando} className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold disabled:opacity-50 transition-transform hover:scale-105 active:scale-95" style={{ background: 'rgba(59,130,246,0.15)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.3)' }}>
               {importando ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}{importando ? 'Importando...' : 'Importar mapa de comissão (PDF)'}
             </button>
             {resultImport && <span className="text-xs" style={{ color: resultImport.startsWith('Erro') ? '#ef4444' : '#22c55e' }}>{resultImport}</span>}
           </div>
+          )}
 
           {/* Filtro por data */}
           <div className="flex items-end gap-2 mb-4 flex-wrap">
@@ -372,9 +374,11 @@ export default function ComissoesPage() {
           {/* Abas */}
           <div className="flex gap-2 mb-5">
             <button onClick={() => setAba('vendas')} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: aba === 'vendas' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${aba === 'vendas' ? 'var(--accent)' : 'var(--border)'}`, color: aba === 'vendas' ? 'var(--accent)' : 'var(--muted-color)' }}><DollarSign size={14} />Vendas</button>
+            {ehGestao && (<>
             <button onClick={() => setAba('mapa')} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: aba === 'mapa' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${aba === 'mapa' ? 'var(--accent)' : 'var(--border)'}`, color: aba === 'mapa' ? 'var(--accent)' : 'var(--muted-color)' }}><FileText size={14} />Mapa de Comissão</button>
             <button onClick={() => setAba('calculo')} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: aba === 'calculo' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${aba === 'calculo' ? 'var(--accent)' : 'var(--border)'}`, color: aba === 'calculo' ? 'var(--accent)' : 'var(--muted-color)' }}><Calculator size={14} />Cálculo de Comissão</button>
             <button onClick={() => setAba('config')} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: aba === 'config' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${aba === 'config' ? 'var(--accent)' : 'var(--border)'}`, color: aba === 'config' ? 'var(--accent)' : 'var(--muted-color)' }}><Settings size={14} />Configurar padrão</button>
+            </>)}
           </div>
 
           {loading ? (
@@ -576,12 +580,12 @@ export default function ComissoesPage() {
                           <th className="p-3 text-left text-xs" style={{ color: 'var(--muted-color)' }}>Cliente</th>
                           <th className="p-3 text-left text-xs" style={{ color: 'var(--muted-color)' }}>Adesão</th>
                           <th className="p-3 text-right text-xs" style={{ color: 'var(--muted-color)' }}>Crédito</th>
-                          <th className="p-3 text-right text-xs" style={{ color: 'var(--accent)' }}>Com. Rep.</th>
-                          <th className="p-3 text-right text-xs" style={{ color: '#22c55e' }}>Recebido</th>
-                          <th className="p-3 text-right text-xs" style={{ color: '#f59e0b' }}>Falta</th>
+                          {ehGestao && <th className="p-3 text-right text-xs" style={{ color: 'var(--accent)' }}>Com. Rep.</th>}
+                          {ehGestao && <th className="p-3 text-right text-xs" style={{ color: '#22c55e' }}>Recebido</th>}
+                          {ehGestao && <th className="p-3 text-right text-xs" style={{ color: '#f59e0b' }}>Falta</th>}
                           <th className="p-3 text-right text-xs" style={{ color: 'var(--muted-color)' }}>Vend.</th>
                           <th className="p-3 text-right text-xs" style={{ color: 'var(--muted-color)' }}>Superv.</th>
-                          <th className="p-3 text-center text-xs" style={{ color: 'var(--muted-color)' }}>Estorno</th>
+                          {ehGestao && <th className="p-3 text-center text-xs" style={{ color: 'var(--muted-color)' }}>Estorno</th>}
                         </tr>
                       </thead>
                       <tbody>
@@ -594,12 +598,12 @@ export default function ComissoesPage() {
                               <td className="p-3" style={{ color: 'var(--text)' }}>{v.cliente}<br /><span className="text-[10px]" style={{ color: 'var(--muted-color)' }}>{v.vendedor}</span></td>
                               <td className="p-3"><span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)' }}>{v.adesao != null ? `${v.adesao}%` : '-'}</span><br/><span className="text-[10px]" style={{ color: 'var(--muted-color)' }}>{v.bem}</span></td>
                               <td className="p-3 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda(v.credito)}</td>
-                              <td className="p-3 text-right font-semibold" style={{ color: 'var(--accent)' }}>{fmtMoeda(v.comissao_lr)}</td>
-                              <td className="p-3 text-right" style={{ color: '#22c55e' }}>{fmtMoeda(v.comissao_recebida_rs || 0)}<br /><span className="text-[10px]">{recPct.toFixed(1)}%</span></td>
-                              <td className="p-3 text-right" style={{ color: faltaRs > 1 ? '#f59e0b' : '#22c55e' }}>{faltaRs > 1 ? fmtMoeda(faltaRs) : `${'\u2713'} 100%`}</td>
+                              {ehGestao && <td className="p-3 text-right font-semibold" style={{ color: 'var(--accent)' }}>{fmtMoeda(v.comissao_lr)}</td>}
+                              {ehGestao && <td className="p-3 text-right" style={{ color: '#22c55e' }}>{fmtMoeda(v.comissao_recebida_rs || 0)}<br /><span className="text-[10px]">{recPct.toFixed(1)}%</span></td>}
+                              {ehGestao && <td className="p-3 text-right" style={{ color: faltaRs > 1 ? '#f59e0b' : '#22c55e' }}>{faltaRs > 1 ? fmtMoeda(faltaRs) : `${'\u2713'} 100%`}</td>}
                               <td className="p-3 text-right" style={{ color: 'var(--text2)' }}>{v.percentual_vendedor}%<br /><span className="text-[10px]">{fmtMoeda(v.comissao_vendedor)}</span></td>
                               <td className="p-3 text-right" style={{ color: 'var(--text2)' }}>{v.percentual_supervisor}%<br /><span className="text-[10px]">{fmtMoeda(v.comissao_supervisor)}</span></td>
-                              <td className="p-3 text-center">
+                              {ehGestao && <td className="p-3 text-center">
                                 {v.em_risco ? (
                                   <div className="flex flex-col items-center gap-0.5">
                                     <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}>{'\u25cf'} {fmtMoeda(v.valor_estorno)}</span>
@@ -608,7 +612,7 @@ export default function ComissoesPage() {
                                 ) : (
                                   <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e' }}>{'\u2713'} seguro</span>
                                 )}
-                              </td>
+                              </td>}
                             </tr>
                           )
                         })}
