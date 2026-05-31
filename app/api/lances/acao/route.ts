@@ -76,6 +76,42 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, config_id: cfg.id })
     }
 
+    // ── EDITAR / TROCAR lance (ajusta tipo/valor) ──
+    if (acao === 'editar') {
+      const { lance_id } = body
+      if (!lance_id) return NextResponse.json({ error: "lance_id obrigatório" }, { status: 400 })
+      const { data: lanceM } = await supabaseAdmin.from('lances_mensais').select('id, lance_config_id, status, data_assembleia').eq('id', lance_id).single()
+      if (!lanceM) return NextResponse.json({ error: "Lance não encontrado" }, { status: 404 })
+
+      // se já ofertado, só pode trocar se a assembleia ainda não passou
+      if (lanceM.status === 'ofertado') {
+        const hoje = new Date().toISOString().slice(0, 10)
+        if (lanceM.data_assembleia && lanceM.data_assembleia < hoje) {
+          return NextResponse.json({ error: "A assembleia já passou, não é possível trocar este lance." }, { status: 400 })
+        }
+      }
+
+      // atualiza a config com os novos dados
+      const updCfg: any = {}
+      if (body.tipo) updCfg.tipo = body.tipo
+      if (body.valor_percentual !== undefined) updCfg.valor_percentual = body.valor_percentual
+      if (body.observacao !== undefined) updCfg.observacao = body.observacao
+      if (body.recorrente !== undefined) updCfg.recorrente = body.recorrente
+      if (Object.keys(updCfg).length > 0) {
+        await supabaseAdmin.from('lances_config').update(updCfg).eq('id', lanceM.lance_config_id)
+      }
+
+      // se estava ofertado, volta pra solicitado (precisa reofertar)
+      const novoStatus = lanceM.status === 'ofertado' ? 'solicitado' : lanceM.status
+      await supabaseAdmin.from('lances_mensais').update({
+        status: novoStatus,
+        comprovante_url: lanceM.status === 'ofertado' ? null : undefined,
+        comprovante_nome: lanceM.status === 'ofertado' ? null : undefined,
+      }).eq('id', lance_id)
+
+      return NextResponse.json({ success: true, voltou_solicitado: lanceM.status === 'ofertado' })
+    }
+
     // ── SOLICITAR (vendedor define o valor do lance: pendente -> solicitado) ──
     if (acao === 'solicitar') {
       const { lance_id } = body
