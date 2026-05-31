@@ -11,7 +11,7 @@ const supabaseAdmin = createClient(
 
 export async function GET() {
   const { data } = await supabaseAdmin.from('config_producao').select('*').eq('id', 1).single()
-  return NextResponse.json({ dia_inicio: data?.dia_inicio || 21 })
+  return NextResponse.json({ data_inicio: data?.data_inicio || null, data_fim: data?.data_fim || null })
 }
 
 export async function POST(req: NextRequest) {
@@ -29,11 +29,12 @@ export async function POST(req: NextRequest) {
     if (!me || me.role !== 'master') return NextResponse.json({ error: "Apenas master" }, { status: 403 })
 
     const body = await req.json()
-    const dia = parseInt(body.dia_inicio) || 21
-    if (dia < 1 || dia > 28) return NextResponse.json({ error: "Dia deve ser entre 1 e 28" }, { status: 400 })
+    if (!body.data_inicio || !body.data_fim) return NextResponse.json({ error: "Informe início e fim" }, { status: 400 })
 
-    await supabaseAdmin.from('config_producao').upsert({ id: 1, dia_inicio: dia, atualizado_em: new Date().toISOString() }, { onConflict: 'id' })
-    return NextResponse.json({ success: true, dia_inicio: dia })
+    await supabaseAdmin.from('config_producao').upsert({
+      id: 1, data_inicio: body.data_inicio, data_fim: body.data_fim, atualizado_em: new Date().toISOString()
+    }, { onConflict: 'id' })
+    return NextResponse.json({ success: true })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
