@@ -47,7 +47,7 @@ export async function GET() {
       if (lanceCfg) {
         const lm = (lancesMes || []).find((m: any) => m.lance_config_id === lanceCfg.id)
         if (lanceCfg.status_final === 'contemplado') statusLance = 'contemplado'
-        else if (lm?.status === 'ofertado') statusLance = 'solicitado'
+        else if (lm?.status) statusLance = lm.status  // usa o status real: pendente / solicitado / ofertado
         else statusLance = 'pendente'
       }
       return {
