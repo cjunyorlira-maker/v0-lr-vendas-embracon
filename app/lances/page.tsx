@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { Target, Loader2, Upload, Download, Check, Paperclip, Trophy, X, Clock } from 'lucide-react'
+import { Target, Loader2, Upload, Download, Check, Paperclip, Trophy, X, Clock, Search } from 'lucide-react'
 
 interface Lance {
   id: string
@@ -16,6 +16,9 @@ interface Lance {
   comprovante_nome: string | null
   comprovante_baixado: boolean
   contemplado: boolean
+  grupo?: string | null
+  cota?: string | null
+  numero_proposta?: string | null
   clientes?: { nome: string }
   usuarios?: { nome: string }
   lances_config?: { tipo: string; valor_percentual: number; observacao: string; recorrente: boolean }
@@ -60,9 +63,27 @@ export default function LancesPage() {
   const podeOfertar = ['master', 'representante', 'adm'].includes(role)
 
   // pisca se pendente (sempre, até ofertar)
-  const pendentes = lances.filter(l => l.status === 'pendente')
-  const solicitados = lances.filter(l => l.status === 'solicitado')
-  const ofertados = lances.filter(l => l.status === 'ofertado')
+  const [fGrupo, setFGrupo] = useState('')
+  const [busca, setBusca] = useState('')
+
+  // grupos disponíveis (ordenados por quantidade de clientes)
+  const gruposContagem: Record<string, number> = {}
+  lances.forEach(l => { if (l.grupo) gruposContagem[l.grupo] = (gruposContagem[l.grupo] || 0) + 1 })
+  const gruposOrdenados = Object.entries(gruposContagem).sort((a, b) => b[1] - a[1])
+
+  const lancesFiltrados = lances.filter(l => {
+    if (fGrupo && String(l.grupo) !== fGrupo) return false
+    if (busca) {
+      const b = busca.toLowerCase()
+      const bate = (l.clientes?.nome || '').toLowerCase().includes(b) || String(l.grupo || '').includes(b) || String(l.numero_proposta || '').includes(b)
+      if (!bate) return false
+    }
+    return true
+  })
+
+  const pendentes = lancesFiltrados.filter(l => l.status === 'pendente')
+  const solicitados = lancesFiltrados.filter(l => l.status === 'solicitado')
+  const ofertados = lancesFiltrados.filter(l => l.status === 'ofertado')
 
   function handlePdf(file: File) {
     if (file.type !== 'application/pdf' && !file.type.startsWith('image/')) { alert('Anexe PDF ou imagem'); return }
@@ -131,6 +152,7 @@ export default function LancesPage() {
         </div>
         <div className="flex flex-wrap gap-2 text-xs mb-3" style={{ color: 'var(--muted-color)' }}>
           <span className="px-2 py-0.5 rounded" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)' }}>{descTipo(lance.lances_config)}</span>
+          {lance.grupo && <span className="flex items-center gap-1">Grupo {lance.grupo}/{lance.cota}</span>}
           {lance.data_assembleia && <span className="flex items-center gap-1"><Clock size={11} />Assemb: {fmtData(lance.data_assembleia)}</span>}
           {lance.lances_config?.recorrente && <span style={{ color: '#a855f7' }}>{'\u267b'} recorrente</span>}
         </div>
@@ -185,6 +207,18 @@ export default function LancesPage() {
           {loading ? (
             <div className="flex items-center justify-center py-12"><Loader2 size={20} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
           ) : (
+            <div className="flex items-center gap-2 mb-5 flex-wrap">
+              <div className="relative">
+                <Search size={15} style={{ color: 'var(--muted-color)', position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
+                <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar cliente, grupo, proposta..." className="rounded-lg pl-8 pr-3 py-2 text-sm outline-none w-64" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+              </div>
+              <select value={fGrupo} onChange={(e) => setFGrupo(e.target.value)} className="rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                <option value="" style={{ background: '#131313' }}>Todos os grupos</option>
+                {gruposOrdenados.map(([g, qt]) => <option key={g} value={g} style={{ background: '#131313' }}>Grupo {g} ({qt})</option>)}
+              </select>
+              {(fGrupo || busca) && <button onClick={() => { setFGrupo(''); setBusca('') }} className="rounded-lg px-3 py-1.5 text-xs" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>Limpar</button>}
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               {/* Coluna Pendente */}
               <div>
