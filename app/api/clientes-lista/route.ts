@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
+import { getEscopo } from '@/lib/escopo'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,7 +28,10 @@ export async function GET() {
       .select('id, cliente_id, numero_proposta, numero_contrato, grupo, cota, valor_credito, adesao_percent, data_assembleia_entrada, data_venda, empresa_id, equipe_id, vendedor_id, checado, pdf_proposta_url, planos(sigla, nome_completo, bem, adesao_percent), clientes(id, nome, cpf_cnpj, telefone), usuarios:vendedor_id(nome), equipes(nome), boletos(status, qtd_parcelas, data_proxima_cobranca)')
       .order('data_assembleia_entrada', { ascending: true })
 
-    if (me.role === 'representante' || me.role === 'adm') q = q.eq('empresa_id', me.empresa_id)
+    const { escopoGlobal } = await getEscopo(me)
+    if (escopoGlobal) {
+      // master ou adm da matriz: vê tudo (sem filtro)
+    } else if (me.role === 'representante' || me.role === 'adm') q = q.eq('empresa_id', me.empresa_id)
     else if (me.role === 'supervisor') q = q.eq('equipe_id', me.equipe_id)
     else if (me.role === 'vendedor') q = q.eq('vendedor_id', me.id)
     const { data: vendas } = await q
@@ -76,7 +80,7 @@ export async function GET() {
 
     // opções de filtro conforme role (supervisor incluído na lista de vendedores)
     let empresasOpc: any[] = [], equipesOpc: any[] = [], vendedoresOpc: any[] = []
-    if (me.role === 'master') {
+    if (escopoGlobal) {
       const { data: emp } = await supabaseAdmin.from('empresas').select('id, nome').order('nome'); empresasOpc = emp || []
       const { data: eq } = await supabaseAdmin.from('equipes').select('id, nome, empresa_id').order('nome'); equipesOpc = eq || []
       const { data: vd } = await supabaseAdmin.from('usuarios').select('id, nome, empresa_id, equipe_id').in('role', ['vendedor','supervisor']).order('nome'); vendedoresOpc = vd || []
