@@ -27,6 +27,10 @@ export default function ComissoesPage() {
   const [logoEmpresa, setLogoEmpresa] = useState<string | null>(null)
   const [empresaNome, setEmpresaNome] = useState('')
   const [carregandoMapa, setCarregandoMapa] = useState(false)
+  const [planosCalc, setPlanosCalc] = useState<any[]>([])
+  const [planoSelCalc, setPlanoSelCalc] = useState<string>('')
+  const [creditoCalc, setCreditoCalc] = useState('')
+  const [parcelasAntecip, setParcelasAntecip] = useState(0)
   const [dataDe, setDataDe] = useState('')
   const [dataAte, setDataAte] = useState('')
   const [filtros, setFiltros] = useState<{ empresas: any[]; equipes: any[]; vendedores: any[] }>({ empresas: [], equipes: [], vendedores: [] })
@@ -55,6 +59,9 @@ export default function ComissoesPage() {
 
   useEffect(() => { loadData() }, [])
   useEffect(() => { if (aba === 'mapa') carregarMapas() }, [aba])
+  useEffect(() => { if (aba === 'calculo' && planosCalc.length === 0) {
+    fetch('/api/planos').then(r => r.json()).then(d => { if (d.planos) setPlanosCalc(d.planos.filter((p: any) => p.ativo)) })
+  } }, [aba])
 
   async function loadData() {
     setLoading(true)
@@ -416,7 +423,69 @@ export default function ComissoesPage() {
               )}
             </div>
           ) : aba === 'calculo' ? (
-            <div className="py-8 text-center" style={{ color: 'var(--muted-color)' }}>Cálculo de comissão (em construção)</div>
+            <div className="max-w-2xl">
+              <p className="text-sm mb-4" style={{ color: 'var(--muted-color)' }}>Simule a comissão do representante por plano, incluindo antecipação de parcelas e estorno.</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-5">
+                <div>
+                  <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Plano</label>
+                  <select value={planoSelCalc} onChange={(e) => { setPlanoSelCalc(e.target.value); setParcelasAntecip(0) }} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle}>
+                    <option value="" style={{ background: '#131313' }}>Selecione o plano</option>
+                    {planosCalc.map(p => <option key={p.id} value={p.id} style={{ background: '#131313' }}>{p.sigla} — {p.bem} {p.adesao_percent}%</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Valor do crédito (R$)</label>
+                  <input value={creditoCalc} onChange={(e) => { const num = e.target.value.replace(/\D/g, ''); setCreditoCalc(num ? (parseInt(num) / 100).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : '') }} placeholder="200.000,00" className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
+                </div>
+              </div>
+              {(() => {
+                const plano = planosCalc.find(p => p.id === planoSelCalc)
+                if (!plano) return <p className="text-xs py-8 text-center" style={{ color: 'var(--muted-color)' }}>Selecione um plano para ver o cálculo.</p>
+                const credito = parseFloat(creditoCalc.replace(/\./g, '').replace(',', '.')) || 0
+                const parcelas: number[] = Array.isArray(plano.comissao_parcelas) ? plano.comissao_parcelas : []
+                const totalPct = plano.comissao_total || parcelas.reduce((s: number, x: number) => s + x, 0)
+                const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                const qtdConsiderar = parcelasAntecip > 0 ? Math.min(parcelasAntecip, parcelas.length) : parcelas.length
+                const pctRecebido = parcelas.slice(0, qtdConsiderar).reduce((s: number, x: number) => s + x, 0)
+                const valorRecebido = credito * pctRecebido / 100
+                const valorTotal = credito * totalPct / 100
+                return (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      <div className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+                        <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Comissão total</p>
+                        <p className="text-lg font-bold" style={{ color: 'var(--accent)' }}>{totalPct}%</p>
+                        <p className="text-xs" style={{ color: '#22c55e' }}>{fmt(valorTotal)}</p>
+                      </div>
+                      <div className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+                        <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Parcelas de comissão</p>
+                        <p className="text-lg font-bold" style={{ color: 'var(--text)' }}>{parcelas.length}x</p>
+                        <p className="text-[10px]" style={{ color: 'var(--muted-color)' }}>{parcelas.map((x: number) => x + '%').join(' / ')}</p>
+                      </div>
+                      {plano.estorno_ate_pgto && (
+                        <div className="rounded-xl p-4" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                          <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Estorno se sair antes</p>
+                          <p className="text-lg font-bold" style={{ color: '#ef4444' }}>{plano.estorno_percent}%</p>
+                          <p className="text-[10px]" style={{ color: 'var(--muted-color)' }}>até o {plano.estorno_ate_pgto}º pagamento</p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+                      <label className="block text-xs mb-2" style={{ color: 'var(--muted-color)' }}>Simular antecipação: quantas parcelas o cliente antecipou?</label>
+                      <div className="flex items-center gap-2 flex-wrap mb-3">
+                        {[0, 1, 2, 3, 4, 5, 6, 7, 8].slice(0, parcelas.length + 1).map(n => (
+                          <button key={n} onClick={() => setParcelasAntecip(n)} className="rounded-lg px-3 py-1.5 text-xs font-medium" style={{ background: parcelasAntecip === n ? 'rgba(212,175,55,0.2)' : 'rgba(255,255,255,0.03)', border: `1px solid ${parcelasAntecip === n ? 'var(--accent)' : 'var(--border)'}`, color: parcelasAntecip === n ? 'var(--accent)' : 'var(--muted-color)' }}>{n === 0 ? 'Tudo' : n}</button>
+                        ))}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm" style={{ color: 'var(--text2)' }}>{parcelasAntecip > 0 ? `Antecipando ${parcelasAntecip} parcela(s) → recebe ${pctRecebido}%` : `Recebendo todas as parcelas → ${totalPct}%`}</span>
+                        <span className="text-lg font-bold" style={{ color: '#22c55e' }}>{fmt(valorRecebido)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
           ) : aba === 'config' ? (
             <>
             {meuRole === 'master' && (
