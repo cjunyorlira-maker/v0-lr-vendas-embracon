@@ -58,16 +58,20 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url)
     const modo = searchParams.get('modo') || 'vendedor' // vendedor | equipe | empresa
-    const padrao = periodoPadrao()
+    let padrao = periodoPadrao()
+    try {
+      const { data: cfg } = await supabaseAdmin.from('config_producao').select('data_inicio, data_fim').eq('id', 1).single()
+      if (cfg?.data_inicio && cfg?.data_fim) padrao = { inicio: cfg.data_inicio, fim: cfg.data_fim }
+    } catch {}
     const inicio = searchParams.get('inicio') || padrao.inicio
     const fim = searchParams.get('fim') || padrao.fim
 
     // busca vendas no período (com escopo do usuário)
     let q = supabaseAdmin
       .from('vendas')
-      .select('valor_credito, vendedor_id, equipe_id, empresa_id, criado_em, usuarios:vendedor_id(nome, foto_url), equipes(nome), empresas(nome)')
-      .gte('criado_em', inicio + 'T00:00:00')
-      .lte('criado_em', fim + 'T23:59:59')
+      .select('valor_credito, vendedor_id, equipe_id, empresa_id, criado_em, data_venda, usuarios:vendedor_id(nome, foto_url), equipes(nome), empresas(nome)')
+      .gte('data_venda', inicio)
+      .lte('data_venda', fim)
 
     if (me.role === 'master') { /* tudo */ }
     else if (['representante', 'adm'].includes(me.role)) q = q.eq('empresa_id', me.empresa_id)
