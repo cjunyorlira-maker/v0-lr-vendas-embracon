@@ -205,6 +205,7 @@ export default function LancesPage() {
           {loading ? (
             <div className="flex items-center justify-center py-12"><Loader2 size={20} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
           ) : (
+            <>
             <div className="flex items-center gap-2 mb-5 flex-wrap">
               <div className="relative">
                 <Search size={15} style={{ color: 'var(--muted-color)', position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
@@ -249,6 +250,7 @@ export default function LancesPage() {
                 </div>
               </div>
             </div>
+            </>
           )}
         </main>
       </div>
