@@ -45,6 +45,7 @@ export default function NovaVendaPage() {
   const [qtdParcelas, setQtdParcelas] = useState('0')
   const [observacoes, setObservacoes] = useState('')
   const [dataAssembleia, setDataAssembleia] = useState('')
+  const [dataVenda, setDataVenda] = useState('')
   const [dataVencimento, setDataVencimento] = useState('')
   const [calendarioGrupo, setCalendarioGrupo] = useState<any[]>([])
   const [proximaCobranca, setProximaCobranca] = useState('')
@@ -111,6 +112,7 @@ export default function NovaVendaPage() {
         if (d.grupo) { setGrupo(d.grupo); buscarGrupo(d.grupo) }; if (d.cota) setCota(d.cota)
         if (d.valor_credito) setValorCredito(fmtMoeda(d.valor_credito)); if (d.valor_primeira_parcela) setValorPrimeiraParcela(fmtMoeda(d.valor_primeira_parcela))
         if (d.valor_demais_parcelas) setValorDemaisParcelas(fmtMoeda(d.valor_demais_parcelas)); if (d.adesao_calculada) setAdesaoPercent(String(d.adesao_calculada))
+        if (d.data_venda) setDataVenda(d.data_venda)
         if (data.plano_detectado) setPlanoId(data.plano_detectado.id)
         const achados = d.campos_encontrados || 0
         if (achados < 5) setAvisoParser(`Consegui ler ${achados} de ${d.campos_totais} campos. Confira e complete.`)
@@ -136,6 +138,7 @@ export default function NovaVendaPage() {
       const body: any = {
         nome_cliente: nomeCliente.trim(), cpf_cnpj: cpfCnpj || null, telefone: telefone || null, email: email || null,
         numero_proposta: numeroProposta || null, numero_contrato: numeroContrato || null, grupo: grupo || null, cota: cota || null,
+        data_venda: dataVenda || null,
         valor_credito: parseValor(valorCredito), valor_primeira_parcela: parseValor(valorPrimeiraParcela), valor_demais_parcelas: parseValor(valorDemaisParcelas),
         adesao_percent: adesaoPercent ? parseFloat(adesaoPercent) : null, plano_id: planoId || null,
         qtd_parcelas: parseInt(qtdParcelas) || 0, valor_boleto: valorBoletoCalc, pdf_base64: pdfBase64, pdf_nome: pdfNome,
