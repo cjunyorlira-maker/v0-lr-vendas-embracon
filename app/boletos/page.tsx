@@ -168,7 +168,29 @@ O boleto está em anexo.`
     if (res.ok) location.reload(); else alert('Erro ao marcar TED')
   }
 
-  const filtrados = boletos.filter(b => b.status === abaAtiva)
+  function aplicarProducao() { if (prodInicio) setDataDe(prodInicio); if (prodFim) setDataAte(prodFim) }
+  function aplicarSemana() {
+    const hoje = new Date(); const dia = hoje.getDay()
+    const dom = new Date(hoje); dom.setDate(hoje.getDate() - dia)
+    const sab = new Date(dom); sab.setDate(dom.getDate() + 6)
+    const iso = (d: Date) => d.toISOString().slice(0, 10)
+    setDataDe(iso(dom)); setDataAte(iso(sab))
+  }
+  const filtrados = boletos.filter(b => {
+    if (b.status !== abaAtiva) return false
+    const ba = b as any
+    if (fEmpresa && ba.empresa_id !== fEmpresa) return false
+    if (fEquipe && ba.equipe_id !== fEquipe) return false
+    if (fVendedor && ba.vendedor_id !== fVendedor) return false
+    if (dataDe || dataAte) {
+      const dv = ba.vendas?.data_venda
+      if (dv) {
+        if (dataDe && dv < dataDe) return false
+        if (dataAte && dv > dataAte) return false
+      }
+    }
+    return true
+  })
   const contar = (k: string) => boletos.filter(b => b.status === k).length
   const statusAtual = STATUS.find(s => s.key === abaAtiva)
   const podeAvancar = (status: string) => status === 'aguardando_pagamento' ? podePagar : podeOperar
@@ -179,6 +201,47 @@ O boleto está em anexo.`
       <div className="relative lg:ml-60" style={{ zIndex: 1 }}>
         <Header title="Boletos" />
         <main className="mx-auto max-w-[1400px] px-6 py-8 lg:px-8">
+          <div className="flex items-end gap-2 mb-4 flex-wrap">
+            {role === 'master' && (
+              <div>
+                <label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>Empresa</label>
+                <select value={fEmpresa} onChange={(e) => { setFEmpresa(e.target.value); setFEquipe(''); setFVendedor('') }} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                  <option value="" style={{ background: '#131313' }}>Todas</option>
+                  {filtrosOpc.empresas.map(e => <option key={e.id} value={e.id} style={{ background: '#131313' }}>{e.nome}</option>)}
+                </select>
+              </div>
+            )}
+            {['master', 'representante', 'adm'].includes(role) && (
+              <div>
+                <label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>Equipe</label>
+                <select value={fEquipe} onChange={(e) => { setFEquipe(e.target.value); setFVendedor('') }} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                  <option value="" style={{ background: '#131313' }}>Todas</option>
+                  {filtrosOpc.equipes.filter(eq => !fEmpresa || eq.empresa_id === fEmpresa).map(eq => <option key={eq.id} value={eq.id} style={{ background: '#131313' }}>{eq.nome}</option>)}
+                </select>
+              </div>
+            )}
+            {['master', 'representante', 'adm', 'supervisor'].includes(role) && (
+              <div>
+                <label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>Vendedor</label>
+                <select value={fVendedor} onChange={(e) => setFVendedor(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                  <option value="" style={{ background: '#131313' }}>Todos</option>
+                  {filtrosOpc.vendedores.filter(vd => (!fEmpresa || vd.empresa_id === fEmpresa) && (!fEquipe || vd.equipe_id === fEquipe)).map(vd => <option key={vd.id} value={vd.id} style={{ background: '#131313' }}>{vd.nome}</option>)}
+                </select>
+              </div>
+            )}
+            <button onClick={aplicarSemana} className="rounded-lg px-3 py-1.5 text-xs self-end" style={{ background: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.3)' }}>Semana</button>
+            <button onClick={aplicarProducao} className="rounded-lg px-3 py-1.5 text-xs self-end" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)', border: '1px solid rgba(212,175,55,0.3)' }}>Produção</button>
+            <div>
+              <label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>De</label>
+              <input type="date" value={dataDe} onChange={(e) => setDataDe(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+            </div>
+            <div>
+              <label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>Até</label>
+              <input type="date" value={dataAte} onChange={(e) => setDataAte(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+            </div>
+            {(fEmpresa || fEquipe || fVendedor || dataDe || dataAte) && <button onClick={() => { setFEmpresa(''); setFEquipe(''); setFVendedor(''); setDataDe(''); setDataAte('') }} className="rounded-lg px-3 py-1.5 text-xs self-end" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>Limpar</button>}
+          </div>
+
           <div className="flex gap-2 mb-6 flex-wrap">
             {STATUS.map(s => {
               const Icon = s.icon; const ativo = abaAtiva === s.key; const qt = contar(s.key)
