@@ -56,6 +56,7 @@ export default function LancesPage() {
 
   // pisca se pendente (sempre, até ofertar)
   const pendentes = lances.filter(l => l.status === 'pendente')
+  const solicitados = lances.filter(l => l.status === 'solicitado')
   const ofertados = lances.filter(l => l.status === 'ofertado')
 
   function handlePdf(file: File) {
@@ -98,6 +99,13 @@ export default function LancesPage() {
     } catch { alert('Erro ao baixar') }
   }
 
+  async function solicitarLance(lance: Lance) {
+    setProcessando(lance.id)
+    await fetch('/api/lances/acao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'solicitar', lance_id: lance.id }) })
+    await loadData()
+    setProcessando(null)
+  }
+
   async function marcarContemplado(lance: Lance) {
     setProcessando(lance.id)
     await fetch('/api/lances/acao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'contemplado', lance_id: lance.id, config_id: lance.lance_config_id }) })
@@ -119,7 +127,12 @@ export default function LancesPage() {
         </div>
         {lance.lances_config?.observacao && <p className="text-xs mb-3 italic" style={{ color: 'var(--muted-color)' }}>{'"'}{lance.lances_config.observacao}{'"'}</p>}
 
-        {lance.status === 'pendente' && podeOfertar && (
+        {lance.status === 'pendente' && (
+          <button onClick={() => solicitarLance(lance)} disabled={processando === lance.id} className="w-full flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold transition-transform hover:scale-105 active:scale-95" style={{ background: 'rgba(234,179,8,0.15)', color: '#eab308', border: '1px solid #eab308' }}>
+            <Target size={13} />Definir lance pra ofertar
+          </button>
+        )}
+        {lance.status === 'solicitado' && podeOfertar && (
           <button onClick={() => { setOfertarModal(lance); setPdfAnexo(null) }} className="w-full flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold transition-transform hover:scale-105 active:scale-95" style={{ background: 'rgba(249,115,22,0.15)', color: '#f97316', border: '1px solid #f97316' }}>
             <Upload size={13} />Ofertar lance
           </button>
@@ -163,7 +176,7 @@ export default function LancesPage() {
           {loading ? (
             <div className="flex items-center justify-center py-12"><Loader2 size={20} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               {/* Coluna Pendente */}
               <div>
                 <div className="flex items-center gap-2 mb-3">
@@ -172,6 +185,16 @@ export default function LancesPage() {
                 </div>
                 <div className="space-y-3">
                   {pendentes.length === 0 ? <p className="text-xs py-8 text-center" style={{ color: 'var(--muted-color)' }}>Nenhum lance pendente</p> : pendentes.map(l => <CardLance key={l.id} lance={l} piscar={true} />)}
+                </div>
+              </div>
+              {/* Coluna Solicitado */}
+              <div>
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ background: '#f97316' }} />
+                  <h3 className="text-sm font-semibold" style={{ color: '#f97316' }}>Solicitados ({solicitados.length})</h3>
+                </div>
+                <div className="space-y-3">
+                  {solicitados.length === 0 ? <p className="text-xs py-8 text-center" style={{ color: 'var(--muted-color)' }}>Nenhum lance solicitado</p> : solicitados.map(l => <CardLance key={l.id} lance={l} piscar={true} />)}
                 </div>
               </div>
               {/* Coluna Ofertado */}
