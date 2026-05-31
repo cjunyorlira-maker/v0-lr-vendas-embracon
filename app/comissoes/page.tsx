@@ -263,6 +263,7 @@ export default function ComissoesPage() {
         <Header title="Comissões" />
         <main className="mx-auto max-w-[1400px] px-6 py-8 lg:px-8">
           {/* Resumo: LR total, Recebido, A receber, Risco */}
+          {ehGestao && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
             <div className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
               <div className="flex items-center gap-2 mb-1"><TrendingUp size={14} style={{ color: 'var(--accent)' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Comissão Rep. (total)</p></div>
@@ -281,17 +282,22 @@ export default function ComissoesPage() {
               <p className="text-xl font-bold" style={{ color: emRisco > 0 ? '#ef4444' : 'var(--text)' }}>{emRisco}</p>
             </div>
           </div>
+          )}
 
           {/* Cards de comissão de equipe */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
+            {(ehGestao || ehAdm) && (
             <div className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
               <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Comissão Vendedores</p>
               <p className="text-xl font-bold" style={{ color: '#3b82f6' }}>{fmtMoeda(totalVendedores)}</p>
             </div>
+            )}
+            {(ehGestao || ehAdm) && (
             <div className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
               <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Comissão Supervisores</p>
               <p className="text-xl font-bold" style={{ color: '#a855f7' }}>{fmtMoeda(totalSupervisores)}</p>
             </div>
+            )}
             {meuRole === 'master' && (
               <div className="rounded-xl p-4" style={{ background: 'linear-gradient(135deg, rgba(212,175,55,0.15) 0%, rgba(212,175,55,0.04) 100%)', border: '1px solid rgba(212,175,55,0.3)' }}>
                 <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Comissão Master (0,25%)</p>
@@ -299,16 +305,28 @@ export default function ComissoesPage() {
                 <p className="text-[10px] mt-0.5" style={{ color: 'var(--muted-color)' }}>sobre {fmtMoeda(producaoTotal)} de produção</p>
               </div>
             )}
-            <div className="rounded-xl p-4" style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.12) 0%, rgba(34,197,94,0.04) 100%)', border: '1px solid rgba(34,197,94,0.25)' }}>
+            {ehGestao && (<div className="rounded-xl p-4" style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.12) 0%, rgba(34,197,94,0.04) 100%)', border: '1px solid rgba(34,197,94,0.25)' }}>
               <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Líquido Representante</p>
               <p className="text-xl font-bold" style={{ color: '#22c55e' }}>{fmtMoeda(liquidoRep)}</p>
               <p className="text-[10px] mt-0.5" style={{ color: 'var(--muted-color)' }}>após vendedor e supervisor</p>
-            </div>
-            <div className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+            </div>)}
+            {ehGestao && (<div className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
               <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Total em Vendas</p>
               <p className="text-xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(producaoTotal)}</p>
               <p className="text-[10px] mt-0.5" style={{ color: 'var(--muted-color)' }}>{vendasFiltradas.length} venda(s)</p>
-            </div>
+            </div>)}
+            {(ehVendedor || ehSupervisor) && (
+              <div className="rounded-xl p-4" style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.12) 0%, rgba(34,197,94,0.04) 100%)', border: '1px solid rgba(34,197,94,0.25)' }}>
+                <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Minha comissão a receber</p>
+                <p className="text-xl font-bold" style={{ color: '#22c55e' }}>{fmtMoeda(minhaComissao)}</p>
+              </div>
+            )}
+            {ehSupervisor && (
+              <div className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+                <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Comissão da equipe</p>
+                <p className="text-xl font-bold" style={{ color: '#a855f7' }}>{fmtMoeda(comissaoEquipe)}</p>
+              </div>
+            )}
           </div>
 
           {/* Importar mapa */}
