@@ -462,13 +462,17 @@ export default function ComissoesPage() {
                           </div>
                           {(() => {
                             const credito = parseFloat(creditoCalc.replace(/\./g, '').replace(',', '.')) || 0
-                            const qtd = parcelasAntecip > 0 ? Math.min(parcelasAntecip, parcelas.length) : parcelas.length
-                            const pctReceb = parcelas.slice(0, qtd).reduce((s: number, x: number) => s + x, 0)
-                            const valReceb = credito * pctReceb / 100
                             const fmt = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+                            // a comissão total (4%, 4,5%) é a verdade. As parcelas dão o peso de cada recebimento.
+                            const somaParcelas = parcelas.reduce((s: number, x: number) => s + x, 0) || 1
+                            const qtd = parcelasAntecip > 0 ? Math.min(parcelasAntecip, parcelas.length) : parcelas.length
+                            const pesoRecebido = parcelas.slice(0, qtd).reduce((s: number, x: number) => s + x, 0)
+                            // normaliza: a fração do total proporcional ao peso das parcelas antecipadas
+                            const pctReceb = (pesoRecebido / somaParcelas) * totalPct
+                            const valReceb = credito * pctReceb / 100
                             return (
                               <div className="flex items-center justify-between">
-                                <span className="text-xs" style={{ color: 'var(--text2)' }}>{parcelasAntecip > 0 ? `Recebe ${pctReceb}% (parcelas 1 a ${qtd})` : `Recebe tudo: ${totalPct}%`}</span>
+                                <span className="text-xs" style={{ color: 'var(--text2)' }}>{parcelasAntecip > 0 ? `Recebe ${pctReceb.toFixed(2)}% (parcelas 1 a ${qtd})` : `Recebe tudo: ${totalPct}%`}</span>
                                 <span className="text-base font-bold" style={{ color: '#22c55e' }}>{fmt(valReceb)}</span>
                               </div>
                             )
