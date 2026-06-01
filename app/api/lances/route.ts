@@ -100,6 +100,7 @@ export async function GET() {
       .select('*, lances_config(tipo, valor_percentual, observacao, recorrente, venda_id), clientes(nome), usuarios:vendedor_id(nome), equipes(nome)')
       .in('status', ['pendente', 'solicitado', 'ofertado'])
       .neq('contemplado', true)
+      .neq('ciclo_encerrado', true)
 
     const { escopoGlobal } = await getEscopo(me)
     if (escopoGlobal) { /* master ou adm matriz: vê tudo */ }
