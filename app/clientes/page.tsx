@@ -11,7 +11,7 @@ interface Cota {
   grupo: string; cota: string; numero_proposta: string | null; numero_contrato: string | null; credito: number; bem: string; adesao: number | null; plano: string
   data_assembleia: string | null; data_venda: string | null
   vendedor: string | null; equipe_nome: string | null; vendedor_id: string; equipe_id: string; empresa_id: string
-  status_boleto: string; qtd_parcelas: number; proxima_cobranca: string | null
+  status_boleto: string; qtd_parcelas: number; proxima_cobranca: string | null; status_cliente: string
   status_lance: string | null; checado: boolean; pdf_proposta_url: string | null
 }
 interface ClienteAgr { cliente_id: string; nome: string; cpf: string; telefone: string; cotas: Cota[] }
@@ -38,6 +38,7 @@ export default function ClientesPage() {
   const [loading, setLoading] = useState(true)
   const [busca, setBusca] = useState('')
   const [expandido, setExpandido] = useState<string | null>(null)
+  const [abaCliente, setAbaCliente] = useState<'ativos' | 'cancelados'>('ativos')
   const [meuRole, setMeuRole] = useState('')
   const [mostraFiltros, setMostraFiltros] = useState(false)
   const [fBem, setFBem] = useState('')
@@ -122,7 +123,12 @@ export default function ClientesPage() {
   }
 
   // aplica filtros
-  const filtrados = clientes.filter(cl => {
+  // separa cotas canceladas das ativas e reagrupa
+  const clientesPorAba = clientes.map(cl => {
+    const cotasAba = cl.cotas.filter(c => abaCliente === 'cancelados' ? c.status_cliente === 'cancelado' : c.status_cliente !== 'cancelado')
+    return { ...cl, cotas: cotasAba }
+  }).filter(cl => cl.cotas.length > 0)
+  const filtrados = clientesPorAba.filter(cl => {
     // busca
     if (busca) {
       const b = busca.toLowerCase()
@@ -230,6 +236,10 @@ export default function ClientesPage() {
             </div>
           )}
 
+          <div className="flex gap-2 mb-4">
+            <button onClick={() => setAbaCliente('ativos')} className="rounded-lg px-3 py-1.5 text-xs font-medium" style={{ background: abaCliente === 'ativos' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${abaCliente === 'ativos' ? 'var(--accent)' : 'var(--border)'}`, color: abaCliente === 'ativos' ? 'var(--accent)' : 'var(--muted-color)' }}>Ativos</button>
+            <button onClick={() => setAbaCliente('cancelados')} className="rounded-lg px-3 py-1.5 text-xs font-medium" style={{ background: abaCliente === 'cancelados' ? 'rgba(239,68,68,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${abaCliente === 'cancelados' ? '#ef4444' : 'var(--border)'}`, color: abaCliente === 'cancelados' ? '#ef4444' : 'var(--muted-color)' }}>Cancelados</button>
+          </div>
           {loading ? (
             <div className="flex items-center justify-center py-12"><Loader2 size={20} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
           ) : (
@@ -244,6 +254,12 @@ export default function ClientesPage() {
                     <div className="p-4 cursor-pointer" onClick={() => setExpandido(aberto ? null : cl.cliente_id)}>
                       <div className="flex items-center justify-between gap-3 flex-wrap">
                         <div className="flex items-center gap-3 flex-wrap">
+                          {(() => {
+                            const temAtraso = cl.cotas.some(c => c.status_cliente === 'atraso')
+                            const temCancelado = cl.cotas.some(c => c.status_cliente === 'cancelado')
+                            const st = temCancelado ? { cor: '#ef4444', bg: 'rgba(239,68,68,0.15)', label: 'Cancelado' } : temAtraso ? { cor: '#f59e0b', bg: 'rgba(245,158,11,0.15)', label: 'Em atraso' } : { cor: '#22c55e', bg: 'rgba(34,197,94,0.15)', label: 'Em dia' }
+                            return <span className="text-[10px] px-2 py-0.5 rounded-full font-medium" style={{ background: st.bg, color: st.cor }}>{st.label}</span>
+                          })()}
                           <span className="text-base font-semibold" style={{ color: 'var(--text)' }}>{cl.nome}</span>
                           <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)' }}>{cl.cotas.length} cota(s)</span>
                           {cl.cotas.map((c, i) => (
