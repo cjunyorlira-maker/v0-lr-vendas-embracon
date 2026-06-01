@@ -167,22 +167,22 @@ O boleto está em anexo.`
     const iso = (d: Date) => d.toISOString().slice(0, 10)
     setDataDe(iso(dom)); setDataAte(iso(sab))
   }
-  const filtrados = boletos.filter(b => {
-    if (b.status !== abaAtiva) return false
-    const ba = b as any
-    if (fEmpresa && ba.empresa_id !== fEmpresa) return false
-    if (fEquipe && ba.equipe_id !== fEquipe) return false
-    if (fVendedor && ba.vendedor_id !== fVendedor) return false
+  // aplica os filtros (empresa/equipe/vendedor/data) ignorando o status
+  const passaFiltros = (b: any) => {
+    if (fEmpresa && b.empresa_id !== fEmpresa) return false
+    if (fEquipe && b.equipe_id !== fEquipe) return false
+    if (fVendedor && b.vendedor_id !== fVendedor) return false
     if (dataDe || dataAte) {
-      const dv = ba.vendas?.data_venda
+      const dv = b.vendas?.data_venda
       if (dv) {
         if (dataDe && dv < dataDe) return false
         if (dataAte && dv > dataAte) return false
       }
     }
     return true
-  })
-  const contar = (k: string) => boletos.filter(b => b.status === k).length
+  }
+  const filtrados = boletos.filter(b => b.status === abaAtiva && passaFiltros(b as any))
+  const contar = (k: string) => boletos.filter(b => b.status === k && passaFiltros(b as any)).length
   const statusAtual = STATUS.find(s => s.key === abaAtiva)
   const podeAvancar = (status: string) => status === 'aguardando_pagamento' ? podePagar : podeOperar
 
