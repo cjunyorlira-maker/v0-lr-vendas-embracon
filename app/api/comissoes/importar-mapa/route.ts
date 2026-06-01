@@ -3,6 +3,10 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextRequest, NextResponse } from "next/server"
 
+// pdf-parse precisa do runtime Node.js (não funciona no Edge)
+export const runtime = 'nodejs'
+export const maxDuration = 30
+
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -45,11 +49,21 @@ export async function POST(req: NextRequest) {
     const buffer = Buffer.from(await file.arrayBuffer())
     let texto = ''
     try {
-      const { PDFParse } = await import('pdf-parse')
-      const parser = new PDFParse({ data: buffer })
-      const parsed = await parser.getText()
-      await parser.destroy()
-      texto = parsed.text || ''
+      const pdfParse = (await import('pdf-parse')).default
+      function renderPage(pageData: any) {
+        const opts = { normalizeWhitespace: false, disableCombineTextItems: false }
+        return pageData.getTextContent(opts).then((tc: any) => {
+          let lastY: number | undefined, txt = ''
+          for (const item of tc.items) {
+            if (lastY === item.transform[5] || lastY === undefined) txt += item.str + ' '
+            else txt += '\n' + item.str + ' '
+            lastY = item.transform[5]
+          }
+          return txt
+        })
+      }
+      const parsed = await pdfParse(buffer, { pagerender: renderPage })
+      texto = (parsed.text || '').replace(/\u00a0/g, ' ')
     } catch (e) {
       return NextResponse.json({ error: "Não consegui ler o PDF do mapa: " + String(e) }, { status: 400 })
     }
