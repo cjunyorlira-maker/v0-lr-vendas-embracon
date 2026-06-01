@@ -58,7 +58,8 @@ export async function GET(req: NextRequest) {
     if (!me) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 403 })
 
     const { searchParams } = new URL(req.url)
-    const modo = searchParams.get('modo') || 'vendedor' // vendedor | equipe | empresa
+    const modo = searchParams.get('modo') || 'vendedor' // vendedor | equipe | empresa | representante
+    const filtroEmpresa = searchParams.get('empresa') || ''
     let padrao = periodoPadrao()
     try {
       const { data: cfg } = await supabaseAdmin.from('config_producao').select('data_inicio, data_fim').eq('id', 1).single()
@@ -81,6 +82,7 @@ export async function GET(req: NextRequest) {
     // vendedor vê o ranking todo da empresa dele (pra se comparar)
     else if (me.role === 'vendedor') q = q.eq('empresa_id', me.empresa_id)
 
+    if (filtroEmpresa) q = q.eq('empresa_id', filtroEmpresa)
     const { data: vendas } = await q
     const lista = vendas || []
 
@@ -96,7 +98,12 @@ export async function GET(req: NextRequest) {
         const e = Array.isArray(v.equipes) ? v.equipes[0] : v.equipes
         chave = v.equipe_id || 'sem'; nome = e?.nome || 'Sem equipe'
       }
+      else if (modo === 'empresa') {
+        const emp = Array.isArray(v.empresas) ? v.empresas[0] : v.empresas
+        chave = v.empresa_id || 'sem'; nome = emp?.nome || 'Sem empresa'
+      }
       else {
+        // representante: agrupa por empresa, mas mostra o nome do representante dela
         const emp = Array.isArray(v.empresas) ? v.empresas[0] : v.empresas
         chave = v.empresa_id || 'sem'; nome = emp?.nome || 'Sem empresa'
       }
@@ -106,6 +113,17 @@ export async function GET(req: NextRequest) {
       item.qtd += 1
     }
 
+    // modo representante: busca o nome do representante de cada empresa
+    if (modo === 'representante') {
+      const empresaIds = Array.from(mapa.keys()).filter(k => k !== 'sem')
+      if (empresaIds.length > 0) {
+        const { data: reps } = await supabaseAdmin.from('usuarios').select('nome, foto_url, empresa_id').eq('role', 'representante').in('empresa_id', empresaIds)
+        for (const [chave, item] of mapa.entries()) {
+          const rep = (reps || []).find((r: any) => r.empresa_id === chave)
+          if (rep) { item.nome = rep.nome; item.foto = rep.foto_url }
+        }
+      }
+    }
     const ranking = Array.from(mapa.values())
       .sort((a, b) => b.valor - a.valor)
       .map((r, i) => ({ posicao: i + 1, ...r }))

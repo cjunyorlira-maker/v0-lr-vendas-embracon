@@ -12,25 +12,49 @@ const fmtMoeda = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'curre
 export default function RankingPage() {
   const [ranking, setRanking] = useState<RankItem[]>([])
   const [loading, setLoading] = useState(true)
-  const [modo, setModo] = useState<'vendedor' | 'equipe' | 'empresa'>('vendedor')
+  const [modo, setModo] = useState<'vendedor' | 'equipe' | 'representante'>('vendedor')
   const [role, setRole] = useState('')
   const [inicio, setInicio] = useState('')
   const [fim, setFim] = useState('')
+  const [fEmpresa, setFEmpresa] = useState('')
+  const [empresas, setEmpresas] = useState<any[]>([])
+  const [periodoAtivo, setPeriodoAtivo] = useState<'producao' | 'semana' | 'ano'>('producao')
 
-  useEffect(() => { loadData() }, [modo])
+  useEffect(() => { loadData() }, [modo, fEmpresa])
+  useEffect(() => {
+    fetch('/api/usuarios/listar').then(r => r.json()).then(d => { if (d.empresas) setEmpresas(d.empresas) }).catch(() => {})
+  }, [])
 
   async function loadData(customInicio?: string, customFim?: string) {
     setLoading(true)
     let url = `/api/ranking?modo=${modo}`
     if (customInicio && customFim) url += `&inicio=${customInicio}&fim=${customFim}`
+    if (fEmpresa) url += `&empresa=${fEmpresa}`
     const res = await fetch(url)
     const data = await res.json()
     if (data.ranking) {
       setRanking(data.ranking)
       setRole(data.meu_role)
-      if (data.periodo) { setInicio(data.periodo.inicio); setFim(data.periodo.fim) }
+      if (data.periodo && periodoAtivo === 'producao') { setInicio(data.periodo.inicio); setFim(data.periodo.fim) }
     }
     setLoading(false)
+  }
+
+  function aplicarPeriodo(tipo: 'producao' | 'semana' | 'ano') {
+    setPeriodoAtivo(tipo)
+    if (tipo === 'semana') {
+      const hoje = new Date(); const dia = hoje.getDay()
+      const dom = new Date(hoje); dom.setDate(hoje.getDate() - dia)
+      const sab = new Date(dom); sab.setDate(dom.getDate() + 6)
+      const iso = (d: Date) => d.toISOString().slice(0, 10)
+      setInicio(iso(dom)); setFim(iso(sab)); loadData(iso(dom), iso(sab))
+    } else if (tipo === 'ano') {
+      const ano = new Date().getFullYear()
+      loadData(`${ano}-01-01`, `${ano}-12-31`)
+      setInicio(`${ano}-01-01`); setFim(`${ano}-12-31`)
+    } else {
+      loadData()
+    }
   }
 
   const podio = ranking.slice(0, 5)
@@ -39,7 +63,7 @@ export default function RankingPage() {
   const abas = [
     { k: 'vendedor', l: 'Vendedores', icon: User, roles: ['master', 'representante', 'adm', 'supervisor', 'vendedor'] },
     { k: 'equipe', l: 'Equipes', icon: Users, roles: ['master', 'representante', 'adm'] },
-    { k: 'empresa', l: 'Empresas', icon: Building2, roles: ['master'] },
+    { k: 'representante', l: 'Representantes', icon: Building2, roles: ['master'] },
   ].filter(a => a.roles.includes(role) || role === '')
 
   const medalCor = (pos: number) => pos === 1 ? '#FFD700' : pos === 2 ? '#C0C0C0' : pos === 3 ? '#CD7F32' : 'var(--muted-color)'
@@ -64,6 +88,19 @@ export default function RankingPage() {
               <div><label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>Até</label><input type="date" value={fim} onChange={(e) => setFim(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }} /></div>
               <button onClick={() => loadData(inicio, fim)} className="rounded-lg px-3 py-1.5 text-xs font-semibold" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)', border: '1px solid rgba(212,175,55,0.3)' }}>Aplicar</button>
             </div>
+          </div>
+
+          {/* Controles de período + empresa */}
+          <div className="flex items-center gap-2 flex-wrap mb-4">
+            <button onClick={() => aplicarPeriodo('producao')} className="rounded-lg px-3 py-1.5 text-xs font-medium" style={{ background: periodoAtivo === 'producao' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${periodoAtivo === 'producao' ? 'var(--accent)' : 'var(--border)'}`, color: periodoAtivo === 'producao' ? 'var(--accent)' : 'var(--muted-color)' }}>Produção</button>
+            <button onClick={() => aplicarPeriodo('semana')} className="rounded-lg px-3 py-1.5 text-xs font-medium" style={{ background: periodoAtivo === 'semana' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${periodoAtivo === 'semana' ? 'var(--accent)' : 'var(--border)'}`, color: periodoAtivo === 'semana' ? 'var(--accent)' : 'var(--muted-color)' }}>Semana</button>
+            <button onClick={() => aplicarPeriodo('ano')} className="rounded-lg px-3 py-1.5 text-xs font-medium" style={{ background: periodoAtivo === 'ano' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${periodoAtivo === 'ano' ? 'var(--accent)' : 'var(--border)'}`, color: periodoAtivo === 'ano' ? 'var(--accent)' : 'var(--muted-color)' }}>Ano (acumulado)</button>
+            {empresas.length > 0 && (
+              <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} className="rounded-lg px-3 py-1.5 text-xs outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                <option value="" style={{ background: '#131313' }}>Todas as empresas</option>
+                {empresas.map(e => <option key={e.id} value={e.id} style={{ background: '#131313' }}>{e.nome}</option>)}
+              </select>
+            )}
           </div>
 
           {/* Abas */}
