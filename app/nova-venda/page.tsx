@@ -76,13 +76,21 @@ export default function NovaVendaPage() {
   const fmtMoeda = (v: number) => v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
   function calcularProximaCobranca() {
-    if (!dataVencimento || !qtdParcelas) return ''
+    if (!dataVencimento) return ''
     const base = new Date(dataVencimento + 'T00:00:00')
     const qtd = parseInt(qtdParcelas) || 0
     const alvo = new Date(base); alvo.setMonth(alvo.getMonth() + qtd + 1)
     const mesAlvo = alvo.getMonth() + 1
-    const noCal = calendarioGrupo.find((c: any) => c.mes === mesAlvo)
-    if (noCal && alvo.getFullYear() === 2026) return noCal.data_vencimento
+    const anoAlvo = alvo.getFullYear()
+    // tenta achar no calendário do grupo pela data (mês certo E ano certo, pra pegar a data já ajustada)
+    const noCal = calendarioGrupo.find((c: any) => {
+      if (c.mes !== mesAlvo) return false
+      // se a linha do calendário tem data_vencimento, confere o ano dela
+      if (c.data_vencimento) return new Date(c.data_vencimento + 'T00:00:00').getFullYear() === anoAlvo
+      return true
+    })
+    if (noCal?.data_vencimento) return noCal.data_vencimento
+    // fallback: data calculada (sem ajuste do calendário — quando o ano ainda não foi cadastrado)
     return alvo.toISOString().slice(0, 10)
   }
 
