@@ -33,49 +33,74 @@ export async function GET() {
 
     const mesRef = mesAtualRef()
 
-    // 1. GERA lances do mês pra configs recorrentes ativas que ainda não têm lance neste mês
-    const { data: configsRecorrentes } = await supabaseAdmin
+    // 1. CICLO DA ASSEMBLEIA: pra cada config ativa (recorrente OU não), verifica se o lance
+    // atual já passou da assembleia. Se passou: encerra o atual (vai pro histórico) e gera o próximo.
+    const { data: configsAtivas } = await supabaseAdmin
       .from('lances_config')
       .select('*')
-      .eq('recorrente', true)
       .eq('ativo', true)
       .is('status_final', null)
 
     const hojeStr = new Date().toISOString().slice(0, 10)
-    for (const cfg of (configsRecorrentes || [])) {
-      const { data: existe } = await supabaseAdmin
-        .from('lances_mensais')
-        .select('id')
-        .eq('lance_config_id', cfg.id)
-        .eq('mes_referencia', mesRef)
-        .maybeSingle()
-      if (!existe) {
-        // busca a assembleia do cliente
-        let dataAssembleia: string | null = null
-        if (cfg.venda_id) {
-          const { data: venda } = await supabaseAdmin.from('vendas').select('data_assembleia_entrada').eq('id', cfg.venda_id).single()
-          dataAssembleia = venda?.data_assembleia_entrada || null
-        }
-        // REGRA: só renova/gera o lance do novo mês se o cliente JÁ participou da assembleia
-        // (se a assembleia ainda não passou, mantém o lance do mês anterior, não gera novo)
-        const participou = dataAssembleia ? (dataAssembleia < hojeStr) : true
-        if (!participou) continue
 
-        // Recorrente nasce SOLICITADO (valor já definido); não-recorrente nasceria pendente
-        const statusInicial = cfg.recorrente ? 'solicitado' : 'pendente'
-        await supabaseAdmin.from('lances_mensais').insert({
-          lance_config_id: cfg.id, empresa_id: cfg.empresa_id, cliente_id: cfg.cliente_id,
-          vendedor_id: cfg.vendedor_id, equipe_id: cfg.equipe_id,
-          mes_referencia: mesRef, data_assembleia: dataAssembleia, status: statusInicial,
-        })
+    // helper: calcula a próxima assembleia do grupo a partir de uma data
+    async function proximaAssembleiaGrupo(grupo: string | null, aposData: string): Promise<string | null> {
+      if (!grupo) return null
+      const { data: g } = await supabaseAdmin.from('grupos_embracon').select('linha_calendario').eq('grupo', grupo).maybeSingle()
+      if (!g?.linha_calendario) return null
+      const { data: cal } = await supabaseAdmin.from('calendario_embracon').select('data_assembleia').eq('linha_calendario', g.linha_calendario).order('data_assembleia')
+      for (const a of (cal || [])) {
+        if (a.data_assembleia > aposData) return a.data_assembleia
       }
+      return null
     }
 
-    // 2. LISTA os lances do mês atual (com escopo)
+    for (const cfg of (configsAtivas || [])) {
+      // pega o lance ATIVO atual desta config (não encerrado)
+      const { data: lanceAtivo } = await supabaseAdmin
+        .from('lances_mensais')
+        .select('id, data_assembleia, status, contemplado')
+        .eq('lance_config_id', cfg.id)
+        .neq('ciclo_encerrado', true)
+        .order('mes_referencia', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      // se não tem lance ativo nenhum, pula (lance é criado na ação de criar)
+      if (!lanceAtivo) continue
+      // se já foi contemplado, não faz nada
+      if (lanceAtivo.contemplado) continue
+      // se a assembleia ainda não passou, mantém o lance atual (não gera novo)
+      if (!lanceAtivo.data_assembleia || lanceAtivo.data_assembleia >= hojeStr) continue
+
+      // A ASSEMBLEIA PASSOU: encerra o lance atual (vai pro histórico) e gera o próximo
+      await supabaseAdmin.from('lances_mensais').update({ ciclo_encerrado: true }).eq('id', lanceAtivo.id)
+
+      // calcula a próxima assembleia pelo calendário do grupo
+      let grupo: string | null = null
+      if (cfg.venda_id) {
+        const { data: venda } = await supabaseAdmin.from('vendas').select('grupo').eq('id', cfg.venda_id).single()
+        grupo = venda?.grupo || null
+      }
+      const proxAssembleia = await proximaAssembleiaGrupo(grupo, lanceAtivo.data_assembleia)
+
+      // recorrente → volta como solicitado; não-recorrente → volta como pendente (vendedor solicita)
+      const statusInicial = cfg.recorrente ? 'solicitado' : 'pendente'
+      await supabaseAdmin.from('lances_mensais').insert({
+        lance_config_id: cfg.id, empresa_id: cfg.empresa_id, cliente_id: cfg.cliente_id,
+        vendedor_id: cfg.vendedor_id, equipe_id: cfg.equipe_id,
+        mes_referencia: mesRef, data_assembleia: proxAssembleia, status: statusInicial,
+      })
+    }
+
+    // 2. LISTA os lances ATIVOS (não contemplados/cancelados), independente do mês.
+    // Um lance solicitado/ofertado que ainda não foi pra assembleia continua valendo.
     let q = supabaseAdmin
       .from('lances_mensais')
       .select('*, lances_config(tipo, valor_percentual, observacao, recorrente, venda_id), clientes(nome), usuarios:vendedor_id(nome), equipes(nome)')
-      .eq('mes_referencia', mesRef)
+      .in('status', ['pendente', 'solicitado', 'ofertado'])
+      .neq('contemplado', true)
+      .neq('ciclo_encerrado', true)
 
     const { escopoGlobal } = await getEscopo(me)
     if (escopoGlobal) { /* master ou adm matriz: vê tudo */ }
