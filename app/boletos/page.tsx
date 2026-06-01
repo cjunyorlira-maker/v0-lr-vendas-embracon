@@ -65,11 +65,11 @@ export default function BoletosPage() {
     } catch {}
     // carrega config de produção
     try { const rp = await fetch('/api/config-producao'); const dp = await rp.json(); if (dp.data_inicio) setProdInicio(dp.data_inicio); if (dp.data_fim) setProdFim(dp.data_fim) } catch {}
-    const { data } = await supabase
-      .from('boletos')
-      .select('id, qtd_parcelas, valor_boleto, status, boleto_pdf_url, data_solicitacao, data_anexo_boleto, data_pagamento, pago_via_ted, empresa_id, equipe_id, vendedor_id, clientes(nome), vendas(numero_proposta, numero_contrato, grupo, cota, valor_credito, data_venda), empresas(nome), equipes(nome), usuarios:vendedor_id(nome)')
-      .order('criado_em', { ascending: false })
-    if (data) setBoletos(data as any)
+    try {
+      const resB = await fetch('/api/boletos/listar')
+      const dB = await resB.json()
+      if (dB.boletos) setBoletos(dB.boletos as any)
+    } catch {}
     setLoading(false)
   }
 
