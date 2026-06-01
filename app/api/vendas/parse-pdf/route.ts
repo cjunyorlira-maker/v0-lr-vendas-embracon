@@ -89,11 +89,23 @@ export async function POST(req: NextRequest) {
     const arrayBuffer = await file.arrayBuffer()
     const buffer = Buffer.from(arrayBuffer)
 
-    // Extrai texto do PDF (API da v1: função direta, sem dependência de canvas)
+    // Extrai texto do PDF (v1) com render que preserva o layout (junta itens da mesma linha)
     let textoPdf = ''
     try {
       const pdfParse = (await import('pdf-parse')).default
-      const data = await pdfParse(buffer)
+      function renderPage(pageData: any) {
+        const opts = { normalizeWhitespace: false, disableCombineTextItems: false }
+        return pageData.getTextContent(opts).then((tc: any) => {
+          let lastY: number | undefined, txt = ''
+          for (const item of tc.items) {
+            if (lastY === item.transform[5] || lastY === undefined) txt += item.str + ' '
+            else txt += '\n' + item.str + ' '
+            lastY = item.transform[5]
+          }
+          return txt
+        })
+      }
+      const data = await pdfParse(buffer, { pagerender: renderPage })
       textoPdf = data.text || ''
     } catch (e) {
       return NextResponse.json({
