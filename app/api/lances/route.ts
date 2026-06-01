@@ -71,11 +71,13 @@ export async function GET() {
       }
     }
 
-    // 2. LISTA os lances do mês atual (com escopo)
+    // 2. LISTA os lances ATIVOS (não contemplados/cancelados), independente do mês.
+    // Um lance solicitado/ofertado que ainda não foi pra assembleia continua valendo.
     let q = supabaseAdmin
       .from('lances_mensais')
       .select('*, lances_config(tipo, valor_percentual, observacao, recorrente, venda_id), clientes(nome), usuarios:vendedor_id(nome), equipes(nome)')
-      .eq('mes_referencia', mesRef)
+      .in('status', ['pendente', 'solicitado', 'ofertado'])
+      .neq('contemplado', true)
 
     const { escopoGlobal } = await getEscopo(me)
     if (escopoGlobal) { /* master ou adm matriz: vê tudo */ }
