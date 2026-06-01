@@ -22,7 +22,11 @@ function parseValorBR(texto: string): number | null {
   if (!texto) return null
   let limpo = texto.replace(/[R$\s]/g, '')
   if (limpo.includes(',')) {
+    // tem vírgula = decimal brasileiro: pontos são milhar
     limpo = limpo.replace(/\./g, '').replace(',', '.')
+  } else if (/\.\d{3}(\.\d{3})*$/.test(limpo)) {
+    // sem vírgula mas com ponto de milhar (ex: 12.345 ou 1.234.567) = inteiro
+    limpo = limpo.replace(/\./g, '')
   }
   const num = parseFloat(limpo)
   return isNaN(num) ? null : num
@@ -145,17 +149,24 @@ export function parseProposta(textoPdf: string): DadosProposta {
     if (valores.length > 0) valor_credito = Math.max(...valores)
   }
 
-  // ─── 1ª PARCELA ─── "importância de R$" ... valor "9182,8" numa linha próxima
+  // ─── 1ª PARCELA ─── "Recebemos ... a importância de R$ 4612" (mesma linha, com OU sem decimais)
   let valor_primeira_parcela: number | null = null
   const idxImp = idxLinha(/import[âa]ncia de R\$/i)
   if (idxImp !== -1) {
-    // o valor pode estar na mesma linha ou nas próximas 6 linhas (após "CONSORCIADO")
-    for (let i = idxImp; i < Math.min(idxImp + 8, linhas.length); i++) {
-      // procura valor tipo "9182,8" ou "9.182,80" sozinho ou no fim da linha
-      const vm = linhas[i].match(/(?:^|\s)(\d{1,3}(?:\.\d{3})*,\d{1,2})\s*$/) || linhas[i].match(/^(\d{3,6},\d{1,2})$/)
-      if (vm) {
-        const num = parseValorBR(vm[1])
-        if (num && num >= 100) { valor_primeira_parcela = num; break }
+    // 1) valor logo após "importância de R$" na mesma linha (vírgula opcional)
+    const mesmaLinha = linhas[idxImp].match(/import[âa]ncia de R\$\s*([\d.]+(?:,\d{1,2})?)/i)
+    if (mesmaLinha) {
+      const num = parseValorBR(mesmaLinha[1])
+      if (num && num >= 100) valor_primeira_parcela = num
+    }
+    // 2) fallback: valor numa linha próxima
+    if (!valor_primeira_parcela) {
+      for (let i = idxImp; i < Math.min(idxImp + 8, linhas.length); i++) {
+        const vm = linhas[i].match(/(?:^|\s)([\d.]+(?:,\d{1,2})?)\s*$/)
+        if (vm) {
+          const num = parseValorBR(vm[1])
+          if (num && num >= 100) { valor_primeira_parcela = num; break }
+        }
       }
     }
   }
