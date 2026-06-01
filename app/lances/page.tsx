@@ -44,6 +44,9 @@ export default function LancesPage() {
   const [role, setRole] = useState('')
   const [mesRef, setMesRef] = useState('')
   const [processando, setProcessando] = useState<string | null>(null)
+  const [historicoModal, setHistoricoModal] = useState<any>(null)
+  const [historicoLista, setHistoricoLista] = useState<any[]>([])
+  const [carregandoHist, setCarregandoHist] = useState(false)
   const [ofertarModal, setOfertarModal] = useState<Lance | null>(null)
   const [definirModal, setDefinirModal] = useState<Lance | null>(null)
   const [defTipo, setDefTipo] = useState<'fixo25' | 'fixo50' | 'valor' | 'livre'>('fixo25')
@@ -62,6 +65,18 @@ export default function LancesPage() {
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { loadData() }, [])
+
+  async function abrirHistorico(lance: any) {
+    setHistoricoModal(lance)
+    setCarregandoHist(true)
+    setHistoricoLista([])
+    try {
+      const res = await fetch(`/api/lances/historico?config_id=${lance.lance_config_id}`)
+      const data = await res.json()
+      if (data.ofertas) setHistoricoLista(data.ofertas)
+    } catch {}
+    setCarregandoHist(false)
+  }
 
   async function loadData() {
     const supabase = createClient()
@@ -179,7 +194,10 @@ export default function LancesPage() {
       <div className="rounded-xl p-4" style={{ background: lance.contemplado ? 'rgba(34,197,94,0.08)' : 'rgba(0,0,0,0.12)', backdropFilter: 'blur(4px)', border: lance.contemplado ? '1px solid rgba(34,197,94,0.4)' : '1px solid var(--border)', animation: piscar ? 'piscaLance 1.5s ease-in-out infinite' : 'none' }}>
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{lance.clientes?.nome}</span>
-          {lance.contemplado && <span className="flex items-center gap-1 text-xs font-bold" style={{ color: '#22c55e' }}><Trophy size={12} />Contemplado</span>}
+          <div className="flex items-center gap-2">
+            {lance.contemplado && <span className="flex items-center gap-1 text-xs font-bold" style={{ color: '#22c55e' }}><Trophy size={12} />Contemplado</span>}
+            <button onClick={() => abrirHistorico(lance)} title="Histórico de ofertas" className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}><Clock size={11} />Histórico</button>
+          </div>
         </div>
         <div className="flex flex-wrap gap-2 text-xs mb-3" style={{ color: 'var(--muted-color)' }}>
           <span className="px-2 py-0.5 rounded" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)' }}>{descTipo(lance.lances_config)}</span>
@@ -357,6 +375,39 @@ export default function LancesPage() {
                 <button onClick={() => confirmarDefinir()} disabled={processando === definirModal.id} className="flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #d4af37 0%, #c9a227 50%, #b8941f 100%)', color: '#0a0a0a' }}>{processando === definirModal.id ? <Loader2 size={14} className="animate-spin" /> : 'Solicitar lance'}</button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {historicoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }} onClick={() => setHistoricoModal(null)} />
+          <div className="relative w-full max-w-md rounded-xl p-6 max-h-[80vh] overflow-y-auto" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+            <h3 className="text-base font-semibold mb-1" style={{ color: 'var(--text)' }}>Histórico de ofertas</h3>
+            <p className="text-xs mb-4" style={{ color: 'var(--muted-color)' }}>{historicoModal.clientes?.nome} · Grupo {historicoModal.grupo}/{historicoModal.cota}</p>
+            {carregandoHist ? (
+              <div className="flex justify-center py-8"><Loader2 size={18} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
+            ) : historicoLista.length === 0 ? (
+              <p className="text-xs text-center py-8" style={{ color: 'var(--muted-color)' }}>Nenhuma oferta registrada ainda.</p>
+            ) : (
+              <div className="space-y-2">
+                {historicoLista.map((of: any, i: number) => {
+                  const stLabel = of.contemplado ? 'Contemplado' : of.ciclo_encerrado ? 'Participou (não contemplado)' : of.status === 'ofertado' ? 'Ofertado' : of.status === 'solicitado' ? 'Solicitado' : 'Pendente'
+                  const stCor = of.contemplado ? '#22c55e' : of.ciclo_encerrado ? 'var(--muted-color)' : of.status === 'ofertado' ? '#f59e0b' : 'var(--accent)'
+                  return (
+                    <div key={i} className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)' }}>
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-medium" style={{ color: stCor }}>{stLabel}</span>
+                        {of.data_assembleia && <span className="text-[10px]" style={{ color: 'var(--muted-color)' }}>Assemb: {fmtData(of.data_assembleia)}</span>}
+                      </div>
+                      {of.comprovante_nome && <p className="text-[10px]" style={{ color: 'var(--muted-color)' }}>{of.comprovante_nome}</p>}
+                      {of.justificativa_sem_comprovante && <p className="text-[10px] italic" style={{ color: '#f59e0b' }}>Sem comprovante: {of.justificativa_sem_comprovante}</p>}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+            <button onClick={() => setHistoricoModal(null)} className="w-full mt-4 rounded-lg py-2.5 text-sm" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text2)' }}>Fechar</button>
           </div>
         </div>
       )}
