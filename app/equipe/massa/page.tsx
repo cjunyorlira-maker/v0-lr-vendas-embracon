@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import { Loader2, Upload, Check, X } from 'lucide-react'
@@ -42,23 +42,28 @@ function emailDe(nome: string): string {
     for (const p of partes.slice(1)) { if (!['da','de','do','dos','das','e'].includes(p)) { sobrenome = p; break } }
     base = primeiro + sobrenome
   }
-  return base + '@lrmultimarcas.com'
+  return base
 }
 
 export default function CadastroMassa() {
   const [texto, setTexto] = useState(LISTA_INICIAL)
   const [processando, setProcessando] = useState(false)
   const [resultado, setResultado] = useState<any>(null)
+  const [empresas, setEmpresas] = useState<any[]>([])
+  const [empresaSel, setEmpresaSel] = useState('')
+  const [dominio, setDominio] = useState('lrmultimarcas.com')
+
+  useEffect(() => { fetch('/api/usuarios/listar').then(r => r.json()).then(d => { if (d.empresas) setEmpresas(d.empresas) }).catch(() => {}) }, [])
 
   const linhas = texto.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
     const [nome, role, equipe] = l.split('|').map(s => s.trim())
-    return { nome, role: (role || 'vendedor').toLowerCase(), equipe: equipe || '', email: emailDe(nome || '') }
+    return { nome, role: (role || 'vendedor').toLowerCase(), equipe: equipe || '', email: emailDe(nome || '') + '@' + dominio }
   })
 
   async function criar() {
     setProcessando(true); setResultado(null)
     try {
-      const res = await fetch('/api/usuarios/massa', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ usuarios: linhas }) })
+      const res = await fetch('/api/usuarios/massa', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ usuarios: linhas, empresa_id: empresaSel || undefined }) })
       const data = await res.json()
       setResultado(data)
     } catch (e) { setResultado({ error: String(e) }) }
@@ -72,6 +77,19 @@ export default function CadastroMassa() {
         <Header title="Cadastro em Massa" />
         <main className="mx-auto max-w-3xl px-6 py-8">
           <p className="text-sm mb-2" style={{ color: 'var(--muted-color)' }}>Um por linha, no formato: <code>Nome | cargo | equipe</code> (cargo = supervisor ou vendedor). Email gerado automático (nome+sobrenome@lrmultimarcas.com). Senha padrão: <strong>Mudarlr123</strong>.</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+            <div>
+              <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Empresa</label>
+              <select value={empresaSel} onChange={(e) => setEmpresaSel(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                <option value="" style={{ background: '#131313' }}>Minha empresa (padrão)</option>
+                {empresas.map(e => <option key={e.id} value={e.id} style={{ background: '#131313' }}>{e.nome}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Domínio do email</label>
+              <input value={dominio} onChange={(e) => setDominio(e.target.value.trim())} placeholder="marques.com" className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+            </div>
+          </div>
           <textarea value={texto} onChange={(e) => setTexto(e.target.value)} rows={14} className="w-full rounded-lg px-3 py-2 text-xs font-mono outline-none mb-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }} />
           <div className="rounded-lg p-3 mb-4 text-xs" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)', color: 'var(--muted-color)' }}>
             <strong style={{ color: 'var(--text)' }}>{linhas.length} usuários</strong> · {[...new Set(linhas.map(l => l.equipe))].length} equipes · Prévia dos emails:
