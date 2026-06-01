@@ -90,6 +90,19 @@ export default function RankingPage() {
             </div>
           </div>
 
+          {/* Controles de período + empresa */}
+          <div className="flex items-center gap-2 flex-wrap mb-4">
+            <button onClick={() => aplicarPeriodo('producao')} className="rounded-lg px-3 py-1.5 text-xs font-medium" style={{ background: periodoAtivo === 'producao' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${periodoAtivo === 'producao' ? 'var(--accent)' : 'var(--border)'}`, color: periodoAtivo === 'producao' ? 'var(--accent)' : 'var(--muted-color)' }}>Produção</button>
+            <button onClick={() => aplicarPeriodo('semana')} className="rounded-lg px-3 py-1.5 text-xs font-medium" style={{ background: periodoAtivo === 'semana' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${periodoAtivo === 'semana' ? 'var(--accent)' : 'var(--border)'}`, color: periodoAtivo === 'semana' ? 'var(--accent)' : 'var(--muted-color)' }}>Semana</button>
+            <button onClick={() => aplicarPeriodo('ano')} className="rounded-lg px-3 py-1.5 text-xs font-medium" style={{ background: periodoAtivo === 'ano' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${periodoAtivo === 'ano' ? 'var(--accent)' : 'var(--border)'}`, color: periodoAtivo === 'ano' ? 'var(--accent)' : 'var(--muted-color)' }}>Ano (acumulado)</button>
+            {empresas.length > 0 && (
+              <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} className="rounded-lg px-3 py-1.5 text-xs outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                <option value="" style={{ background: '#131313' }}>Todas as empresas</option>
+                {empresas.map(e => <option key={e.id} value={e.id} style={{ background: '#131313' }}>{e.nome}</option>)}
+              </select>
+            )}
+          </div>
+
           {/* Abas */}
           {abas.length > 1 && (
             <div className="flex gap-2 mb-6">
