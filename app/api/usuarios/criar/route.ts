@@ -2,7 +2,6 @@ import { createClient } from "@supabase/supabase-js"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextRequest, NextResponse } from "next/server"
-import { gerarSenhaTemporaria } from "@/lib/gerar-senha"
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -118,7 +117,8 @@ export async function POST(req: NextRequest) {
       equipe_final = criador.equipe_id
     }
 
-    const senhaTemporaria = gerarSenhaTemporaria()
+    // senha temporária padrão: todos entram com ela e trocam no primeiro login
+    const senhaTemporaria = (body.senha_definida && String(body.senha_definida).length >= 4) ? String(body.senha_definida) : 'Mudarlr123'
 
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
