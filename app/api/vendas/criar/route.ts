@@ -158,6 +158,26 @@ export async function POST(req: NextRequest) {
       console.error('Erro ao criar boleto:', boletoErr)
     }
 
+    // 4b. Cria lance PENDENTE automático (o cliente entra em Lances aguardando o vendedor definir o lance)
+    try {
+      const { data: cfgLance } = await supabaseAdmin.from('lances_config').insert({
+        empresa_id, cliente_id: cliente.id, venda_id: venda.id,
+        vendedor_id, equipe_id,
+        tipo: 'fixo25', valor_percentual: null, observacao: null,
+        recorrente: false, ativo: true, criado_por: criador.id,
+      }).select('id').single()
+      if (cfgLance) {
+        const mesRefLance = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
+        await supabaseAdmin.from('lances_mensais').insert({
+          lance_config_id: cfgLance.id, empresa_id, cliente_id: cliente.id,
+          vendedor_id, equipe_id, mes_referencia: mesRefLance,
+          data_assembleia: data_assembleia_entrada || null, status: 'pendente',
+        })
+      }
+    } catch (e) {
+      console.error('Erro ao criar lance pendente:', e)
+    }
+
     // 5. Notifica ADM/Representante da empresa (nova venda pendente)
     if (boleto) {
       await supabaseAdmin.from('notificacoes').insert([

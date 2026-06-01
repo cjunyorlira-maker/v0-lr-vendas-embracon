@@ -310,9 +310,10 @@ O boleto está em anexo.`
               {pdfAnexo ? (<><Paperclip size={20} style={{ color: '#22c55e' }} /><span className="text-xs" style={{ color: '#22c55e' }}>{pdfAnexo.nome}</span><span className="text-[10px]" style={{ color: 'var(--muted-color)' }}>clique para trocar</span></>) : (<><Upload size={20} style={{ color: 'var(--accent)' }} /><span className="text-xs" style={{ color: 'var(--muted-color)' }}>Clique para selecionar o PDF do boleto</span></>)}
             </div>
             <div className="rounded-lg p-3 mb-4 text-xs" style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', color: '#3b82f6' }}>Em breve: envio automático via WhatsApp (Evolution). Por enquanto, anexe e mande manual.</div>
-            <div className="flex gap-2">
-              <button onClick={() => { setAnexoModal(null); setPdfAnexo(null) }} className="flex-1 rounded-lg py-2.5 text-sm" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text2)' }}>Cancelar</button>
-              <button onClick={() => anexarEAvancar(anexoModal.boleto)} disabled={processando === anexoModal.boleto.id || !pdfAnexo} className="flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #d4af37 0%, #c9a227 50%, #b8941f 100%)', color: '#0a0a0a' }}>{processando === anexoModal.boleto.id ? <Loader2 size={14} className="animate-spin" /> : 'Anexar e avançar'}</button>
+            <div className="flex flex-col gap-2">
+              <button onClick={() => anexarEAvancar(anexoModal.boleto)} disabled={processando === anexoModal.boleto.id || !pdfAnexo} className="w-full flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #d4af37 0%, #c9a227 50%, #b8941f 100%)', color: '#0a0a0a' }}>{processando === anexoModal.boleto.id ? <Loader2 size={14} className="animate-spin" /> : 'Anexar e avançar'}</button>
+              <button onClick={() => confirmarAvanco(anexoModal.boleto.id, {})} disabled={processando === anexoModal.boleto.id} className="w-full rounded-lg py-2.5 text-sm font-medium disabled:opacity-50" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text2)' }}>Avançar sem anexar</button>
+              <button onClick={() => { setAnexoModal(null); setPdfAnexo(null) }} className="w-full rounded-lg py-2 text-xs" style={{ color: 'var(--muted-color)' }}>Cancelar</button>
             </div>
           </div>
         </div>
