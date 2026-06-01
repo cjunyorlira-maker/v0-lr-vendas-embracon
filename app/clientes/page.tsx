@@ -343,6 +343,10 @@ export default function ClientesPage() {
             <h3 className="text-base font-semibold mb-1" style={{ color: 'var(--text)' }}>Editar atribuição</h3>
             <p className="text-xs mb-4" style={{ color: 'var(--muted-color)' }}>{editarModal.nome} · Grupo {editarModal.grupo}/{editarModal.cota}</p>
             <div className="space-y-3">
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Empresa</label>
+                <div className="rounded-lg px-3 py-2 text-sm" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)', color: 'var(--text2)' }}>{filtrosOpc.empresas.find(e => e.id === editarModal.empresa_id)?.nome || 'Empresa do cliente'}</div>
+              </div>
               {['master','representante','adm'].includes(meuRole) && (
                 <div>
                   <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Equipe</label>
@@ -356,7 +360,7 @@ export default function ClientesPage() {
                 <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Vendedor</label>
                 <select value={edVendedor} onChange={(e) => setEdVendedor(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle}>
                   <option value="" style={{ background: '#131313' }}>Sem vendedor</option>
-                  {filtrosOpc.vendedores.filter(vd => (!editarModal?.empresa_id || vd.empresa_id === editarModal.empresa_id) && (!edEquipe || vd.equipe_id === edEquipe)).map(vd => <option key={vd.id} value={vd.id} style={{ background: '#131313' }}>{vd.nome}</option>)}
+                  {filtrosOpc.vendedores.filter(vd => (!editarModal?.empresa_id || vd.empresa_id === editarModal.empresa_id) && (vd.role === 'representante' || !edEquipe || vd.equipe_id === edEquipe)).map(vd => <option key={vd.id} value={vd.id} style={{ background: '#131313' }}>{vd.nome}{vd.role === 'representante' ? ' (Representante)' : ''}</option>)}
                 </select>
               </div>
               <div className="flex gap-2 pt-1">
