@@ -7,7 +7,7 @@ import { DollarSign, Loader2, AlertTriangle, Settings, Check, TrendingUp, Lock, 
 
 interface VendaComissao {
   id: string; cliente: string; vendedor: string; plano: string; adesao: number | null; bem: string; credito: number
-  comissao_lr: number; percentual_vendedor: number; comissao_vendedor: number
+  comissao_lr: number; comissao_lr_total: number; parcelas_pagas: number; total_parcelas_comissao: number; percentual_vendedor: number; comissao_vendedor: number
   percentual_supervisor: number; comissao_supervisor: number
   comissao_recebida_rs: number; comissao_recebida_percent: number
   em_risco: boolean; valor_estorno: number; faltam: number; pgto_seguranca: number
@@ -580,7 +580,7 @@ export default function ComissoesPage() {
                           <th className="p-3 text-left text-xs" style={{ color: 'var(--muted-color)' }}>Cliente</th>
                           <th className="p-3 text-left text-xs" style={{ color: 'var(--muted-color)' }}>Adesão</th>
                           <th className="p-3 text-right text-xs" style={{ color: 'var(--muted-color)' }}>Crédito</th>
-                          {ehGestao && <th className="p-3 text-right text-xs" style={{ color: 'var(--accent)' }}>Com. Rep.</th>}
+                          {ehGestao && <th className="p-3 text-right text-xs" style={{ color: 'var(--accent)' }}>Com. Garantida</th>}
                           {ehGestao && <th className="p-3 text-right text-xs" style={{ color: '#22c55e' }}>Recebido</th>}
                           {ehGestao && <th className="p-3 text-right text-xs" style={{ color: '#f59e0b' }}>Falta</th>}
                           <th className="p-3 text-right text-xs" style={{ color: 'var(--muted-color)' }}>Vend.</th>
@@ -598,7 +598,7 @@ export default function ComissoesPage() {
                               <td className="p-3" style={{ color: 'var(--text)' }}>{v.cliente}<br /><span className="text-[10px]" style={{ color: 'var(--muted-color)' }}>{v.vendedor}</span></td>
                               <td className="p-3"><span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)' }}>{v.adesao != null ? `${v.adesao}%` : '-'}</span><br/><span className="text-[10px]" style={{ color: 'var(--muted-color)' }}>{v.bem}</span></td>
                               <td className="p-3 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda(v.credito)}</td>
-                              {ehGestao && <td className="p-3 text-right font-semibold" style={{ color: 'var(--accent)' }}>{fmtMoeda(v.comissao_lr)}</td>}
+                              {ehGestao && <td className="p-3 text-right font-semibold" style={{ color: 'var(--accent)' }}>{fmtMoeda(v.comissao_lr)}<br /><span className="text-[10px]" style={{ color: 'var(--muted-color)' }}>de {fmtMoeda(v.comissao_lr_total)} · {v.parcelas_pagas}/{v.total_parcelas_comissao} pg</span></td>}
                               {ehGestao && <td className="p-3 text-right" style={{ color: '#22c55e' }}>{fmtMoeda(v.comissao_recebida_rs || 0)}<br /><span className="text-[10px]">{recPct.toFixed(1)}%</span></td>}
                               {ehGestao && <td className="p-3 text-right" style={{ color: faltaRs > 1 ? '#f59e0b' : '#22c55e' }}>{faltaRs > 1 ? fmtMoeda(faltaRs) : `${'\u2713'} 100%`}</td>}
                               <td className="p-3 text-right" style={{ color: 'var(--text2)' }}>{v.percentual_vendedor}%<br /><span className="text-[10px]">{fmtMoeda(v.comissao_vendedor)}</span></td>
