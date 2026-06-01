@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
+import { getEscopo } from '@/lib/escopo'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -24,9 +25,10 @@ export async function GET() {
       .from('usuarios').select('id, role, empresa_id, equipe_id').eq('auth_user_id', authUser.id).single()
     if (!me) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 403 })
 
-    // Monta filtro de escopo conforme o role
+    // Monta filtro de escopo conforme o role (adm matriz tem escopo global, igual master)
+    const { escopoGlobal } = await getEscopo(me)
     function aplicarEscopo(query: any) {
-      if (me.role === 'master') return query
+      if (escopoGlobal) return query
       if (['representante', 'adm'].includes(me.role)) return query.eq('empresa_id', me.empresa_id)
       if (me.role === 'supervisor') return query.eq('equipe_id', me.equipe_id)
       return query.eq('vendedor_id', me.id)
