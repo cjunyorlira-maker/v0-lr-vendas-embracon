@@ -154,7 +154,7 @@ export default function NovaVendaPage() {
         empresa_id_alvo: empresaSel || null, equipe_id_alvo: equipeSel || null, vendedor_id_alvo: vendedorSel || null,
       }
       if (grupoEncontrado === false && grupo && dataAssembleia) {
-        try { await fetch(`/api/grupos/${grupo}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bem: planos.find(p => p.id === planoId)?.bem || null, data_assembleia: dataAssembleia, dia_vencimento: null }) }) } catch {}
+        try { await fetch(`/api/grupos/${grupo}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ bem: planos.find(p => p.id === planoId)?.bem || null, data_assembleia: dataAssembleia, data_vencimento: dataVencimento || null, dia_vencimento: dataVencimento ? new Date(dataVencimento + 'T00:00:00').getDate() : null }) }) } catch {}
       }
       const res = await fetch('/api/vendas/criar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const data = await res.json()
