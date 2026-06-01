@@ -136,6 +136,9 @@ export default function AdicionarUsuarioModal({
     if (currentUserRole === 'master' && role !== 'representante' && !empresaIdAlvo) {
       setError('Selecione a empresa'); setLoading(false); return
     }
+    if (role === 'supervisor' && !equipeId) {
+      setError('Selecione uma equipe ou crie uma nova para o supervisor.'); setLoading(false); return
+    }
 
     try {
       const body: any = {
