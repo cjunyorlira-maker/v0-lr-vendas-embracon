@@ -33,7 +33,8 @@ function parseValorBR(texto: string): number | null {
 }
 
 export function parseProposta(textoPdf: string): DadosProposta {
-  const texto = textoPdf.replace(/\r/g, '')
+  // normaliza espaços não-quebráveis (NBSP \u00a0) e \r — eles quebram os regex de busca
+  const texto = textoPdf.replace(/\u00a0/g, ' ').replace(/\r/g, '')
   const linhas = texto.split('\n').map(l => l.trim()).filter(Boolean)
 
   // Helper: acha índice da primeira linha que casa com regex
