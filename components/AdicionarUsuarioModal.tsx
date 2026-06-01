@@ -136,6 +136,9 @@ export default function AdicionarUsuarioModal({
     if (currentUserRole === 'master' && role !== 'representante' && !empresaIdAlvo) {
       setError('Selecione a empresa'); setLoading(false); return
     }
+    if (role === 'supervisor' && !equipeId) {
+      setError('Selecione uma equipe ou crie uma nova para o supervisor.'); setLoading(false); return
+    }
 
     try {
       const body: any = {
@@ -297,7 +300,7 @@ export default function AdicionarUsuarioModal({
                 </div>
                 {equipes.length > 0 ? (
                   <select value={equipeId} onChange={(e) => setEquipeId(e.target.value)} className="w-full rounded-lg px-3 py-2.5 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
-                    <option value="" style={{ background: '#131313' }}>Sem equipe</option>
+                    <option value="" style={{ background: '#131313' }}>{role === 'supervisor' ? 'Selecione uma equipe' : 'Sem equipe'}</option>
                     {equipes.filter((eq) => {
                       const empAlvo = currentUserRole === 'master' ? empresaIdAlvo : empresaId
                       return !empAlvo || eq.empresa_id === empAlvo
