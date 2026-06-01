@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextRequest, NextResponse } from "next/server"
+import { getEscopo } from '@/lib/escopo'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -38,20 +39,27 @@ export async function GET(req: NextRequest) {
     let detalhe = null
     if (mapaId) {
       const { data: linhas } = await supabaseAdmin.from('mapa_linhas').select('contrato, consorciado, percentual_comis, parcela_de, parcela_ate, valor_comissao').eq('mapa_id', mapaId)
-      // cruza os contratos com as vendas pra pegar o nome real do cliente
+      const { escopoGlobal } = await getEscopo(me)
+      // cruza os contratos com as vendas pra pegar nome do cliente E a empresa de cada contrato
       const contratos = [...new Set((linhas || []).map((l: any) => String(l.contrato)))]
       const nomePorContrato: Record<string, string> = {}
+      const empresaPorContrato: Record<string, string> = {}
       if (contratos.length > 0) {
-        const { data: vendas } = await supabaseAdmin.from('vendas').select('numero_contrato, numero_proposta, clientes(nome)').or(`numero_contrato.in.(${contratos.join(',')}),numero_proposta.in.(${contratos.join(',')})`)
+        const { data: vendas } = await supabaseAdmin.from('vendas').select('numero_contrato, numero_proposta, empresa_id, clientes(nome)').or(`numero_contrato.in.(${contratos.join(',')}),numero_proposta.in.(${contratos.join(',')})`)
         for (const v of (vendas || [])) {
           const nome = Array.isArray(v.clientes) ? v.clientes[0]?.nome : (v.clientes as any)?.nome
-          if (v.numero_contrato) nomePorContrato[String(v.numero_contrato)] = nome || ''
-          if (v.numero_proposta) nomePorContrato[String(v.numero_proposta)] = nome || ''
+          if (v.numero_contrato) { nomePorContrato[String(v.numero_contrato)] = nome || ''; empresaPorContrato[String(v.numero_contrato)] = v.empresa_id }
+          if (v.numero_proposta) { nomePorContrato[String(v.numero_proposta)] = nome || ''; empresaPorContrato[String(v.numero_proposta)] = v.empresa_id }
         }
       }
-      // agrupa por contrato, montando uma linha resumo por cliente
+      // filtra: se NÃO for escopo global, só mostra contratos cuja venda é da empresa do usuário
+      const linhasFiltradas = (linhas || []).filter((l: any) => {
+        if (escopoGlobal) return true
+        return empresaPorContrato[String(l.contrato)] === me.empresa_id
+      })
+      // agrupa por contrato, montando uma linha resumo por cliente (já filtrado por empresa)
       const porCliente: Record<string, any> = {}
-      for (const l of (linhas || [])) {
+      for (const l of linhasFiltradas) {
         const chave = String(l.contrato)
         if (!porCliente[chave]) porCliente[chave] = { contrato: l.contrato, cliente: nomePorContrato[chave] || l.consorciado || 'Não cadastrado', parcelas: [], percentualTotal: 0, total: 0 }
         // lista de parcelas (de-ate)

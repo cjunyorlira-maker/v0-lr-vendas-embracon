@@ -49,7 +49,7 @@ export async function GET() {
     // vendas com dados de comissão + plano + estorno
     let q = supabaseAdmin
       .from('vendas')
-      .select('id, valor_credito, empresa_id, equipe_id, vendedor_id, comissao_vendedor_percent, comissao_supervisor_percent, comissao_recebida_rs, comissao_recebida_percent, criado_em, data_venda, clientes(nome), usuarios:vendedor_id(nome, role), planos(sigla, comissao_total, estorno_percent, estorno_ate_pgto, categoria_comissao, adesao_percent, bem), boletos(qtd_parcelas, status)')
+      .select('id, valor_credito, empresa_id, equipe_id, vendedor_id, comissao_vendedor_percent, comissao_supervisor_percent, comissao_recebida_rs, comissao_recebida_percent, criado_em, data_venda, clientes(nome), usuarios:vendedor_id(nome, role), planos(sigla, comissao_total, comissao_parcelas, estorno_percent, estorno_ate_pgto, categoria_comissao, adesao_percent, bem), boletos(qtd_parcelas, status)')
       .order('criado_em', { ascending: false })
 
     const { escopoGlobal } = await getEscopo(me)
@@ -62,7 +62,13 @@ export async function GET() {
       const vendedor = Array.isArray(v.usuarios) ? v.usuarios[0] : v.usuarios
       const boleto = Array.isArray(v.boletos) ? v.boletos[0] : v.boletos
       const credito = v.valor_credito || 0
-      const comLR = plano?.comissao_total ? credito * (plano.comissao_total / 100) : 0
+      const comLRTotal = plano?.comissao_total ? credito * (plano.comissao_total / 100) : 0
+      // comissão GARANTIDA: proporcional às parcelas já pagas pelo cliente
+      const parcelasComissao: number[] = Array.isArray(plano?.comissao_parcelas) ? plano.comissao_parcelas : []
+      const somaPesos = parcelasComissao.reduce((s: number, x: number) => s + x, 0) || 1
+      const parcelasPagas = 1 + (boleto?.qtd_parcelas || 0) // 1ª parcela + boleto único
+      const pesoPago = parcelasComissao.slice(0, Math.min(parcelasPagas, parcelasComissao.length)).reduce((s: number, x: number) => s + x, 0)
+      const comLR = comLRTotal * (pesoPago / somaPesos) // comissão garantida (vencida)
       // precedência: % individual da venda > padrão da categoria do plano > 0
       const catPlano = plano?.categoria_comissao
       const cfgCat = (configCategorias || []).find((cc: any) => cc.categoria === catPlano)
@@ -87,7 +93,8 @@ export async function GET() {
       return {
         id: v.id, criado_em: v.criado_em, data_venda: v.data_venda || v.criado_em, empresa_id: v.empresa_id, equipe_id: v.equipe_id, vendedor_id: v.vendedor_id, cliente: cliente?.nome || '-', vendedor: vendedor?.nome || '-',
         plano: plano?.sigla || '-', adesao: plano?.adesao_percent ?? null, bem: plano?.bem || '-', credito,
-        comissao_lr: comLR, percentual_vendedor: pVend, comissao_vendedor: comVend,
+        comissao_lr: comLR, comissao_lr_total: comLRTotal, parcelas_pagas: parcelasPagas, total_parcelas_comissao: parcelasComissao.length,
+        percentual_vendedor: pVend, comissao_vendedor: comVend,
         percentual_supervisor: pSup, comissao_supervisor: comSup,
         comissao_recebida_rs: v.comissao_recebida_rs || 0,
         comissao_recebida_percent: v.comissao_recebida_percent || 0,

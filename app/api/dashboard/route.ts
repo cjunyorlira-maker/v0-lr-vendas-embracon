@@ -41,15 +41,30 @@ export async function GET() {
     const cont = (s: string) => lista.filter((b: any) => b.status === s).length
 
     // Vendido no mês (vendas criadas no mês atual)
-    let vq = supabaseAdmin.from('vendas').select('valor_credito, criado_em')
+    let vq = supabaseAdmin.from('vendas').select('valor_credito, criado_em, data_venda')
     vq = aplicarEscopo(vq)
     const { data: vendas } = await vq
     const agora = new Date()
-    const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1)
+    // usa o período de produção configurado (igual ranking/comissões); se não houver, usa o mês atual
+    let periodoInicio: string, periodoFim: string
+    const { data: cfgProd } = await supabaseAdmin.from('config_producao').select('data_inicio, data_fim').eq('id', 1).single()
+    if (cfgProd?.data_inicio && cfgProd?.data_fim) {
+      periodoInicio = cfgProd.data_inicio
+      periodoFim = cfgProd.data_fim
+    } else {
+      const ag = new Date()
+      periodoInicio = new Date(ag.getFullYear(), ag.getMonth(), 1).toISOString().slice(0, 10)
+      periodoFim = ag.toISOString().slice(0, 10)
+    }
+    // filtra por data_venda dentro do período (data_venda é a data real do fechamento)
+    const dentroPeriodo = (v: any) => {
+      const d = v.data_venda || (v.criado_em ? v.criado_em.slice(0, 10) : null)
+      return d && d >= periodoInicio && d <= periodoFim
+    }
     const vendidoMes = (vendas || [])
-      .filter((v: any) => new Date(v.criado_em) >= inicioMes)
+      .filter(dentroPeriodo)
       .reduce((s: number, v: any) => s + (v.valor_credito || 0), 0)
-    const vendasMesQtd = (vendas || []).filter((v: any) => new Date(v.criado_em) >= inicioMes).length
+    const vendasMesQtd = (vendas || []).filter(dentroPeriodo).length
 
     // Próximas cobranças (próximos 30 dias)
     let cq = supabaseAdmin.from('boletos')
