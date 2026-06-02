@@ -206,6 +206,26 @@ export default function ComissoesPage() {
     setImportando(false)
   }
 
+  const [ordenarPor, setOrdenarPor] = useState<string>('recebido')
+  const [ordemAsc, setOrdemAsc] = useState(false)
+  function clicarOrdenar(coluna: string) {
+    if (ordenarPor === coluna) { setOrdemAsc(!ordemAsc) }
+    else { setOrdenarPor(coluna); setOrdemAsc(false) }
+  }
+  function valorColuna(v: any, col: string): number | string {
+    switch (col) {
+      case 'cliente': return (v.cliente || '').toLowerCase()
+      case 'adesao': return v.adesao || 0
+      case 'credito': return v.credito || 0
+      case 'garantida': return v.comissao_lr || 0
+      case 'recebido': return v.comissao_recebida_rs || 0
+      case 'falta': return (v.comissao_lr || 0) - (v.comissao_recebida_rs || 0)
+      case 'vendedor': return v.comissao_vendedor || 0
+      case 'supervisor': return v.comissao_supervisor || 0
+      default: return 0
+    }
+  }
+
   const vendasFiltradas = vendas.filter(v => {
     const va = v as any
     if (fEmpresa && va.empresa_id !== fEmpresa) return false
