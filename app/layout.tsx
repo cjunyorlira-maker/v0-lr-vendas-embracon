@@ -18,6 +18,14 @@ const jetbrains = JetBrains_Mono({
 export const metadata: Metadata = {
   title: 'LR Vendas Embracon',
   description: 'Sistema de gestão de vendas Embracon — LR Multimarcas',
+  icons: {
+    icon: [
+      { url: '/icon32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icon16.png', sizes: '16x16', type: 'image/png' },
+      { url: '/icon192.png', sizes: '192x192', type: 'image/png' },
+    ],
+    apple: [{ url: '/icon180.png', sizes: '180x180' }],
+  },
 }
 
 export const viewport: Viewport = {
