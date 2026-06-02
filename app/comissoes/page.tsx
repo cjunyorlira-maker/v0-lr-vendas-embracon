@@ -148,7 +148,7 @@ export default function ComissoesPage() {
     y += 26
 
     // uma linha por cliente
-    const body: any[] = mapaDetalhe.clientes.map((cl: any) => ([
+    const body: any[] = mapaClientesFiltrados.map((cl: any) => ([
       cl.cliente,
       String(cl.contrato),
       `${cl.percentualTotal}%`,
@@ -170,7 +170,7 @@ export default function ComissoesPage() {
     doc.setFontSize(12); doc.setTextColor(40)
     doc.text('VALOR TOTAL:', 14, finalY + 10)
     doc.setTextColor(201, 162, 39)
-    doc.text(`R$ ${Number(mapaDetalhe.totalGeral).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageW - 14, finalY + 10, { align: 'right' })
+    doc.text(`R$ ${Number(mapaTotalFiltrado).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`, pageW - 14, finalY + 10, { align: 'right' })
 
     doc.save(`mapa-comissao-${mapaInfo?.data_encerramento || 'atual'}.pdf`)
   }
@@ -249,6 +249,9 @@ export default function ComissoesPage() {
       </div>
     )
   }
+
+  const mapaClientesFiltrados = mapaDetalhe?.clientes ? mapaDetalhe.clientes.filter((cl: any) => !fEmpresa || cl.empresa_id === fEmpresa) : []
+  const mapaTotalFiltrado = mapaClientesFiltrados.reduce((s: number, c: any) => s + (c.total || 0), 0)
 
   return (
     <div className="relative min-h-screen font-sans">
@@ -418,7 +421,7 @@ export default function ComissoesPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {mapaDetalhe?.clientes?.map((cl: any, i: number) => (
+                        {mapaClientesFiltrados.map((cl: any, i: number) => (
                           <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                             <td className="p-2 font-medium" style={{ color: 'var(--text)' }}>{cl.cliente}</td>
                             <td className="p-2" style={{ color: 'var(--muted-color)' }}>{cl.contrato}</td>
@@ -431,7 +434,7 @@ export default function ComissoesPage() {
                     </table>
                     <div className="flex justify-between pt-3 mt-2 text-base font-bold" style={{ borderTop: '1px solid var(--border)' }}>
                       <span style={{ color: 'var(--text)' }}>VALOR TOTAL</span>
-                      <span style={{ color: 'var(--accent)' }}>{fmtMoeda(mapaDetalhe?.totalGeral || 0)}</span>
+                      <span style={{ color: 'var(--accent)' }}>{fmtMoeda(mapaTotalFiltrado)}</span>
                     </div>
                   </div>
                 </div>
