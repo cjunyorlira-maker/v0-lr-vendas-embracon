@@ -23,12 +23,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ grup
 
     const hoje = new Date()
 
+    let linhaCal = grupoData.linha_calendario
+    // se o grupo não tem linha mas tem data de assembleia, deduz a linha cruzando com o calendário
+    if (!linhaCal && grupoData.data_assembleia_manual) {
+      const { data: match } = await supabaseAdmin
+        .from('calendario_embracon')
+        .select('linha_calendario')
+        .eq('data_assembleia', grupoData.data_assembleia_manual)
+        .limit(1)
+        .single()
+      if (match?.linha_calendario) linhaCal = match.linha_calendario
+    }
     let calendario: { mes: number; data_assembleia: string; data_vencimento: string }[] = []
-    if (grupoData.linha_calendario) {
+    if (linhaCal) {
       const { data: cal } = await supabaseAdmin
         .from('calendario_embracon')
         .select('mes, data_assembleia, data_vencimento')
-        .eq('linha_calendario', grupoData.linha_calendario)
+        .eq('linha_calendario', linhaCal)
         .order('mes')
       if (cal) calendario = cal
     }
@@ -45,7 +56,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ grup
       grupo: grupoData.grupo,
       bem: grupoData.bem,
       dia_vencimento: grupoData.dia_vencimento,
-      linha_calendario: grupoData.linha_calendario,
+      linha_calendario: linhaCal,
       faixa_credito: grupoData.faixa_credito,
       proxima_assembleia: proxima?.data_assembleia || grupoData.data_assembleia_manual || null,
       proximo_vencimento: proxima?.data_vencimento || null,
