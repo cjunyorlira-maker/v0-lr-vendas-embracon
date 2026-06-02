@@ -600,14 +600,14 @@ export default function ComissoesPage() {
                       <thead>
                         <tr style={{ borderBottom: '1px solid var(--border)' }}>
                           <th className="p-3 text-left"><input type="checkbox" checked={selecionadas.size === vendas.length && vendas.length > 0} onChange={toggleTodas} className="accent-yellow-500" /></th>
-                          <th className="p-3 text-left text-xs" style={{ color: 'var(--muted-color)' }}>Cliente</th>
-                          <th className="p-3 text-left text-xs" style={{ color: 'var(--muted-color)' }}>Adesão</th>
-                          <th className="p-3 text-right text-xs" style={{ color: 'var(--muted-color)' }}>Crédito</th>
-                          {ehGestao && <th className="p-3 text-right text-xs" style={{ color: 'var(--accent)' }}>Com. Garantida</th>}
-                          {ehGestao && <th className="p-3 text-right text-xs" style={{ color: '#22c55e' }}>Recebido</th>}
-                          {ehGestao && <th className="p-3 text-right text-xs" style={{ color: '#f59e0b' }}>Falta</th>}
-                          <th className="p-3 text-right text-xs" style={{ color: 'var(--muted-color)' }}>Vend.</th>
-                          <th className="p-3 text-right text-xs" style={{ color: 'var(--muted-color)' }}>Superv.</th>
+                          <th onClick={() => clicarOrdenar('cliente')} className="p-3 text-left text-xs cursor-pointer select-none" style={{ color: 'var(--muted-color)' }}>Cliente{ordenarPor === 'cliente' ? (ordemAsc ? ' ↑' : ' ↓') : ''}</th>
+                          <th onClick={() => clicarOrdenar('adesao')} className="p-3 text-left text-xs cursor-pointer select-none" style={{ color: 'var(--muted-color)' }}>Adesão{ordenarPor === 'adesao' ? (ordemAsc ? ' ↑' : ' ↓') : ''}</th>
+                          <th onClick={() => clicarOrdenar('credito')} className="p-3 text-right text-xs cursor-pointer select-none" style={{ color: 'var(--muted-color)' }}>Crédito{ordenarPor === 'credito' ? (ordemAsc ? ' ↑' : ' ↓') : ''}</th>
+                          {ehGestao && <th onClick={() => clicarOrdenar('garantida')} className="p-3 text-right text-xs cursor-pointer select-none" style={{ color: 'var(--accent)' }}>Com. Garantida{ordenarPor === 'garantida' ? (ordemAsc ? ' ↑' : ' ↓') : ''}</th>}
+                          {ehGestao && <th onClick={() => clicarOrdenar('recebido')} className="p-3 text-right text-xs cursor-pointer select-none" style={{ color: '#22c55e' }}>Recebido{ordenarPor === 'recebido' ? (ordemAsc ? ' ↑' : ' ↓') : ''}</th>}
+                          {ehGestao && <th onClick={() => clicarOrdenar('falta')} className="p-3 text-right text-xs cursor-pointer select-none" style={{ color: '#f59e0b' }}>Falta{ordenarPor === 'falta' ? (ordemAsc ? ' ↑' : ' ↓') : ''}</th>}
+                          <th onClick={() => clicarOrdenar('vendedor')} className="p-3 text-right text-xs cursor-pointer select-none" style={{ color: 'var(--muted-color)' }}>Vend.{ordenarPor === 'vendedor' ? (ordemAsc ? ' ↑' : ' ↓') : ''}</th>
+                          <th onClick={() => clicarOrdenar('supervisor')} className="p-3 text-right text-xs cursor-pointer select-none" style={{ color: 'var(--muted-color)' }}>Superv.{ordenarPor === 'supervisor' ? (ordemAsc ? ' ↑' : ' ↓') : ''}</th>
                           {ehGestao && <th className="p-3 text-center text-xs" style={{ color: 'var(--muted-color)' }}>Estorno</th>}
                         </tr>
                       </thead>
