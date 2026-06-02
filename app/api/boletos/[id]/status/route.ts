@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextRequest, NextResponse } from "next/server"
+import { getEscopo } from '@/lib/escopo'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -42,7 +43,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .from('boletos').select('*, clientes(nome)').eq('id', boletoId).single()
     if (!boleto) return NextResponse.json({ error: "Boleto não encontrado" }, { status: 404 })
 
-    if (usuario.role !== 'master' && boleto.empresa_id !== usuario.empresa_id) {
+    const { escopoGlobal } = await getEscopo(usuario)
+    if (!escopoGlobal && boleto.empresa_id !== usuario.empresa_id) {
       return NextResponse.json({ error: "Sem permissão para esse boleto" }, { status: 403 })
     }
 
