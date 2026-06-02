@@ -612,7 +612,13 @@ export default function ComissoesPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {[...vendasFiltradas].sort((a, b) => (b.comissao_recebida_rs || 0) - (a.comissao_recebida_rs || 0)).map(v => {
+                        {[...vendasFiltradas].sort((a, b) => {
+                          const va = valorColuna(a, ordenarPor), vb = valorColuna(b, ordenarPor)
+                          let cmp = 0
+                          if (typeof va === 'string' && typeof vb === 'string') cmp = va.localeCompare(vb)
+                          else cmp = (va as number) - (vb as number)
+                          return ordemAsc ? cmp : -cmp
+                        }).map(v => {
                           const faltaRs = v.comissao_lr - (v.comissao_recebida_rs || 0)
                           const recPct = v.comissao_recebida_percent || 0
                           return (
