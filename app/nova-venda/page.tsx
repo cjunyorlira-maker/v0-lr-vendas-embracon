@@ -141,6 +141,7 @@ export default function NovaVendaPage() {
 
   async function handleSalvar() {
     if (!nomeCliente.trim() || !valorCredito.trim()) { setErro('Nome do cliente e valor do crédito são obrigatórios'); return }
+    if (!planoId) { setErro('⚠️ Selecione o PLANO — sem ele a comissão fica zerada. Confira se o plano foi detectado.'); return }
     setSalvando(true); setErro('')
     try {
       const body: any = {
