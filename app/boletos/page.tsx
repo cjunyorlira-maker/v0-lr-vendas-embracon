@@ -282,10 +282,10 @@ O boleto está em anexo.`
                     {['pendente', 'solicitado', 'aguardando_pagamento'].includes(b.status) && podeOperar && (
                       <button onClick={() => pagouViaTed(b.id)} className="rounded-lg px-3 py-2 text-xs font-medium" style={{ background: 'rgba(168,85,247,0.15)', color: '#a855f7', border: '1px solid rgba(168,85,247,0.3)' }}>Pagou via TED</button>
                     )}
+                    {['master','representante','adm'].includes(role) && b.status !== 'pendente' && (
+                      <button onClick={() => voltarStatus(b)} disabled={processando === b.id} title="Voltar etapa (correção)" className="flex items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium disabled:opacity-50" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>{'\u21A9 Voltar'}</button>
+                    )}
                     {statusAtual?.proxLabel && podeAvancar(b.status) && (
-                      {['master','representante','adm'].includes(role) && b.status !== 'pendente' && (
-                        <button onClick={() => voltarStatus(b)} disabled={processando === b.id} title="Voltar etapa (correção)" className="flex items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium disabled:opacity-50" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>{'\u21A9 Voltar'}</button>
-                      )}
                       <button onClick={() => avancarStatus(b)} disabled={processando === b.id} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50 transition-transform hover:scale-105 active:scale-95" style={{ background: `${statusAtual.cor}20`, color: statusAtual.cor, border: `1px solid ${statusAtual.cor}` }}>
                         {processando === b.id ? <Loader2 size={12} className="animate-spin" /> : <>{statusAtual.proxLabel}<ArrowRight size={12} /></>}
                       </button>
