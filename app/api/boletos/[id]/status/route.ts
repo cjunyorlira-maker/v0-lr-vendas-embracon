@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextRequest, NextResponse } from "next/server"
+import { getEscopo } from '@/lib/escopo'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -42,7 +43,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       .from('boletos').select('*, clientes(nome)').eq('id', boletoId).single()
     if (!boleto) return NextResponse.json({ error: "Boleto não encontrado" }, { status: 404 })
 
-    if (usuario.role !== 'master' && boleto.empresa_id !== usuario.empresa_id) {
+    const { escopoGlobal } = await getEscopo(usuario)
+    if (!escopoGlobal && boleto.empresa_id !== usuario.empresa_id) {
       return NextResponse.json({ error: "Sem permissão para esse boleto" }, { status: 403 })
     }
 
@@ -75,6 +77,31 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         ])
       } catch {}
       return NextResponse.json({ success: true, novo_status: 'aguardando_baixa' })
+    }
+
+    // Caso especial: VOLTAR etapa (corrigir erro) — só gestão pode
+    if (body.acao === 'voltar') {
+      const ANTERIOR: Record<string, string> = {
+        solicitado: 'pendente',
+        aguardando_pagamento: 'solicitado',
+        aguardando_baixa: 'aguardando_pagamento',
+        efetivado: 'aguardando_baixa',
+      }
+      const statusAnterior = ANTERIOR[statusAtual]
+      if (!statusAnterior) return NextResponse.json({ error: "Boleto já está no início, não há etapa anterior" }, { status: 400 })
+      if (!['master', 'representante', 'adm'].includes(usuario.role)) {
+        return NextResponse.json({ error: "Seu cargo não pode voltar etapas" }, { status: 403 })
+      }
+      const { error: voltarErr } = await supabaseAdmin.from('boletos').update({ status: statusAnterior, atualizado_em: new Date().toISOString() }).eq('id', boletoId)
+      if (voltarErr) return NextResponse.json({ error: voltarErr.message }, { status: 500 })
+      try {
+        await supabaseAdmin.from('status_log').insert({
+          empresa_id: boleto.empresa_id, boleto_id: boletoId,
+          status_anterior: statusAtual, status_novo: statusAnterior,
+          alterado_por: usuario.id, observacao: 'Voltou etapa (correção)',
+        })
+      } catch {}
+      return NextResponse.json({ success: true, novo_status: statusAnterior })
     }
 
     const transicao = TRANSICOES[statusAtual]

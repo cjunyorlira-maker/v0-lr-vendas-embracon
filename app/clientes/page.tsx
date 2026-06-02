@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { Users, Loader2, ChevronDown, ChevronUp, Search, SlidersHorizontal, Home, Car, Truck, FileText, Target, Check, CalendarClock, Pencil } from 'lucide-react'
+import { Users, Loader2, ChevronDown, ChevronUp, Search, SlidersHorizontal, Home, Car, Truck, FileText, Target, Check, CalendarClock, Pencil, Trash2 } from 'lucide-react'
 
 interface Cota {
   venda_id: string; cliente_id: string; nome: string; cpf: string; telefone: string
@@ -77,6 +77,17 @@ export default function ClientesPage() {
     if (data.filtros) setFiltrosOpc(data.filtros)
     try { const rp = await fetch('/api/config-producao'); const dp = await rp.json(); if (dp.data_inicio) setProdInicio(dp.data_inicio); if (dp.data_fim) setProdFim(dp.data_fim) } catch {}
     setLoading(false)
+  }
+
+  async function deletarCota(c: Cota) {
+    if (!confirm(`ATENÇÃO: isso vai APAGAR a cota ${c.grupo}/${c.cota} de ${c.nome} e TODO o rastro (boleto, lances, comissão). Esta ação NÃO pode ser desfeita. Confirmar?`)) return
+    if (!confirm('Tem certeza mesmo? Essa exclusão é permanente.')) return
+    try {
+      const res = await fetch('/api/clientes-lista/deletar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ venda_id: c.venda_id }) })
+      const data = await res.json()
+      if (!res.ok) { alert(data.error || 'Erro ao deletar'); return }
+      await load()
+    } catch { alert('Erro de conexão') }
   }
 
   async function baixarProposta(cota: Cota) {
@@ -310,6 +321,7 @@ export default function ClientesPage() {
                                   {sl && <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: `${sl.cor}20`, color: sl.cor }}>{sl.label}</span>}
                                 </div>
                                 <div className="flex items-center gap-2">
+                                  {['master','representante','adm'].includes(meuRole) && <button onClick={() => deletarCota(c)} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px]" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}><Trash2 size={11} />Deletar</button>}
                                   {['master','representante','adm','supervisor'].includes(meuRole) && <button onClick={() => { setEditarModal(c); setEdVendedor(c.vendedor_id || ''); setEdEquipe(c.equipe_id || ''); setEdEmpresa(c.empresa_id || '') }} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px]" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text2)', border: '1px solid var(--border)' }}><Pencil size={11} />Editar</button>}
                                   <button onClick={() => toggleChecado(c)} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px]" style={{ background: c.checado ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.04)', color: c.checado ? '#22c55e' : 'var(--muted-color)', border: `1px solid ${c.checado ? 'rgba(34,197,94,0.3)' : 'var(--border)'}` }}><Check size={11} />{c.checado ? 'Checado' : 'Marcar checado'}</button>
                                   <button onClick={() => baixarProposta(c)} disabled={baixando === c.venda_id} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px]" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text2)', border: '1px solid var(--border)' }}>{baixando === c.venda_id ? <Loader2 size={11} className="animate-spin" /> : <FileText size={11} />}Proposta</button>
