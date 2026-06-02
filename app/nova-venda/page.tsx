@@ -141,6 +141,7 @@ export default function NovaVendaPage() {
 
   async function handleSalvar() {
     if (!nomeCliente.trim() || !valorCredito.trim()) { setErro('Nome do cliente e valor do crédito são obrigatórios'); return }
+    if (!planoId) { setErro('⚠️ Selecione o PLANO — sem ele a comissão fica zerada. Confira se o plano foi detectado.'); return }
     setSalvando(true); setErro('')
     try {
       const body: any = {
@@ -222,7 +223,7 @@ export default function NovaVendaPage() {
               <div className="rounded-xl p-5" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
                 <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--accent)' }}>Dados da Venda</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div><label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Plano</label><select value={planoId} onChange={(e) => setPlanoId(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle}><option value="" style={{ background: '#131313' }}>Selecione</option>{planos.map((p) => (<option key={p.id} value={p.id} style={{ background: '#131313' }}>{p.sigla} — {p.nome_completo} ({p.adesao_percent}%)</option>))}</select></div>
+                  <div><label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Plano {!planoId && <span style={{ color: '#ef4444' }}>* obrigatório</span>}</label><select value={planoId} onChange={(e) => setPlanoId(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={{ ...inputStyle, border: !planoId ? '1px solid #ef4444' : (inputStyle as any).border }}><option value="" style={{ background: '#131313' }}>Selecione o plano</option>{planos.map((p) => (<option key={p.id} value={p.id} style={{ background: '#131313' }}>{p.sigla} — {p.nome_completo} ({p.adesao_percent}%)</option>))}</select>{!planoId && <p className="text-[10px] mt-1" style={{ color: '#ef4444' }}>Sem plano, a comissão não é calculada.</p>}</div>
                   <div><label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Adesão (%)</label><select value={adesaoPercent} onChange={(e) => setAdesaoPercent(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle}><option value="" style={{ background: '#131313' }}>-</option><option value="1" style={{ background: '#131313' }}>1%</option><option value="2" style={{ background: '#131313' }}>2%</option></select></div>
                   <div><label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Nº Proposta</label><input value={numeroProposta} onChange={(e) => setNumeroProposta(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} /></div>
                   <div><label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Nº Contrato</label><input value={numeroContrato} onChange={(e) => setNumeroContrato(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} /></div>
