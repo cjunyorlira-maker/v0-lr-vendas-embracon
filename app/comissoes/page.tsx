@@ -592,7 +592,7 @@ export default function ComissoesPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {vendasFiltradas.map(v => {
+                        {[...vendasFiltradas].sort((a, b) => (b.comissao_recebida_rs || 0) - (a.comissao_recebida_rs || 0)).map(v => {
                           const faltaRs = v.comissao_lr - (v.comissao_recebida_rs || 0)
                           const recPct = v.comissao_recebida_percent || 0
                           return (
