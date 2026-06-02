@@ -206,6 +206,26 @@ export default function ComissoesPage() {
     setImportando(false)
   }
 
+  const [ordenarPor, setOrdenarPor] = useState<string>('recebido')
+  const [ordemAsc, setOrdemAsc] = useState(false)
+  function clicarOrdenar(coluna: string) {
+    if (ordenarPor === coluna) { setOrdemAsc(!ordemAsc) }
+    else { setOrdenarPor(coluna); setOrdemAsc(false) }
+  }
+  function valorColuna(v: any, col: string): number | string {
+    switch (col) {
+      case 'cliente': return (v.cliente || '').toLowerCase()
+      case 'adesao': return v.adesao || 0
+      case 'credito': return v.credito || 0
+      case 'garantida': return v.comissao_lr || 0
+      case 'recebido': return v.comissao_recebida_rs || 0
+      case 'falta': return (v.comissao_lr || 0) - (v.comissao_recebida_rs || 0)
+      case 'vendedor': return v.comissao_vendedor || 0
+      case 'supervisor': return v.comissao_supervisor || 0
+      default: return 0
+    }
+  }
+
   const vendasFiltradas = vendas.filter(v => {
     const va = v as any
     if (fEmpresa && va.empresa_id !== fEmpresa) return false
@@ -580,19 +600,25 @@ export default function ComissoesPage() {
                       <thead>
                         <tr style={{ borderBottom: '1px solid var(--border)' }}>
                           <th className="p-3 text-left"><input type="checkbox" checked={selecionadas.size === vendas.length && vendas.length > 0} onChange={toggleTodas} className="accent-yellow-500" /></th>
-                          <th className="p-3 text-left text-xs" style={{ color: 'var(--muted-color)' }}>Cliente</th>
-                          <th className="p-3 text-left text-xs" style={{ color: 'var(--muted-color)' }}>Adesão</th>
-                          <th className="p-3 text-right text-xs" style={{ color: 'var(--muted-color)' }}>Crédito</th>
-                          {ehGestao && <th className="p-3 text-right text-xs" style={{ color: 'var(--accent)' }}>Com. Garantida</th>}
-                          {ehGestao && <th className="p-3 text-right text-xs" style={{ color: '#22c55e' }}>Recebido</th>}
-                          {ehGestao && <th className="p-3 text-right text-xs" style={{ color: '#f59e0b' }}>Falta</th>}
-                          <th className="p-3 text-right text-xs" style={{ color: 'var(--muted-color)' }}>Vend.</th>
-                          <th className="p-3 text-right text-xs" style={{ color: 'var(--muted-color)' }}>Superv.</th>
+                          <th onClick={() => clicarOrdenar('cliente')} className="p-3 text-left text-xs cursor-pointer select-none" style={{ color: 'var(--muted-color)' }}>Cliente{ordenarPor === 'cliente' ? (ordemAsc ? ' ↑' : ' ↓') : ''}</th>
+                          <th onClick={() => clicarOrdenar('adesao')} className="p-3 text-left text-xs cursor-pointer select-none" style={{ color: 'var(--muted-color)' }}>Adesão{ordenarPor === 'adesao' ? (ordemAsc ? ' ↑' : ' ↓') : ''}</th>
+                          <th onClick={() => clicarOrdenar('credito')} className="p-3 text-right text-xs cursor-pointer select-none" style={{ color: 'var(--muted-color)' }}>Crédito{ordenarPor === 'credito' ? (ordemAsc ? ' ↑' : ' ↓') : ''}</th>
+                          {ehGestao && <th onClick={() => clicarOrdenar('garantida')} className="p-3 text-right text-xs cursor-pointer select-none" style={{ color: 'var(--accent)' }}>Com. Garantida{ordenarPor === 'garantida' ? (ordemAsc ? ' ↑' : ' ↓') : ''}</th>}
+                          {ehGestao && <th onClick={() => clicarOrdenar('recebido')} className="p-3 text-right text-xs cursor-pointer select-none" style={{ color: '#22c55e' }}>Recebido{ordenarPor === 'recebido' ? (ordemAsc ? ' ↑' : ' ↓') : ''}</th>}
+                          {ehGestao && <th onClick={() => clicarOrdenar('falta')} className="p-3 text-right text-xs cursor-pointer select-none" style={{ color: '#f59e0b' }}>Falta{ordenarPor === 'falta' ? (ordemAsc ? ' ↑' : ' ↓') : ''}</th>}
+                          <th onClick={() => clicarOrdenar('vendedor')} className="p-3 text-right text-xs cursor-pointer select-none" style={{ color: 'var(--muted-color)' }}>Vend.{ordenarPor === 'vendedor' ? (ordemAsc ? ' ↑' : ' ↓') : ''}</th>
+                          <th onClick={() => clicarOrdenar('supervisor')} className="p-3 text-right text-xs cursor-pointer select-none" style={{ color: 'var(--muted-color)' }}>Superv.{ordenarPor === 'supervisor' ? (ordemAsc ? ' ↑' : ' ↓') : ''}</th>
                           {ehGestao && <th className="p-3 text-center text-xs" style={{ color: 'var(--muted-color)' }}>Estorno</th>}
                         </tr>
                       </thead>
                       <tbody>
-                        {vendasFiltradas.map(v => {
+                        {[...vendasFiltradas].sort((a, b) => {
+                          const va = valorColuna(a, ordenarPor), vb = valorColuna(b, ordenarPor)
+                          let cmp = 0
+                          if (typeof va === 'string' && typeof vb === 'string') cmp = va.localeCompare(vb)
+                          else cmp = (va as number) - (vb as number)
+                          return ordemAsc ? cmp : -cmp
+                        }).map(v => {
                           const faltaRs = v.comissao_lr - (v.comissao_recebida_rs || 0)
                           const recPct = v.comissao_recebida_percent || 0
                           return (
