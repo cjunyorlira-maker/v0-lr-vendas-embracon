@@ -46,22 +46,25 @@ function detectarPlano(
 }
 
 // Calcula a adesão (1% ou 2%) cruzando 1ª parcela com crédito
-function calcularAdesao(valorCredito: number | null, primeiraParcela: number | null): number | null {
+function calcularAdesao(valorCredito: number | null, primeiraParcela: number | null, demaisParcela?: number | null): number | null {
   if (!valorCredito || !primeiraParcela) return null
-  // A taxa de antecipação (1% ou 2%) está embutida na 1ª parcela
-  // 1% de 100.000 = 1.000 ; 2% de 100.000 = 2.000
+  // Fórmula EXATA: a adesão é a diferença entre a 1ª parcela e as demais, sobre o crédito.
+  // (1ª parcela = parcela normal + taxa de adesão; taxa = adesao% do crédito)
+  if (demaisParcela && demaisParcela > 0) {
+    const taxaAdesao = primeiraParcela - demaisParcela
+    const percent = (taxaAdesao / valorCredito) * 100
+    // arredonda pro inteiro mais próximo (1 ou 2)
+    if (percent >= 0.5 && percent < 1.5) return 1
+    if (percent >= 1.5 && percent <= 2.5) return 2
+    // fora da faixa esperada — retorna o arredondado
+    return Math.round(percent) || null
+  }
+  // fallback (sem demais parcela): compara com as taxas, testando 1% primeiro (mais comum)
   const taxa1 = valorCredito * 0.01
   const taxa2 = valorCredito * 0.02
-  // Verifica qual adesão faz a 1ª parcela bater melhor
-  // (1ª parcela = demais_parcela + taxa_antecipada)
-  // Como não temos demais_parcela, usamos heurística: se 1ª parcela > 1.5x taxa2, provavelmente 2%
-  const difPara1 = Math.abs(primeiraParcela - taxa1)
-  const difPara2 = Math.abs(primeiraParcela - taxa2)
-  // Heurística simples: retorna a adesão cuja taxa está mais próxima de uma fração da parcela
-  // Na prática o vendedor confirma, isso é só sugestão
-  if (primeiraParcela >= taxa2 * 0.8 && primeiraParcela <= taxa2 * 3) return 2
-  if (primeiraParcela >= taxa1 * 0.8 && primeiraParcela <= taxa1 * 3) return 1
-  return null
+  const dif1 = Math.abs(primeiraParcela - taxa1)
+  const dif2 = Math.abs(primeiraParcela - taxa2)
+  return dif1 <= dif2 ? 1 : 2
 }
 
 export async function POST(req: NextRequest) {
@@ -127,7 +130,7 @@ export async function POST(req: NextRequest) {
     const dados = parseProposta(textoPdf)
 
     // Calcula adesão
-    const adesao = calcularAdesao(dados.valor_credito, dados.valor_primeira_parcela)
+    const adesao = calcularAdesao(dados.valor_credito, dados.valor_primeira_parcela, dados.valor_demais_parcelas)
 
     // Busca planos pra detectar
     const { data: planos } = await supabaseAdmin
