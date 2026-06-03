@@ -20,7 +20,7 @@ export default function ComissoesPage() {
   const [loading, setLoading] = useState(true)
   const [semAcesso, setSemAcesso] = useState(false)
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set())
-  const [aba, setAba] = useState<'vendas' | 'config' | 'mapa' | 'calculo'>('vendas')
+  const [aba, setAba] = useState<'vendas' | 'config' | 'mapa' | 'calculo' | 'ranking'>('vendas')
   const [mapas, setMapas] = useState<any[]>([])
   const [mapaSel, setMapaSel] = useState<string | null>(null)
   const [mapaDetalhe, setMapaDetalhe] = useState<any>(null)
@@ -434,6 +434,7 @@ export default function ComissoesPage() {
             <button onClick={() => setAba('mapa')} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: aba === 'mapa' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${aba === 'mapa' ? 'var(--accent)' : 'var(--border)'}`, color: aba === 'mapa' ? 'var(--accent)' : 'var(--muted-color)' }}><FileText size={14} />Mapa de Comissão</button>
             <button onClick={() => setAba('calculo')} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: aba === 'calculo' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${aba === 'calculo' ? 'var(--accent)' : 'var(--border)'}`, color: aba === 'calculo' ? 'var(--accent)' : 'var(--muted-color)' }}><Calculator size={14} />Cálculo de Comissão</button>
             <button onClick={() => setAba('config')} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: aba === 'config' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${aba === 'config' ? 'var(--accent)' : 'var(--border)'}`, color: aba === 'config' ? 'var(--accent)' : 'var(--muted-color)' }}><Settings size={14} />Configurar padrão</button>
+            <button onClick={() => setAba('ranking')} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: aba === 'ranking' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${aba === 'ranking' ? 'var(--accent)' : 'var(--border)'}`, color: aba === 'ranking' ? 'var(--accent)' : 'var(--muted-color)' }}><TrendingUp size={14} />Ranking de Faturamento</button>
             </>)}
           </div>
 
