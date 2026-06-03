@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
-    const { venda_id, vendedor_id, equipe_id, empresa_id } = body
+    const { venda_id, vendedor_id, equipe_id, empresa_id, qtd_parcelas } = body
     if (!venda_id) return NextResponse.json({ error: "venda_id obrigatório" }, { status: 400 })
 
     const upd: any = {}
@@ -49,6 +49,45 @@ export async function POST(req: NextRequest) {
         const { data: v } = await supabaseAdmin.from('vendas').select('cliente_id').eq('id', venda_id).single()
         if (v?.cliente_id) await supabaseAdmin.from('clientes').update({ empresa_id: upd.empresa_id }).eq('id', v.cliente_id)
       }
+    }
+
+    // EDIÇÃO DE PARCELAS ANTECIPADAS: recalcula valor do boleto e próxima cobrança
+    if (qtd_parcelas !== undefined && qtd_parcelas !== null && qtd_parcelas !== '') {
+      const novaQtd = parseInt(String(qtd_parcelas)) || 0
+      const { data: venda } = await supabaseAdmin
+        .from('vendas')
+        .select('grupo, valor_demais_parcelas')
+        .eq('id', venda_id).single()
+      const demais = venda?.valor_demais_parcelas || 0
+      const novoValorBoleto = demais * novaQtd
+      // recalcula a próxima cobrança: base (próximo vencimento do grupo) + (qtd+1) meses
+      let novaCobranca: string | null = null
+      if (venda?.grupo) {
+        const { data: grupo } = await supabaseAdmin
+          .from('grupos_embracon').select('linha_calendario, data_assembleia_manual')
+          .eq('grupo', venda.grupo).single()
+        let linhaCal = grupo?.linha_calendario
+        if (!linhaCal && grupo?.data_assembleia_manual) {
+          const { data: m } = await supabaseAdmin.from('calendario_embracon')
+            .select('linha_calendario').eq('data_assembleia', grupo.data_assembleia_manual).limit(1).single()
+          if (m?.linha_calendario) linhaCal = m.linha_calendario
+        }
+        if (linhaCal) {
+          const { data: cal } = await supabaseAdmin.from('calendario_embracon')
+            .select('mes, data_vencimento').eq('linha_calendario', linhaCal).order('mes')
+          const hoje = new Date()
+          const base = (cal || []).map((c: any) => new Date(c.data_vencimento + 'T00:00:00')).filter((d: Date) => d >= hoje).sort((a: Date, b: Date) => a.getTime() - b.getTime())[0]
+          if (base) {
+            const alvo = new Date(base); alvo.setMonth(alvo.getMonth() + novaQtd + 1)
+            const mesAlvo = alvo.getMonth() + 1, anoAlvo = alvo.getFullYear()
+            const noCal = (cal || []).find((c: any) => c.mes === mesAlvo && c.data_vencimento && new Date(c.data_vencimento + 'T00:00:00').getFullYear() === anoAlvo)
+            novaCobranca = noCal?.data_vencimento || alvo.toISOString().slice(0, 10)
+          }
+        }
+      }
+      const updBoleto: any = { qtd_parcelas: novaQtd, meses_cobertos: novaQtd, valor_boleto: novoValorBoleto }
+      if (novaCobranca) updBoleto.data_proxima_cobranca = novaCobranca
+      await supabaseAdmin.from('boletos').update(updBoleto).eq('venda_id', venda_id)
     }
 
     return NextResponse.json({ success: true })
