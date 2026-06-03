@@ -246,6 +246,7 @@ export default function ComissoesPage() {
   const emRisco = vendasFiltradas.filter(v => v.em_risco).length
   const totalVendedores = vendasFiltradas.reduce((s, v) => s + (v.comissao_vendedor || 0), 0)
   const totalSupervisores = vendasFiltradas.reduce((s, v) => s + (v.comissao_supervisor || 0), 0)
+  const totalSupervisorPropria = vendasFiltradas.reduce((s, v: any) => s + (v.comissao_supervisor_propria || 0), 0)
   // Master: 0,25% sobre toda a produção (crédito) do filtro atual
   const producaoTotal = vendasFiltradas.reduce((s, v) => s + (v.credito || 0), 0)
   const comissaoMaster = producaoTotal * 0.0025
@@ -272,6 +273,22 @@ export default function ComissoesPage() {
 
   const mapaClientesFiltrados = mapaDetalhe?.clientes ? mapaDetalhe.clientes.filter((cl: any) => !fEmpresa || cl.empresa_id === fEmpresa) : []
   const mapaTotalFiltrado = mapaClientesFiltrados.reduce((s: number, c: any) => s + (c.total || 0), 0)
+
+  // Prévia Próxima Semana: vendas com boleto efetivado até a quinta desta semana,
+  // contando o que ainda falta receber (comissão total do plano − já recebido no mapa)
+  const previaProximaSemana = (() => {
+    const hoje = new Date()
+    const diaSemana = hoje.getDay()
+    const diasAteQuinta = (4 - diaSemana + 7) % 7
+    const quinta = new Date(hoje); quinta.setDate(hoje.getDate() + diasAteQuinta); quinta.setHours(23, 59, 59, 999)
+    const limite = (diaSemana > 4 || diaSemana === 0) ? new Date(quinta.getTime() + 7 * 86400000) : quinta
+    return vendasFiltradas.reduce((soma: number, v: any) => {
+      if (v.boleto_status !== 'efetivado' || !v.boleto_data_efetivado) return soma
+      if (new Date(v.boleto_data_efetivado) > limite) return soma
+      const falta = (v.comissao_lr_total || 0) - (v.comissao_recebida_rs || 0)
+      return soma + (falta > 0 ? falta : 0)
+    }, 0)
+  })()
 
   return (
     <div className="relative min-h-screen font-sans">
@@ -301,6 +318,14 @@ export default function ComissoesPage() {
           </div>
           )}
 
+          {ehGestao && previaProximaSemana > 0 && (
+            <div className="rounded-xl p-4 mb-6" style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.25)' }}>
+              <div className="flex items-center gap-2 mb-1"><TrendingUp size={14} style={{ color: '#22c55e' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Prévia Próxima Semana</p></div>
+              <p className="text-xl font-bold" style={{ color: '#22c55e' }}>{fmtMoeda(previaProximaSemana)}</p>
+              <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>Vendas efetivadas até quinta que ainda não foram 100% recebidas</p>
+            </div>
+          )}
+
           {/* Cards de comissão de equipe */}
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
             {(ehGestao || ehAdm) && (
@@ -313,6 +338,13 @@ export default function ComissoesPage() {
             <div className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
               <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Comissão Supervisores</p>
               <p className="text-xl font-bold" style={{ color: '#a855f7' }}>{fmtMoeda(totalSupervisores)}</p>
+            </div>
+            )}
+            {(ehGestao || ehAdm) && totalSupervisorPropria > 0 && (
+            <div className="rounded-xl p-4" style={{ background: 'rgba(236,72,153,0.06)', border: '1px solid rgba(236,72,153,0.25)' }}>
+              <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Superv. Venda Própria</p>
+              <p className="text-xl font-bold" style={{ color: '#ec4899' }}>{fmtMoeda(totalSupervisorPropria)}</p>
+              <p className="text-[10px] mt-0.5" style={{ color: 'var(--muted-color)' }}>vendas do próprio supervisor</p>
             </div>
             )}
             {meuRole === 'master' && (
@@ -630,7 +662,7 @@ export default function ComissoesPage() {
                               {ehGestao && <td className="p-3 text-right font-semibold" style={{ color: 'var(--accent)' }}>{fmtMoeda(v.comissao_lr)}<br /><span className="text-[10px]" style={{ color: 'var(--muted-color)' }}>de {fmtMoeda(v.comissao_lr_total)} · {v.parcelas_pagas}/{v.total_parcelas_comissao} pg</span></td>}
                               {ehGestao && <td className="p-3 text-right" style={{ color: '#22c55e' }}>{fmtMoeda(v.comissao_recebida_rs || 0)}<br /><span className="text-[10px]">{recPct.toFixed(1)}%</span></td>}
                               {ehGestao && <td className="p-3 text-right" style={{ color: faltaRs > 1 ? '#f59e0b' : '#22c55e' }}>{faltaRs > 1 ? fmtMoeda(faltaRs) : `${'\u2713'} 100%`}</td>}
-                              <td className="p-3 text-right" style={{ color: 'var(--text2)' }}>{v.percentual_vendedor}%<br /><span className="text-[10px]">{fmtMoeda(v.comissao_vendedor)}</span></td>
+                              <td className="p-3 text-right" style={{ color: 'var(--text2)' }}>{v.percentual_vendedor}%<br /><span className="text-[10px]">{fmtMoeda(v.comissao_vendedor)}</span>{(v as any).venda_propria_supervisor && <><br /><span className="text-[9px]" style={{ color: '#ec4899' }}>superv. própria</span></>}</td>
                               <td className="p-3 text-right" style={{ color: 'var(--text2)' }}>{v.percentual_supervisor}%<br /><span className="text-[10px]">{fmtMoeda(v.comissao_supervisor)}</span></td>
                               {ehGestao && <td className="p-3 text-center">
                                 {v.em_risco ? (

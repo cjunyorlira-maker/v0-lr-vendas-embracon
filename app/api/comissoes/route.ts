@@ -49,7 +49,7 @@ export async function GET() {
     // vendas com dados de comissão + plano + estorno
     let q = supabaseAdmin
       .from('vendas')
-      .select('id, valor_credito, empresa_id, equipe_id, vendedor_id, comissao_vendedor_percent, comissao_supervisor_percent, comissao_recebida_rs, comissao_recebida_percent, criado_em, data_venda, clientes(nome), usuarios:vendedor_id(nome, role), planos(sigla, comissao_total, comissao_parcelas, estorno_percent, estorno_ate_pgto, categoria_comissao, adesao_percent, bem), boletos(qtd_parcelas, status)')
+      .select('id, valor_credito, empresa_id, equipe_id, vendedor_id, comissao_vendedor_percent, comissao_supervisor_percent, comissao_recebida_rs, comissao_recebida_percent, criado_em, data_venda, clientes(nome), usuarios:vendedor_id(nome, role), planos(sigla, comissao_total, comissao_parcelas, estorno_percent, estorno_ate_pgto, categoria_comissao, adesao_percent, bem), boletos(qtd_parcelas, status, data_efetivacao)')
       .order('criado_em', { ascending: false })
 
     const { escopoGlobal } = await getEscopo(me)
@@ -96,8 +96,12 @@ export async function GET() {
         comissao_lr: comLR, comissao_lr_total: comLRTotal, parcelas_pagas: parcelasPagas, total_parcelas_comissao: parcelasComissao.length,
         percentual_vendedor: pVend, comissao_vendedor: comVend,
         percentual_supervisor: pSup, comissao_supervisor: comSup,
+        venda_propria_supervisor: vendaPropriaSupervisor,
+        comissao_supervisor_propria: vendaPropriaSupervisor ? comVend : 0,
         comissao_recebida_rs: v.comissao_recebida_rs || 0,
         comissao_recebida_percent: v.comissao_recebida_percent || 0,
+        boleto_status: boleto?.status || null,
+        boleto_data_efetivado: boleto?.data_efetivacao || null,
         em_risco: emRisco, valor_estorno: estorno, faltam: emRisco ? pgtoSeg - pgtosCobertos : 0, pgto_seguranca: pgtoSeg,
       }
     })

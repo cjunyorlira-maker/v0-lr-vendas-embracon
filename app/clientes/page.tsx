@@ -40,7 +40,7 @@ export default function ClientesPage() {
   const [expandido, setExpandido] = useState<string | null>(null)
   const [abaCliente, setAbaCliente] = useState<'ativos' | 'cancelados'>('ativos')
   const [meuRole, setMeuRole] = useState('')
-  const [mostraFiltros, setMostraFiltros] = useState(false)
+  const [mostraFiltros, setMostraFiltros] = useState(true)
   const [fBem, setFBem] = useState('')
   const [fAdesao, setFAdesao] = useState('')
   const [fLance, setFLance] = useState('')
