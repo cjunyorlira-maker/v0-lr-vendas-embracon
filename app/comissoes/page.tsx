@@ -452,7 +452,7 @@ export default function ComissoesPage() {
           </div>
 
           {/* Abas */}
-          <div className="flex gap-2 mb-5">
+          <div className="flex gap-2 mb-5 flex-wrap">
             <button onClick={() => setAba('vendas')} className={`tab-btn ${aba === 'vendas' ? 'ativo' : ''}`}><DollarSign size={14} />Vendas</button>
             {ehGestao && (<>
             <button onClick={() => setAba('mapa')} className={`tab-btn ${aba === 'mapa' ? 'ativo' : ''}`}><FileText size={14} />Mapa de Comissão</button>
