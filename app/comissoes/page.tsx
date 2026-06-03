@@ -246,6 +246,7 @@ export default function ComissoesPage() {
   const emRisco = vendasFiltradas.filter(v => v.em_risco).length
   const totalVendedores = vendasFiltradas.reduce((s, v) => s + (v.comissao_vendedor || 0), 0)
   const totalSupervisores = vendasFiltradas.reduce((s, v) => s + (v.comissao_supervisor || 0), 0)
+  const totalSupervisorPropria = vendasFiltradas.reduce((s, v: any) => s + (v.comissao_supervisor_propria || 0), 0)
   // Master: 0,25% sobre toda a produção (crédito) do filtro atual
   const producaoTotal = vendasFiltradas.reduce((s, v) => s + (v.credito || 0), 0)
   const comissaoMaster = producaoTotal * 0.0025
@@ -337,6 +338,13 @@ export default function ComissoesPage() {
             <div className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
               <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Comissão Supervisores</p>
               <p className="text-xl font-bold" style={{ color: '#a855f7' }}>{fmtMoeda(totalSupervisores)}</p>
+            </div>
+            )}
+            {(ehGestao || ehAdm) && totalSupervisorPropria > 0 && (
+            <div className="rounded-xl p-4" style={{ background: 'rgba(236,72,153,0.06)', border: '1px solid rgba(236,72,153,0.25)' }}>
+              <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Superv. Venda Própria</p>
+              <p className="text-xl font-bold" style={{ color: '#ec4899' }}>{fmtMoeda(totalSupervisorPropria)}</p>
+              <p className="text-[10px] mt-0.5" style={{ color: 'var(--muted-color)' }}>vendas do próprio supervisor</p>
             </div>
             )}
             {meuRole === 'master' && (
