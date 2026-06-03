@@ -293,8 +293,10 @@ O boleto está em anexo.`
                       <span>{b.qtd_parcelas} parc.</span>
                       <span className="font-semibold" style={{ color: statusAtual?.cor }}>{fmtMoeda(b.valor_boleto)}</span>
                       {b.boleto_pdf_url && <span className="flex items-center gap-1" style={{ color: '#22c55e' }}><Paperclip size={11} />boleto anexado</span>}
-                      {b.status === 'solicitado' && horasDesde(b.data_solicitacao) !== null && <span style={{ color: (horasDesde(b.data_solicitacao) || 0) >= 72 ? '#ef4444' : '#f59e0b' }}>solicitado {tempoDecorrido(b.data_solicitacao)}</span>}
-                      {b.status === 'aguardando_baixa' && horasDesde(b.data_pagamento) !== null && <span style={{ color: (horasDesde(b.data_pagamento) || 0) >= 24 ? '#a855f7' : 'var(--muted-color)' }}>aguardando baixa {tempoDecorrido(b.data_pagamento)}{(horasDesde(b.data_pagamento) || 0) >= 24 ? ' — verificar' : ''}</span>}
+                      {b.status === 'pendente' && <span style={{ color: (horasDesde((b as any).criado_em) || 0) >= 24 ? '#ef4444' : '#eab308' }}>pendente {tempoDecorrido((b as any).criado_em)}</span>}
+                      {b.status === 'solicitado' && <span style={{ color: (horasDesde(b.data_solicitacao) || 0) >= 72 ? '#ef4444' : '#f97316' }}>solicitado {tempoDecorrido(b.data_solicitacao)}</span>}
+                      {b.status === 'aguardando_pagamento' && <span style={{ color: (horasDesde((b as any).data_anexo_boleto) || 0) >= 72 ? '#ef4444' : '#3b82f6' }}>aguardando pagamento {tempoDecorrido((b as any).data_anexo_boleto)}</span>}
+                      {b.status === 'aguardando_baixa' && <span style={{ color: (horasDesde(b.data_pagamento) || 0) >= 24 ? '#ef4444' : '#a855f7' }}>aguardando baixa {tempoDecorrido(b.data_pagamento)}{(horasDesde(b.data_pagamento) || 0) >= 24 ? ' — verificar' : ''}</span>}
                       {b.pago_via_ted && <span style={{ color: '#a855f7' }}>via TED</span>}
                     </div>
                     <div className="flex gap-3 mt-1.5 text-[11px] flex-wrap" style={{ color: 'var(--muted-color)' }}>
