@@ -93,18 +93,18 @@ export default function LoginPage() {
 
           <div className="text-center mb-8">
             <h1 className="font-serif text-2xl font-semibold text-[#f5f0e8] mb-2">Controle de Clientes</h1>
-            <p className="text-sm text-[#8a8070]">Acesse com suas credenciais</p>
+            <p className="text-sm text-[#cabfa8]">Acesse com suas credenciais</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-5">
             <div className="space-y-2">
-              <label htmlFor="email" className="text-sm text-[#a09080]">E-mail</label>
-              <Input id="email" type="email" placeholder="seu@email.com" required value={email} onChange={(e) => setEmail(e.target.value)} className="bg-black/40 border-[rgba(212,175,55,0.25)] text-[#f5f0e8] placeholder:text-[#5a5040] focus:border-[#d4af37] focus:ring-[#d4af37]/20 h-12 backdrop-blur-sm" />
+              <label htmlFor="email" className="text-sm text-[#d8cdb8]">E-mail</label>
+              <Input id="email" type="email" placeholder="seu@email.com" required value={email} onChange={(e) => setEmail(e.target.value)} className="bg-black/55 border-[rgba(212,175,55,0.25)] text-[#f5f0e8] placeholder:text-[#8a8070] focus:border-[#d4af37] focus:ring-[#d4af37]/20 h-12 backdrop-blur-sm" />
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="password" className="text-sm text-[#a09080]">Senha</label>
-              <Input id="password" type="password" placeholder="********" required value={password} onChange={(e) => setPassword(e.target.value)} className="bg-black/40 border-[rgba(212,175,55,0.25)] text-[#f5f0e8] placeholder:text-[#5a5040] focus:border-[#d4af37] focus:ring-[#d4af37]/20 h-12 backdrop-blur-sm" />
+              <label htmlFor="password" className="text-sm text-[#d8cdb8]">Senha</label>
+              <Input id="password" type="password" placeholder="********" required value={password} onChange={(e) => setPassword(e.target.value)} className="bg-black/55 border-[rgba(212,175,55,0.25)] text-[#f5f0e8] placeholder:text-[#8a8070] focus:border-[#d4af37] focus:ring-[#d4af37]/20 h-12 backdrop-blur-sm" />
             </div>
 
             {error && (
@@ -119,7 +119,7 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="text-center text-xs text-[#5a5040] mt-6">Grupo LR Multimarcas</p>
+        <p className="text-center text-xs text-[#b5aa95] mt-6">Grupo LR Multimarcas</p>
       </div>
     </div>
   )
