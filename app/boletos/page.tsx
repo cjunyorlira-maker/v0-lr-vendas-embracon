@@ -273,7 +273,7 @@ O boleto está em anexo.`
                   onMouseEnter={(e) => { if (!ativo) { e.currentTarget.style.background = `${s.cor}14`; e.currentTarget.style.borderColor = `${s.cor}99`; e.currentTarget.style.color = s.cor; e.currentTarget.style.transform = 'translateY(-1px)'; e.currentTarget.style.boxShadow = `0 4px 14px ${s.cor}22` } }}
                   onMouseLeave={(e) => { if (!ativo) { e.currentTarget.style.background = `${s.cor}0d`; e.currentTarget.style.borderColor = `${s.cor}40`; e.currentTarget.style.color = 'var(--text2)'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none' } }}
                   className="flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-semibold transition-all" style={{ background: ativo ? `${s.cor}22` : `${s.cor}0d`, backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: `1px solid ${ativo ? s.cor : `${s.cor}40`}`, color: ativo ? s.cor : 'var(--text2)', boxShadow: ativo ? `0 4px 16px ${s.cor}33` : 'none' }}>
-                  <Icon size={14} />{s.label}<span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ background: ativo ? s.cor : 'rgba(255,255,255,0.08)', color: ativo ? '#0a0a0a' : 'var(--muted-color)' }}>{qt}</span>
+                  <Icon size={14} />{s.label}<span className="rounded-full px-1.5 py-0.5 text-[10px] font-bold" style={{ background: ativo ? s.cor : `${s.cor}33`, color: ativo ? '#0a0a0a' : s.cor }}>{qt}</span>
                 </button>
               )
             })}
