@@ -70,10 +70,21 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-[#080808] flex items-center justify-center p-6 relative overflow-hidden">
-      <AnimatedBackground />
+      {/* Para voltar ao fundo animado, descomente a linha abaixo e remova o <video> */}
+      {/* <AnimatedBackground /> */}
+      <video
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="absolute inset-0 z-0 h-full w-full object-cover"
+      >
+        <source src="/videos/login-bg.mp4" type="video/mp4" />
+      </video>
+      <div className="absolute inset-0 z-0 bg-black/50" />
 
       <div className="relative z-10 w-full max-w-md">
-        <div className="bg-gradient-to-br from-white/[0.08] to-white/[0.03] backdrop-blur-xl border border-[rgba(212,175,55,0.2)] rounded-2xl p-8 shadow-2xl shadow-black/50">
+        <div className="bg-gradient-to-br from-white/[0.05] to-white/[0.02] backdrop-blur-md border border-[rgba(212,175,55,0.2)] rounded-2xl p-8 shadow-2xl shadow-black/50">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-1 bg-gradient-to-r from-transparent via-[#d4af37] to-transparent rounded-full" />
 
           <div className="flex justify-center mb-8 mt-4">
