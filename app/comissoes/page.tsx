@@ -116,9 +116,9 @@ export default function ComissoesPage() {
     setSalvandoConfig(true)
     const categorias = CATEGORIAS.map(c => ({
       categoria: c.key,
-      percentual_vendedor: parseFloat(catConfig[c.key]?.vend || '0') || 0,
-      percentual_supervisor: parseFloat(catConfig[c.key]?.sup || '0') || 0,
-      percentual_supervisor_proprio: parseFloat(catConfig[c.key]?.supProprio || '0') || 0,
+      percentual_vendedor: parseFloat((catConfig[c.key]?.vend || '0').replace(',', '.')) || 0,
+      percentual_supervisor: parseFloat((catConfig[c.key]?.sup || '0').replace(',', '.')) || 0,
+      percentual_supervisor_proprio: parseFloat((catConfig[c.key]?.supProprio || '0').replace(',', '.')) || 0,
     }))
     await fetch('/api/comissoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'salvar_config_categoria', categorias, empresa_id: fEmpresa || undefined }) })
     await loadData(); setSalvandoConfig(false)
