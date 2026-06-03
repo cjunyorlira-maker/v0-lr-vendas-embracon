@@ -591,6 +591,29 @@ export default function ComissoesPage() {
                 )
               })}
             </div>
+          ) : aba === 'ranking' ? (
+            <div>
+              <div className="flex gap-2 mb-4 flex-wrap">
+                <button onClick={() => setRankModo('pessoa')} className="rounded-lg px-3 py-1.5 text-xs font-medium" style={{ background: rankModo === 'pessoa' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${rankModo === 'pessoa' ? 'var(--accent)' : 'var(--border)'}`, color: rankModo === 'pessoa' ? 'var(--accent)' : 'var(--muted-color)' }}>Por Pessoa</button>
+                <button onClick={() => setRankModo('equipe')} className="rounded-lg px-3 py-1.5 text-xs font-medium" style={{ background: rankModo === 'equipe' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${rankModo === 'equipe' ? 'var(--accent)' : 'var(--border)'}`, color: rankModo === 'equipe' ? 'var(--accent)' : 'var(--muted-color)' }}>Por Equipe</button>
+                {meuRole === 'master' && <button onClick={() => setRankModo('empresa')} className="rounded-lg px-3 py-1.5 text-xs font-medium" style={{ background: rankModo === 'empresa' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${rankModo === 'empresa' ? 'var(--accent)' : 'var(--border)'}`, color: rankModo === 'empresa' ? 'var(--accent)' : 'var(--muted-color)' }}>Por Empresa</button>}
+              </div>
+              <div className="space-y-2">
+                {rankingFaturamento.map((r, i) => (
+                  <div key={i} className="flex items-center justify-between rounded-xl p-3" style={{ background: 'rgba(0,0,0,0.12)', backdropFilter: 'blur(4px)', border: '1px solid var(--border)' }}>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-bold w-7 text-center" style={{ color: i === 0 ? '#f59e0b' : i === 1 ? '#a3a3a3' : i === 2 ? '#cd7f32' : 'var(--muted-color)' }}>{i + 1}º</span>
+                      <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{r.nome}</span>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold" style={{ color: '#22c55e' }}>{fmtMoeda(r.valor)}</p>
+                      <p className="text-[10px]" style={{ color: 'var(--muted-color)' }}>{r.qtd} venda(s)</p>
+                    </div>
+                  </div>
+                ))}
+                {rankingFaturamento.length === 0 && <p className="text-sm text-center py-8" style={{ color: 'var(--muted-color)' }}>Nenhuma venda no período.</p>}
+              </div>
+            </div>
           ) : aba === 'config' ? (
             <>
             {meuRole === 'master' && (
