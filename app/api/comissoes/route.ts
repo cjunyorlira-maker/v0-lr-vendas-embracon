@@ -188,10 +188,11 @@ export async function POST(req: NextRequest) {
       const { venda_ids, percentual_vendedor, percentual_supervisor, percentual_supervisor_proprio } = body
       if (!Array.isArray(venda_ids) || venda_ids.length === 0) return NextResponse.json({ error: "Nenhuma venda selecionada" }, { status: 400 })
       const update: any = {}
-      if (percentual_vendedor !== undefined && percentual_vendedor !== null && percentual_vendedor !== '') update.comissao_vendedor_percent = parseFloat(percentual_vendedor)
-      if (percentual_supervisor !== undefined && percentual_supervisor !== null && percentual_supervisor !== '') update.comissao_supervisor_percent = parseFloat(percentual_supervisor)
+      const parsePct = (x: any) => parseFloat(String(x).replace(',', '.'))
+      if (percentual_vendedor !== undefined && percentual_vendedor !== null && percentual_vendedor !== '') update.comissao_vendedor_percent = parsePct(percentual_vendedor)
+      if (percentual_supervisor !== undefined && percentual_supervisor !== null && percentual_supervisor !== '') update.comissao_supervisor_percent = parsePct(percentual_supervisor)
       // supervisor próprio: salvo no comissao_vendedor_percent (usado quando o vendedor é supervisor)
-      if (percentual_supervisor_proprio !== undefined && percentual_supervisor_proprio !== null && percentual_supervisor_proprio !== '') update.comissao_vendedor_percent = parseFloat(percentual_supervisor_proprio)
+      if (percentual_supervisor_proprio !== undefined && percentual_supervisor_proprio !== null && percentual_supervisor_proprio !== '') update.comissao_vendedor_percent = parsePct(percentual_supervisor_proprio)
       if (Object.keys(update).length === 0) return NextResponse.json({ error: "Informe ao menos um percentual" }, { status: 400 })
       await supabaseAdmin.from('vendas').update(update).in('id', venda_ids)
       return NextResponse.json({ success: true })
