@@ -307,7 +307,7 @@ export default function ComissoesPage() {
         ganho = (v.comissao_vendedor || 0) + (v.comissao_supervisor || 0)
       } else {
         chave = v.empresa_id || 'sem'; nome = nomeEmpresa(v.empresa_id)
-        ganho = (v.comissao_vendedor || 0) + (v.comissao_supervisor || 0)
+        ganho = v.comissao_lr || 0
       }
       if (!mapa.has(chave)) mapa.set(chave, { nome, valor: 0, qtd: 0 })
       const it = mapa.get(chave)!; it.valor += ganho; it.qtd += 1
