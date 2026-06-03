@@ -251,7 +251,7 @@ export default function ComissoesPage() {
   // Master: 0,25% sobre toda a produção (crédito) do filtro atual
   const producaoTotal = vendasFiltradas.reduce((s, v) => s + (v.credito || 0), 0)
   const comissaoMaster = producaoTotal * 0.0025
-  const liquidoRep = totalLR - totalVendedores - totalSupervisores
+  const liquidoRep = totalLR - totalVendedores - totalSupervisores - totalSupervisorPropria
   // helpers de papel
   const ehGestao = ['master', 'representante'].includes(meuRole)
   const ehAdm = meuRole === 'adm'
