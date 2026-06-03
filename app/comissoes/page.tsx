@@ -120,7 +120,7 @@ export default function ComissoesPage() {
       percentual_supervisor: parseFloat(catConfig[c.key]?.sup || '0') || 0,
       percentual_supervisor_proprio: parseFloat(catConfig[c.key]?.supProprio || '0') || 0,
     }))
-    await fetch('/api/comissoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'salvar_config_categoria', categorias }) })
+    await fetch('/api/comissoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'salvar_config_categoria', categorias, empresa_id: fEmpresa || undefined }) })
     await loadData(); setSalvandoConfig(false)
   }
 
@@ -639,7 +639,7 @@ export default function ComissoesPage() {
                           <th onClick={() => clicarOrdenar('credito')} className="p-3 text-right text-xs cursor-pointer select-none" style={{ color: 'var(--muted-color)' }}>Crédito{ordenarPor === 'credito' ? (ordemAsc ? ' ↑' : ' ↓') : ''}</th>
                           {ehGestao && <th onClick={() => clicarOrdenar('garantida')} className="p-3 text-right text-xs cursor-pointer select-none" style={{ color: 'var(--accent)' }}>Com. Garantida{ordenarPor === 'garantida' ? (ordemAsc ? ' ↑' : ' ↓') : ''}</th>}
                           {ehGestao && <th onClick={() => clicarOrdenar('recebido')} className="p-3 text-right text-xs cursor-pointer select-none" style={{ color: '#22c55e' }}>Recebido{ordenarPor === 'recebido' ? (ordemAsc ? ' ↑' : ' ↓') : ''}</th>}
-                          {ehGestao && <th onClick={() => clicarOrdenar('falta')} className="p-3 text-right text-xs cursor-pointer select-none" style={{ color: '#f59e0b' }}>Falta{ordenarPor === 'falta' ? (ordemAsc ? ' ↑' : ' ↓') : ''}</th>}
+                          {ehGestao && <th onClick={() => clicarOrdenar('falta')} className="p-3 text-right text-xs cursor-pointer select-none" style={{ color: '#f59e0b' }}>Falta{ordenarPor === 'falta' ? (ordemAsc ? ' ��' : ' ↓') : ''}</th>}
                           <th onClick={() => clicarOrdenar('vendedor')} className="p-3 text-right text-xs cursor-pointer select-none" style={{ color: 'var(--muted-color)' }}>Vend.{ordenarPor === 'vendedor' ? (ordemAsc ? ' ↑' : ' ↓') : ''}</th>
                           <th onClick={() => clicarOrdenar('supervisor')} className="p-3 text-right text-xs cursor-pointer select-none" style={{ color: 'var(--muted-color)' }}>Superv.{ordenarPor === 'supervisor' ? (ordemAsc ? ' ↑' : ' ↓') : ''}</th>
                           {ehGestao && <th className="p-3 text-center text-xs" style={{ color: 'var(--muted-color)' }}>Estorno</th>}
