@@ -662,7 +662,7 @@ export default function ComissoesPage() {
                               {ehGestao && <td className="p-3 text-right font-semibold" style={{ color: 'var(--accent)' }}>{fmtMoeda(v.comissao_lr)}<br /><span className="text-[10px]" style={{ color: 'var(--muted-color)' }}>de {fmtMoeda(v.comissao_lr_total)} · {v.parcelas_pagas}/{v.total_parcelas_comissao} pg</span></td>}
                               {ehGestao && <td className="p-3 text-right" style={{ color: '#22c55e' }}>{fmtMoeda(v.comissao_recebida_rs || 0)}<br /><span className="text-[10px]">{recPct.toFixed(1)}%</span></td>}
                               {ehGestao && <td className="p-3 text-right" style={{ color: faltaRs > 1 ? '#f59e0b' : '#22c55e' }}>{faltaRs > 1 ? fmtMoeda(faltaRs) : `${'\u2713'} 100%`}</td>}
-                              <td className="p-3 text-right" style={{ color: 'var(--text2)' }}>{v.percentual_vendedor}%<br /><span className="text-[10px]">{fmtMoeda(v.comissao_vendedor)}</span></td>
+                              <td className="p-3 text-right" style={{ color: 'var(--text2)' }}>{v.percentual_vendedor}%<br /><span className="text-[10px]">{fmtMoeda(v.comissao_vendedor)}</span>{(v as any).venda_propria_supervisor && <><br /><span className="text-[9px]" style={{ color: '#ec4899' }}>superv. própria</span></>}</td>
                               <td className="p-3 text-right" style={{ color: 'var(--text2)' }}>{v.percentual_supervisor}%<br /><span className="text-[10px]">{fmtMoeda(v.comissao_supervisor)}</span></td>
                               {ehGestao && <td className="p-3 text-center">
                                 {v.em_risco ? (
