@@ -44,6 +44,7 @@ export default function ComissoesPage() {
   const [fVendedor, setFVendedor] = useState('')
   const [pctVend, setPctVend] = useState('')
   const [pctSup, setPctSup] = useState('')
+  const [pctSupProprio, setPctSupProprio] = useState('')
   const [aplicando, setAplicando] = useState(false)
   const [salvandoConfig, setSalvandoConfig] = useState(false)
   const CATEGORIAS = [
@@ -105,10 +106,10 @@ export default function ComissoesPage() {
 
   async function aplicar() {
     if (selecionadas.size === 0) { alert('Selecione ao menos uma venda'); return }
-    if (!pctVend && !pctSup) { alert('Informe ao menos um percentual'); return }
+    if (!pctVend && !pctSup && !pctSupProprio) { alert('Informe ao menos um percentual'); return }
     setAplicando(true)
-    await fetch('/api/comissoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'aplicar', venda_ids: Array.from(selecionadas), percentual_vendedor: pctVend || undefined, percentual_supervisor: pctSup || undefined }) })
-    setSelecionadas(new Set()); setPctVend(''); setPctSup(''); await loadData(); setAplicando(false)
+    await fetch('/api/comissoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'aplicar', venda_ids: Array.from(selecionadas), percentual_vendedor: pctVend || undefined, percentual_supervisor: pctSup || undefined, percentual_supervisor_proprio: pctSupProprio || undefined }) })
+    setSelecionadas(new Set()); setPctVend(''); setPctSup(''); setPctSupProprio(''); await loadData(); setAplicando(false)
   }
 
   async function salvarConfig() {
@@ -119,7 +120,7 @@ export default function ComissoesPage() {
       percentual_supervisor: parseFloat(catConfig[c.key]?.sup || '0') || 0,
       percentual_supervisor_proprio: parseFloat(catConfig[c.key]?.supProprio || '0') || 0,
     }))
-    await fetch('/api/comissoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'salvar_config_categoria', categorias }) })
+    await fetch('/api/comissoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'salvar_config_categoria', categorias, empresa_id: fEmpresa || undefined }) })
     await loadData(); setSalvandoConfig(false)
   }
 
@@ -619,6 +620,7 @@ export default function ComissoesPage() {
                   <span className="text-sm font-medium self-center" style={{ color: 'var(--accent)' }}>{selecionadas.size} selecionada{selecionadas.size !== 1 ? 's' : ''}</span>
                   <div><label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>% Vendedor</label><input value={pctVend} onChange={(e) => setPctVend(e.target.value)} placeholder="0,5" className="rounded-lg px-2 py-1.5 text-xs outline-none w-20" style={inputStyle} /></div>
                   <div><label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>% Supervisor</label><input value={pctSup} onChange={(e) => setPctSup(e.target.value)} placeholder="0,2" className="rounded-lg px-2 py-1.5 text-xs outline-none w-20" style={inputStyle} /></div>
+                  <div><label className="block text-[10px] mb-1" style={{ color: '#ec4899' }}>% Superv. própria</label><input value={pctSupProprio} onChange={(e) => setPctSupProprio(e.target.value)} placeholder="1,0" className="rounded-lg px-2 py-1.5 text-xs outline-none w-20" style={inputStyle} /></div>
                   <button onClick={aplicar} disabled={aplicando} className="rounded-lg px-4 py-1.5 text-xs font-semibold disabled:opacity-50" style={{ background: 'var(--accent)', color: '#0a0a0a' }}>{aplicando ? 'Aplicando...' : 'Aplicar nas selecionadas'}</button>
                 </div>
               )}
@@ -637,7 +639,7 @@ export default function ComissoesPage() {
                           <th onClick={() => clicarOrdenar('credito')} className="p-3 text-right text-xs cursor-pointer select-none" style={{ color: 'var(--muted-color)' }}>Crédito{ordenarPor === 'credito' ? (ordemAsc ? ' ↑' : ' ↓') : ''}</th>
                           {ehGestao && <th onClick={() => clicarOrdenar('garantida')} className="p-3 text-right text-xs cursor-pointer select-none" style={{ color: 'var(--accent)' }}>Com. Garantida{ordenarPor === 'garantida' ? (ordemAsc ? ' ↑' : ' ↓') : ''}</th>}
                           {ehGestao && <th onClick={() => clicarOrdenar('recebido')} className="p-3 text-right text-xs cursor-pointer select-none" style={{ color: '#22c55e' }}>Recebido{ordenarPor === 'recebido' ? (ordemAsc ? ' ↑' : ' ↓') : ''}</th>}
-                          {ehGestao && <th onClick={() => clicarOrdenar('falta')} className="p-3 text-right text-xs cursor-pointer select-none" style={{ color: '#f59e0b' }}>Falta{ordenarPor === 'falta' ? (ordemAsc ? ' ↑' : ' ↓') : ''}</th>}
+                          {ehGestao && <th onClick={() => clicarOrdenar('falta')} className="p-3 text-right text-xs cursor-pointer select-none" style={{ color: '#f59e0b' }}>Falta{ordenarPor === 'falta' ? (ordemAsc ? ' ��' : ' ↓') : ''}</th>}
                           <th onClick={() => clicarOrdenar('vendedor')} className="p-3 text-right text-xs cursor-pointer select-none" style={{ color: 'var(--muted-color)' }}>Vend.{ordenarPor === 'vendedor' ? (ordemAsc ? ' ↑' : ' ↓') : ''}</th>
                           <th onClick={() => clicarOrdenar('supervisor')} className="p-3 text-right text-xs cursor-pointer select-none" style={{ color: 'var(--muted-color)' }}>Superv.{ordenarPor === 'supervisor' ? (ordemAsc ? ' ↑' : ' ↓') : ''}</th>
                           {ehGestao && <th className="p-3 text-center text-xs" style={{ color: 'var(--muted-color)' }}>Estorno</th>}
