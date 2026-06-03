@@ -245,7 +245,7 @@ export default function ComissoesPage() {
   const totalRecebido = vendasFiltradas.reduce((s, v) => s + (v.comissao_recebida_rs || 0), 0)
   const totalFalta = totalLR - totalRecebido
   const emRisco = vendasFiltradas.filter(v => v.em_risco).length
-  const totalVendedores = vendasFiltradas.reduce((s, v) => s + (v.comissao_vendedor || 0), 0)
+  const totalVendedores = vendasFiltradas.reduce((s, v: any) => s + (v.venda_propria_supervisor ? 0 : (v.comissao_vendedor || 0)), 0)
   const totalSupervisores = vendasFiltradas.reduce((s, v) => s + (v.comissao_supervisor || 0), 0)
   const totalSupervisorPropria = vendasFiltradas.reduce((s, v: any) => s + (v.comissao_supervisor_propria || 0), 0)
   // Master: 0,25% sobre toda a produção (crédito) do filtro atual
