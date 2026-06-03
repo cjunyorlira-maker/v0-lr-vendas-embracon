@@ -194,10 +194,12 @@ export function parseProposta(textoPdf: string): DadosProposta {
 
   let bem_detectado: string | null = null
   const t = texto.toLowerCase()
-  if (/imovelnac|im[óo]vel/.test(t)) bem_detectado = 'Imóvel'
-  else if (/pesadonac|caminh[ãa]o|m[áa]quina/.test(t)) bem_detectado = 'Pesados'
+  // detecta pelo código do plano no campo do bem (PESADOS, IMOVELNAC, AUTONAC, etc).
+  // Pesados vem ANTES de imóvel/auto pra não ser confundido. "serviço" do rodapé é ignorado (só servnac vale).
+  if (/pesadonac|pesados|caminh[ãa]o|m[áa]quina/.test(t)) bem_detectado = 'Pesados'
+  else if (/imovelnac|im[óo]vel/.test(t)) bem_detectado = 'Imóvel'
   else if (/autonac|motonac|autom[óo]vel|ve[íi]culo/.test(t)) bem_detectado = 'Veículo'
-  else if (/servnac|servi[çc]o/.test(t)) bem_detectado = 'Serviços'
+  else if (/servnac/.test(t)) bem_detectado = 'Serviços'
 
   // Data de fechamento: "Dia 27 Mês maio Ano 2026"
   const MESES_MAP: Record<string, number> = { janeiro:1, fevereiro:2, 'março':3, marco:3, abril:4, maio:5, junho:6, julho:7, agosto:8, setembro:9, outubro:10, novembro:11, dezembro:12 }
