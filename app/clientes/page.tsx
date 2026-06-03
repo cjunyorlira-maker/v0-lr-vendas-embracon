@@ -124,7 +124,7 @@ export default function ClientesPage() {
   async function salvarEdicao() {
     if (!editarModal) return
     setSalvandoEditar(true)
-    await fetch('/api/clientes-lista/editar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ venda_id: editarModal.venda_id, vendedor_id: edVendedor || null, equipe_id: edEquipe || null, empresa_id: edEmpresa || null }) })
+    await fetch('/api/clientes-lista/editar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ venda_id: editarModal.venda_id, vendedor_id: edVendedor || null, equipe_id: edEquipe || null, empresa_id: edEmpresa || null, qtd_parcelas: edParcelas !== '' ? edParcelas : undefined }) })
     setSalvandoEditar(false)
     setEditarModal(null); load()
   }
