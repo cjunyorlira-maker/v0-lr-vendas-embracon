@@ -106,10 +106,10 @@ export default function ComissoesPage() {
 
   async function aplicar() {
     if (selecionadas.size === 0) { alert('Selecione ao menos uma venda'); return }
-    if (!pctVend && !pctSup) { alert('Informe ao menos um percentual'); return }
+    if (!pctVend && !pctSup && !pctSupProprio) { alert('Informe ao menos um percentual'); return }
     setAplicando(true)
-    await fetch('/api/comissoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'aplicar', venda_ids: Array.from(selecionadas), percentual_vendedor: pctVend || undefined, percentual_supervisor: pctSup || undefined }) })
-    setSelecionadas(new Set()); setPctVend(''); setPctSup(''); await loadData(); setAplicando(false)
+    await fetch('/api/comissoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'aplicar', venda_ids: Array.from(selecionadas), percentual_vendedor: pctVend || undefined, percentual_supervisor: pctSup || undefined, percentual_supervisor_proprio: pctSupProprio || undefined }) })
+    setSelecionadas(new Set()); setPctVend(''); setPctSup(''); setPctSupProprio(''); await loadData(); setAplicando(false)
   }
 
   async function salvarConfig() {
