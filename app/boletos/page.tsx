@@ -168,6 +168,19 @@ O boleto está em anexo.`
     const d = new Date(dataStr); const hoje = new Date()
     return Math.floor((hoje.getTime() - d.getTime()) / (1000 * 60 * 60 * 24))
   }
+  function horasDesde(dataStr: string | null): number | null {
+    if (!dataStr) return null
+    const d = new Date(dataStr); const hoje = new Date()
+    return Math.floor((hoje.getTime() - d.getTime()) / (1000 * 60 * 60))
+  }
+  function tempoDecorrido(dataStr: string | null): string {
+    const h = horasDesde(dataStr)
+    if (h === null) return ''
+    if (h < 1) return 'há menos de 1h'
+    if (h < 24) return `há ${h}h`
+    const dias = Math.floor(h / 24)
+    return `há ${dias} dia${dias > 1 ? 's' : ''}`
+  }
   async function pagouViaTed(boletoId: string) {
     if (!confirm('Confirmar pagamento via TED? O boleto vai direto para Aguardando Baixa.')) return
     const res = await fetch(`/api/boletos/${boletoId}/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'pagou_ted' }) })
@@ -274,8 +287,8 @@ O boleto está em anexo.`
                       <span>{b.qtd_parcelas} parc.</span>
                       <span className="font-semibold" style={{ color: statusAtual?.cor }}>{fmtMoeda(b.valor_boleto)}</span>
                       {b.boleto_pdf_url && <span className="flex items-center gap-1" style={{ color: '#22c55e' }}><Paperclip size={11} />boleto anexado</span>}
-                      {b.status === 'solicitado' && diasDesde(b.data_solicitacao) !== null && <span style={{ color: (diasDesde(b.data_solicitacao) || 0) >= 3 ? '#ef4444' : '#f59e0b' }}>solicitado há {diasDesde(b.data_solicitacao)} dia(s)</span>}
-                      {b.status === 'aguardando_baixa' && diasDesde(b.data_pagamento) !== null && <span style={{ color: (diasDesde(b.data_pagamento) || 0) >= 1 ? '#a855f7' : 'var(--muted-color)' }}>aguardando baixa há {diasDesde(b.data_pagamento)} dia(s){(diasDesde(b.data_pagamento) || 0) >= 1 ? ' — verificar' : ''}</span>}
+                      {b.status === 'solicitado' && horasDesde(b.data_solicitacao) !== null && <span style={{ color: (horasDesde(b.data_solicitacao) || 0) >= 72 ? '#ef4444' : '#f59e0b' }}>solicitado {tempoDecorrido(b.data_solicitacao)}</span>}
+                      {b.status === 'aguardando_baixa' && horasDesde(b.data_pagamento) !== null && <span style={{ color: (horasDesde(b.data_pagamento) || 0) >= 24 ? '#a855f7' : 'var(--muted-color)' }}>aguardando baixa {tempoDecorrido(b.data_pagamento)}{(horasDesde(b.data_pagamento) || 0) >= 24 ? ' — verificar' : ''}</span>}
                       {b.pago_via_ted && <span style={{ color: '#a855f7' }}>via TED</span>}
                     </div>
                     <div className="flex gap-3 mt-1.5 text-[11px] flex-wrap" style={{ color: 'var(--muted-color)' }}>
