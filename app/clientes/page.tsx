@@ -174,7 +174,7 @@ export default function ClientesPage() {
     setDataDe(iso(dom)); setDataAte(iso(sab))
   }
 
-  const inputStyle = { background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }
+  const inputStyle = { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }
 
   return (
     <div className="relative min-h-screen font-sans">
