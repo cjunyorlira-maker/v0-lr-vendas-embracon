@@ -96,6 +96,8 @@ export async function GET() {
         comissao_lr: comLR, comissao_lr_total: comLRTotal, parcelas_pagas: parcelasPagas, total_parcelas_comissao: parcelasComissao.length,
         percentual_vendedor: pVend, comissao_vendedor: comVend,
         percentual_supervisor: pSup, comissao_supervisor: comSup,
+        venda_propria_supervisor: vendaPropriaSupervisor,
+        comissao_supervisor_propria: vendaPropriaSupervisor ? comVend : 0,
         comissao_recebida_rs: v.comissao_recebida_rs || 0,
         comissao_recebida_percent: v.comissao_recebida_percent || 0,
         boleto_status: boleto?.status || null,
