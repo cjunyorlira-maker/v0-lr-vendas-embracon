@@ -211,10 +211,8 @@ O boleto está em anexo.`
   }
   const filtrados = boletos.filter(b => b.status === abaAtiva && passaFiltros(b as any))
     .sort((a, b) => {
-      // mais antigos primeiro: usa data de solicitação (ou criação) como referência
-      const da = new Date((a as any).data_solicitacao || (a as any).criado_em || 0).getTime()
-      const db = new Date((b as any).data_solicitacao || (b as any).criado_em || 0).getTime()
-      return da - db
+      const dataRef = (x: any) => x.data_pagamento || x.data_anexo_boleto || x.data_solicitacao || x.criado_em || 0
+      return new Date(dataRef(a)).getTime() - new Date(dataRef(b)).getTime()
     })
   const contar = (k: string) => boletos.filter(b => b.status === k && passaFiltros(b as any)).length
   const statusAtual = STATUS.find(s => s.key === abaAtiva)
