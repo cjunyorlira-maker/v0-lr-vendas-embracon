@@ -263,7 +263,7 @@ export default function ClientesPage() {
                 const temLancePendente = cl.cotas.some(c => c.status_lance === 'pendente')
                 const algumNaoChecado = cl.cotas.some(c => !c.checado)
                 return (
-                  <div key={cl.cliente_id} className="rounded-xl overflow-hidden" style={{ background: 'rgba(0,0,0,0.12)', backdropFilter: 'blur(4px)', border: '1px solid var(--border)' }}>
+                  <div key={cl.cliente_id} className="card-glass overflow-hidden">
                     <div className="p-4 cursor-pointer" onClick={() => setExpandido(aberto ? null : cl.cliente_id)}>
                       <div className="flex items-center justify-between gap-3 flex-wrap">
                         <div className="flex items-center gap-3 flex-wrap">
