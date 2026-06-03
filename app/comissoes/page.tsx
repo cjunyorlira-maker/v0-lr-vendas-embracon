@@ -273,6 +273,22 @@ export default function ComissoesPage() {
   const mapaClientesFiltrados = mapaDetalhe?.clientes ? mapaDetalhe.clientes.filter((cl: any) => !fEmpresa || cl.empresa_id === fEmpresa) : []
   const mapaTotalFiltrado = mapaClientesFiltrados.reduce((s: number, c: any) => s + (c.total || 0), 0)
 
+  // Prévia Próxima Semana: vendas com boleto efetivado até a quinta desta semana,
+  // contando o que ainda falta receber (comissão total do plano − já recebido no mapa)
+  const previaProximaSemana = (() => {
+    const hoje = new Date()
+    const diaSemana = hoje.getDay()
+    const diasAteQuinta = (4 - diaSemana + 7) % 7
+    const quinta = new Date(hoje); quinta.setDate(hoje.getDate() + diasAteQuinta); quinta.setHours(23, 59, 59, 999)
+    const limite = (diaSemana > 4 || diaSemana === 0) ? new Date(quinta.getTime() + 7 * 86400000) : quinta
+    return vendasFiltradas.reduce((soma: number, v: any) => {
+      if (v.boleto_status !== 'efetivado' || !v.boleto_data_efetivado) return soma
+      if (new Date(v.boleto_data_efetivado) > limite) return soma
+      const falta = (v.comissao_lr_total || 0) - (v.comissao_recebida_rs || 0)
+      return soma + (falta > 0 ? falta : 0)
+    }, 0)
+  })()
+
   return (
     <div className="relative min-h-screen font-sans">
       <Sidebar />
@@ -299,6 +315,14 @@ export default function ComissoesPage() {
               <p className="text-xl font-bold" style={{ color: emRisco > 0 ? '#ef4444' : 'var(--text)' }}>{emRisco}</p>
             </div>
           </div>
+          )}
+
+          {ehGestao && previaProximaSemana > 0 && (
+            <div className="rounded-xl p-4 mb-6" style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.25)' }}>
+              <div className="flex items-center gap-2 mb-1"><TrendingUp size={14} style={{ color: '#22c55e' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Prévia Próxima Semana</p></div>
+              <p className="text-xl font-bold" style={{ color: '#22c55e' }}>{fmtMoeda(previaProximaSemana)}</p>
+              <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>Vendas efetivadas até quinta que ainda não foram 100% recebidas</p>
+            </div>
           )}
 
           {/* Cards de comissão de equipe */}
