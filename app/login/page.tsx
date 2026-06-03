@@ -84,7 +84,7 @@ export default function LoginPage() {
       <div className="absolute inset-0 z-0 bg-black/50" />
 
       <div className="relative z-10 w-full max-w-md">
-        <div className="bg-gradient-to-br from-white/[0.05] to-white/[0.02] backdrop-blur-md border border-[rgba(212,175,55,0.2)] rounded-2xl p-8 shadow-2xl shadow-black/50">
+        <div className="bg-gradient-to-br from-black/65 to-black/55 backdrop-blur-md border border-[rgba(212,175,55,0.2)] rounded-2xl p-8 shadow-2xl shadow-black/50">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-1 bg-gradient-to-r from-transparent via-[#d4af37] to-transparent rounded-full" />
 
           <div className="flex justify-center mb-8 mt-4">
