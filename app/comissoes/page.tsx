@@ -20,7 +20,8 @@ export default function ComissoesPage() {
   const [loading, setLoading] = useState(true)
   const [semAcesso, setSemAcesso] = useState(false)
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set())
-  const [aba, setAba] = useState<'vendas' | 'config' | 'mapa' | 'calculo'>('vendas')
+  const [rankModo, setRankModo] = useState<'pessoa' | 'equipe' | 'empresa'>('pessoa')
+  const [aba, setAba] = useState<'vendas' | 'config' | 'mapa' | 'calculo' | 'ranking'>('vendas')
   const [mapas, setMapas] = useState<any[]>([])
   const [mapaSel, setMapaSel] = useState<string | null>(null)
   const [mapaDetalhe, setMapaDetalhe] = useState<any>(null)
@@ -291,6 +292,29 @@ export default function ComissoesPage() {
     }, 0)
   })()
 
+  // Ranking de Faturamento: agrupa a comissão GERADA usando vendasFiltradas (o que já está na tela)
+  const nomeEmpresa = (id: string) => filtros.empresas.find((e: any) => e.id === id)?.nome || 'Sem empresa'
+  const nomeEquipe = (id: string) => filtros.equipes.find((e: any) => e.id === id)?.nome || 'Sem equipe'
+  const rankingFaturamento = (() => {
+    const mapa = new Map<string, { nome: string; valor: number; qtd: number }>()
+    for (const v of vendasFiltradas as any[]) {
+      let chave = '', nome = '', ganho = 0
+      if (rankModo === 'pessoa') {
+        chave = v.vendedor_id || 'sem'; nome = v.vendedor || 'Sem vendedor'
+        ganho = v.comissao_vendedor || 0
+      } else if (rankModo === 'equipe') {
+        chave = v.equipe_id || 'sem'; nome = nomeEquipe(v.equipe_id)
+        ganho = (v.comissao_vendedor || 0) + (v.comissao_supervisor || 0)
+      } else {
+        chave = v.empresa_id || 'sem'; nome = nomeEmpresa(v.empresa_id)
+        ganho = (v.comissao_vendedor || 0) + (v.comissao_supervisor || 0)
+      }
+      if (!mapa.has(chave)) mapa.set(chave, { nome, valor: 0, qtd: 0 })
+      const it = mapa.get(chave)!; it.valor += ganho; it.qtd += 1
+    }
+    return Array.from(mapa.values()).sort((a, b) => b.valor - a.valor)
+  })()
+
   return (
     <div className="relative min-h-screen font-sans">
       <Sidebar />
@@ -429,11 +453,12 @@ export default function ComissoesPage() {
 
           {/* Abas */}
           <div className="flex gap-2 mb-5">
-            <button onClick={() => setAba('vendas')} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: aba === 'vendas' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${aba === 'vendas' ? 'var(--accent)' : 'var(--border)'}`, color: aba === 'vendas' ? 'var(--accent)' : 'var(--muted-color)' }}><DollarSign size={14} />Vendas</button>
+            <button onClick={() => setAba('vendas')} className={`tab-btn ${aba === 'vendas' ? 'ativo' : ''}`}><DollarSign size={14} />Vendas</button>
             {ehGestao && (<>
-            <button onClick={() => setAba('mapa')} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: aba === 'mapa' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${aba === 'mapa' ? 'var(--accent)' : 'var(--border)'}`, color: aba === 'mapa' ? 'var(--accent)' : 'var(--muted-color)' }}><FileText size={14} />Mapa de Comissão</button>
-            <button onClick={() => setAba('calculo')} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: aba === 'calculo' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${aba === 'calculo' ? 'var(--accent)' : 'var(--border)'}`, color: aba === 'calculo' ? 'var(--accent)' : 'var(--muted-color)' }}><Calculator size={14} />Cálculo de Comissão</button>
-            <button onClick={() => setAba('config')} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: aba === 'config' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${aba === 'config' ? 'var(--accent)' : 'var(--border)'}`, color: aba === 'config' ? 'var(--accent)' : 'var(--muted-color)' }}><Settings size={14} />Configurar padrão</button>
+            <button onClick={() => setAba('mapa')} className={`tab-btn ${aba === 'mapa' ? 'ativo' : ''}`}><FileText size={14} />Mapa de Comissão</button>
+            <button onClick={() => setAba('calculo')} className={`tab-btn ${aba === 'calculo' ? 'ativo' : ''}`}><Calculator size={14} />Cálculo de Comissão</button>
+            <button onClick={() => setAba('config')} className={`tab-btn ${aba === 'config' ? 'ativo' : ''}`}><Settings size={14} />Configurar padrão</button>
+            <button onClick={() => setAba('ranking')} className={`tab-btn ${aba === 'ranking' ? 'ativo' : ''}`}><TrendingUp size={14} />Ranking de Faturamento</button>
             </>)}
           </div>
 
@@ -565,6 +590,29 @@ export default function ComissoesPage() {
                   </div>
                 )
               })}
+            </div>
+          ) : aba === 'ranking' ? (
+            <div>
+              <div className="flex gap-2 mb-4 flex-wrap">
+                <button onClick={() => setRankModo('pessoa')} className="rounded-lg px-3 py-1.5 text-xs font-medium" style={{ background: rankModo === 'pessoa' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${rankModo === 'pessoa' ? 'var(--accent)' : 'var(--border)'}`, color: rankModo === 'pessoa' ? 'var(--accent)' : 'var(--muted-color)' }}>Por Pessoa</button>
+                <button onClick={() => setRankModo('equipe')} className="rounded-lg px-3 py-1.5 text-xs font-medium" style={{ background: rankModo === 'equipe' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${rankModo === 'equipe' ? 'var(--accent)' : 'var(--border)'}`, color: rankModo === 'equipe' ? 'var(--accent)' : 'var(--muted-color)' }}>Por Equipe</button>
+                {meuRole === 'master' && <button onClick={() => setRankModo('empresa')} className="rounded-lg px-3 py-1.5 text-xs font-medium" style={{ background: rankModo === 'empresa' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${rankModo === 'empresa' ? 'var(--accent)' : 'var(--border)'}`, color: rankModo === 'empresa' ? 'var(--accent)' : 'var(--muted-color)' }}>Por Empresa</button>}
+              </div>
+              <div className="space-y-2">
+                {rankingFaturamento.map((r, i) => (
+                  <div key={i} className="flex items-center justify-between rounded-xl p-3" style={{ background: 'rgba(0,0,0,0.12)', backdropFilter: 'blur(4px)', border: '1px solid var(--border)' }}>
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-bold w-7 text-center" style={{ color: i === 0 ? '#f59e0b' : i === 1 ? '#a3a3a3' : i === 2 ? '#cd7f32' : 'var(--muted-color)' }}>{i + 1}º</span>
+                      <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{r.nome}</span>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm font-bold" style={{ color: '#22c55e' }}>{fmtMoeda(r.valor)}</p>
+                      <p className="text-[10px]" style={{ color: 'var(--muted-color)' }}>{r.qtd} venda(s)</p>
+                    </div>
+                  </div>
+                ))}
+                {rankingFaturamento.length === 0 && <p className="text-sm text-center py-8" style={{ color: 'var(--muted-color)' }}>Nenhuma venda no período.</p>}
+              </div>
             </div>
           ) : aba === 'config' ? (
             <>
