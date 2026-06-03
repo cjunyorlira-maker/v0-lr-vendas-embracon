@@ -71,7 +71,9 @@ export async function GET() {
       const comLR = comLRTotal * (pesoPago / somaPesos) // comissão garantida (vencida)
       // precedência: % individual da venda > padrão da categoria do plano > 0
       const catPlano = plano?.categoria_comissao
-      const cfgCat = (configCategorias || []).find((cc: any) => cc.categoria === catPlano)
+      // pega a config da categoria DA EMPRESA da venda (pro master ver a comissão certa de cada representação)
+      const cfgCat = (configCategorias || []).find((cc: any) => cc.categoria === catPlano && (cc.empresa_id === v.empresa_id || cc.empresa_id === null))
+        || (configCategorias || []).find((cc: any) => cc.categoria === catPlano)
       const vendedorObj = Array.isArray(v.usuarios) ? v.usuarios[0] : v.usuarios
       const vendaPropriaSupervisor = vendedorObj?.role === 'supervisor'
       let pVend: number, pSup: number
