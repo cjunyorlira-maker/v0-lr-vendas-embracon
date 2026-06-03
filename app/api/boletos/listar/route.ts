@@ -27,7 +27,7 @@ export async function GET() {
 
     let q = supabaseAdmin
       .from('boletos')
-      .select('id, qtd_parcelas, valor_boleto, status, boleto_pdf_url, data_solicitacao, data_anexo_boleto, data_pagamento, pago_via_ted, empresa_id, equipe_id, vendedor_id, clientes(nome), vendas(numero_proposta, numero_contrato, grupo, cota, valor_credito, data_venda), empresas(nome), equipes(nome), usuarios:vendedor_id(nome)')
+      .select('id, qtd_parcelas, valor_boleto, status, boleto_pdf_url, data_solicitacao, data_anexo_boleto, data_pagamento, criado_em, pago_via_ted, empresa_id, equipe_id, vendedor_id, clientes(nome), vendas(numero_proposta, numero_contrato, grupo, cota, valor_credito, data_venda), empresas(nome), equipes(nome), usuarios:vendedor_id(nome)')
       .order('criado_em', { ascending: false })
 
     // aplica escopo: global vê tudo; senão filtra pela empresa/equipe/vendedor
