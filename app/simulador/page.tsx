@@ -114,7 +114,7 @@ export default function SimuladorPage() {
                     <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>1ª parcela</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(p1)}</p></div>
                     <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Demais (cada)</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(pd)}</p></div>
                     <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>+ {qtd} antecipadas</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(pd * qtd)}</p></div>
-                    <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Total p/ não estornar</p><p className="text-lg font-semibold" style={{ color: '#f59e0b' }}>{fmtMoeda(totalNaoEstornar)}</p></div>
+                    <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Total p/ não estornar{limiteEstorno > 0 ? ` (${limiteEstorno} parcelas)` : ''}</p><p className="text-lg font-semibold" style={{ color: '#f59e0b' }}>{fmtMoeda(totalNaoEstornar)}</p></div>
                   </div>
                   <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
                     <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Total que o cliente desembolsa (1ª + {qtd})</p>
