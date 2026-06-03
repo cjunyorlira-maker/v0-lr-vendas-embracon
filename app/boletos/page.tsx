@@ -15,6 +15,7 @@ interface Boleto {
   clientes?: { nome: string }
   vendas?: { numero_proposta: string; numero_contrato: string; grupo: string; cota: string; valor_credito: number }
   empresas?: { nome: string }
+  equipes?: { nome: string }
   usuarios?: { nome: string }
 }
 
@@ -167,6 +168,19 @@ O boleto está em anexo.`
     const d = new Date(dataStr); const hoje = new Date()
     return Math.floor((hoje.getTime() - d.getTime()) / (1000 * 60 * 60 * 24))
   }
+  function horasDesde(dataStr: string | null): number | null {
+    if (!dataStr) return null
+    const d = new Date(dataStr); const hoje = new Date()
+    return Math.floor((hoje.getTime() - d.getTime()) / (1000 * 60 * 60))
+  }
+  function tempoDecorrido(dataStr: string | null): string {
+    const h = horasDesde(dataStr)
+    if (h === null) return ''
+    if (h < 1) return 'há menos de 1h'
+    if (h < 24) return `há ${h}h`
+    const dias = Math.floor(h / 24)
+    return `há ${dias} dia${dias > 1 ? 's' : ''}`
+  }
   async function pagouViaTed(boletoId: string) {
     if (!confirm('Confirmar pagamento via TED? O boleto vai direto para Aguardando Baixa.')) return
     const res = await fetch(`/api/boletos/${boletoId}/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'pagou_ted' }) })
@@ -196,6 +210,12 @@ O boleto está em anexo.`
     return true
   }
   const filtrados = boletos.filter(b => b.status === abaAtiva && passaFiltros(b as any))
+    .sort((a, b) => {
+      // mais antigos primeiro: usa data de solicitação (ou criação) como referência
+      const da = new Date((a as any).data_solicitacao || (a as any).criado_em || 0).getTime()
+      const db = new Date((b as any).data_solicitacao || (b as any).criado_em || 0).getTime()
+      return da - db
+    })
   const contar = (k: string) => boletos.filter(b => b.status === k && passaFiltros(b as any)).length
   const statusAtual = STATUS.find(s => s.key === abaAtiva)
   const podeAvancar = (status: string) => status === 'aguardando_pagamento' ? podePagar : podeOperar
@@ -273,9 +293,16 @@ O boleto está em anexo.`
                       <span>{b.qtd_parcelas} parc.</span>
                       <span className="font-semibold" style={{ color: statusAtual?.cor }}>{fmtMoeda(b.valor_boleto)}</span>
                       {b.boleto_pdf_url && <span className="flex items-center gap-1" style={{ color: '#22c55e' }}><Paperclip size={11} />boleto anexado</span>}
-                      {b.status === 'solicitado' && diasDesde(b.data_solicitacao) !== null && <span style={{ color: (diasDesde(b.data_solicitacao) || 0) >= 3 ? '#ef4444' : '#f59e0b' }}>solicitado há {diasDesde(b.data_solicitacao)} dia(s)</span>}
-                      {b.status === 'aguardando_baixa' && diasDesde(b.data_pagamento) !== null && <span style={{ color: (diasDesde(b.data_pagamento) || 0) >= 1 ? '#a855f7' : 'var(--muted-color)' }}>aguardando baixa há {diasDesde(b.data_pagamento)} dia(s){(diasDesde(b.data_pagamento) || 0) >= 1 ? ' — verificar' : ''}</span>}
+                      {b.status === 'pendente' && <span style={{ color: (horasDesde((b as any).criado_em) || 0) >= 24 ? '#ef4444' : '#eab308' }}>pendente {tempoDecorrido((b as any).criado_em)}</span>}
+                      {b.status === 'solicitado' && <span style={{ color: (horasDesde(b.data_solicitacao) || 0) >= 72 ? '#ef4444' : '#f97316' }}>solicitado {tempoDecorrido(b.data_solicitacao)}</span>}
+                      {b.status === 'aguardando_pagamento' && <span style={{ color: (horasDesde((b as any).data_anexo_boleto) || 0) >= 72 ? '#ef4444' : '#3b82f6' }}>aguardando pagamento {tempoDecorrido((b as any).data_anexo_boleto)}</span>}
+                      {b.status === 'aguardando_baixa' && <span style={{ color: (horasDesde(b.data_pagamento) || 0) >= 24 ? '#ef4444' : '#a855f7' }}>aguardando baixa {tempoDecorrido(b.data_pagamento)}{(horasDesde(b.data_pagamento) || 0) >= 24 ? ' — verificar' : ''}</span>}
                       {b.pago_via_ted && <span style={{ color: '#a855f7' }}>via TED</span>}
+                    </div>
+                    <div className="flex gap-3 mt-1.5 text-[11px] flex-wrap" style={{ color: 'var(--muted-color)' }}>
+                      {b.usuarios?.nome && <span>👤 {b.usuarios.nome}</span>}
+                      {b.equipes?.nome && <span>🏷️ {b.equipes.nome}</span>}
+                      {b.empresas?.nome && <span style={{ color: 'var(--accent)' }}>🏢 {b.empresas.nome}</span>}
                     </div>
                   </div>
                   <div className="flex gap-2">
