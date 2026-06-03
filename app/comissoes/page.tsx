@@ -44,6 +44,7 @@ export default function ComissoesPage() {
   const [fVendedor, setFVendedor] = useState('')
   const [pctVend, setPctVend] = useState('')
   const [pctSup, setPctSup] = useState('')
+  const [pctSupProprio, setPctSupProprio] = useState('')
   const [aplicando, setAplicando] = useState(false)
   const [salvandoConfig, setSalvandoConfig] = useState(false)
   const CATEGORIAS = [
@@ -619,6 +620,7 @@ export default function ComissoesPage() {
                   <span className="text-sm font-medium self-center" style={{ color: 'var(--accent)' }}>{selecionadas.size} selecionada{selecionadas.size !== 1 ? 's' : ''}</span>
                   <div><label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>% Vendedor</label><input value={pctVend} onChange={(e) => setPctVend(e.target.value)} placeholder="0,5" className="rounded-lg px-2 py-1.5 text-xs outline-none w-20" style={inputStyle} /></div>
                   <div><label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>% Supervisor</label><input value={pctSup} onChange={(e) => setPctSup(e.target.value)} placeholder="0,2" className="rounded-lg px-2 py-1.5 text-xs outline-none w-20" style={inputStyle} /></div>
+                  <div><label className="block text-[10px] mb-1" style={{ color: '#ec4899' }}>% Superv. própria</label><input value={pctSupProprio} onChange={(e) => setPctSupProprio(e.target.value)} placeholder="1,0" className="rounded-lg px-2 py-1.5 text-xs outline-none w-20" style={inputStyle} /></div>
                   <button onClick={aplicar} disabled={aplicando} className="rounded-lg px-4 py-1.5 text-xs font-semibold disabled:opacity-50" style={{ background: 'var(--accent)', color: '#0a0a0a' }}>{aplicando ? 'Aplicando...' : 'Aplicar nas selecionadas'}</button>
                 </div>
               )}
