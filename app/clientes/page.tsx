@@ -56,6 +56,7 @@ export default function ClientesPage() {
   const [baixando, setBaixando] = useState<string | null>(null)
   const [editarModal, setEditarModal] = useState<Cota | null>(null)
   const [edEmpresa, setEdEmpresa] = useState('')
+  const [edParcelas, setEdParcelas] = useState('')
   const [edVendedor, setEdVendedor] = useState('')
   const [edEquipe, setEdEquipe] = useState('')
   const [salvandoEditar, setSalvandoEditar] = useState(false)
@@ -322,7 +323,7 @@ export default function ClientesPage() {
                                 </div>
                                 <div className="flex items-center gap-2">
                                   {['master','representante','adm'].includes(meuRole) && <button onClick={() => deletarCota(c)} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px]" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}><Trash2 size={11} />Deletar</button>}
-                                  {['master','representante','adm','supervisor'].includes(meuRole) && <button onClick={() => { setEditarModal(c); setEdVendedor(c.vendedor_id || ''); setEdEquipe(c.equipe_id || ''); setEdEmpresa(c.empresa_id || '') }} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px]" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text2)', border: '1px solid var(--border)' }}><Pencil size={11} />Editar</button>}
+                                  {['master','representante','adm','supervisor'].includes(meuRole) && <button onClick={() => { setEditarModal(c); setEdVendedor(c.vendedor_id || ''); setEdEquipe(c.equipe_id || ''); setEdEmpresa(c.empresa_id || ''); setEdParcelas(String(c.qtd_parcelas ?? '')) }} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px]" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text2)', border: '1px solid var(--border)' }}><Pencil size={11} />Editar</button>}
                                   <button onClick={() => toggleChecado(c)} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px]" style={{ background: c.checado ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.04)', color: c.checado ? '#22c55e' : 'var(--muted-color)', border: `1px solid ${c.checado ? 'rgba(34,197,94,0.3)' : 'var(--border)'}` }}><Check size={11} />{c.checado ? 'Checado' : 'Marcar checado'}</button>
                                   <button onClick={() => baixarProposta(c)} disabled={baixando === c.venda_id} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px]" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text2)', border: '1px solid var(--border)' }}>{baixando === c.venda_id ? <Loader2 size={11} className="animate-spin" /> : <FileText size={11} />}Proposta</button>
                                   {!c.status_lance && <button onClick={() => setLanceModal(c)} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px]" style={{ background: 'rgba(168,85,247,0.15)', color: '#a855f7', border: '1px solid rgba(168,85,247,0.3)' }}><Target size={11} />Criar lance</button>}
