@@ -286,7 +286,7 @@ O boleto está em anexo.`
           ) : (
             <div className="space-y-3">
               {filtrados.map(b => (
-                <div key={b.id} className="rounded-xl p-4 flex items-center justify-between flex-wrap gap-3" style={{ background: 'rgba(0,0,0,0.12)', backdropFilter: 'blur(4px)', border: '1px solid var(--border)' }}>
+                <div key={b.id} className="card-glass p-4 flex items-center justify-between flex-wrap gap-3">
                   <div className="flex-1 min-w-[200px]">
                     <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>{b.clientes?.nome}</p>
                     <div className="flex gap-3 mt-1 text-xs flex-wrap" style={{ color: 'var(--muted-color)' }}>
