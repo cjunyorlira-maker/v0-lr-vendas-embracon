@@ -174,7 +174,7 @@ export default function ClientesPage() {
     setDataDe(iso(dom)); setDataAte(iso(sab))
   }
 
-  const inputStyle = { background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }
+  const inputStyle = { background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: 'var(--text)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }
 
   return (
     <div className="relative min-h-screen font-sans">
@@ -263,7 +263,7 @@ export default function ClientesPage() {
                 const temLancePendente = cl.cotas.some(c => c.status_lance === 'pendente')
                 const algumNaoChecado = cl.cotas.some(c => !c.checado)
                 return (
-                  <div key={cl.cliente_id} className="rounded-xl overflow-hidden" style={{ background: 'rgba(0,0,0,0.12)', backdropFilter: 'blur(4px)', border: '1px solid var(--border)' }}>
+                  <div key={cl.cliente_id} className="card-glass overflow-hidden">
                     <div className="p-4 cursor-pointer" onClick={() => setExpandido(aberto ? null : cl.cliente_id)}>
                       <div className="flex items-center justify-between gap-3 flex-wrap">
                         <div className="flex items-center gap-3 flex-wrap">
@@ -381,6 +381,11 @@ export default function ClientesPage() {
                   <option value="" style={{ background: '#131313' }}>Sem vendedor</option>
                   {filtrosOpc.vendedores.filter(vd => (!edEmpresa || vd.empresa_id === edEmpresa) && (vd.role === 'representante' || !edEquipe || vd.equipe_id === edEquipe)).map(vd => <option key={vd.id} value={vd.id} style={{ background: '#131313' }}>{vd.nome}{vd.role === 'representante' ? ' (Representante)' : ''}</option>)}
                 </select>
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Parcelas antecipadas</label>
+                <input type="number" min="0" value={edParcelas} onChange={(e) => setEdParcelas(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
+                <p className="text-[10px] mt-1" style={{ color: '#f59e0b' }}>Recalcula o valor do boleto e a próxima cobrança automaticamente.</p>
               </div>
               <div className="flex gap-2 pt-1">
                 <button onClick={() => setEditarModal(null)} className="flex-1 rounded-lg py-2.5 text-sm" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text2)' }}>Cancelar</button>

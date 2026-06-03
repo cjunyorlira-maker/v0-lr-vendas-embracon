@@ -70,10 +70,21 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-[#080808] flex items-center justify-center p-6 relative overflow-hidden">
-      <AnimatedBackground />
+      {/* Para voltar ao fundo animado, descomente a linha abaixo e remova o <video> */}
+      {/* <AnimatedBackground /> */}
+      <video
+        autoPlay
+        loop
+        muted
+        playsInline
+        className="absolute inset-0 z-0 h-full w-full object-cover"
+      >
+        <source src="/videos/login-bg.mp4" type="video/mp4" />
+      </video>
+      <div className="absolute inset-0 z-0 bg-black/50" />
 
       <div className="relative z-10 w-full max-w-md">
-        <div className="bg-gradient-to-br from-white/[0.08] to-white/[0.03] backdrop-blur-xl border border-[rgba(212,175,55,0.2)] rounded-2xl p-8 shadow-2xl shadow-black/50">
+        <div className="bg-gradient-to-br from-black/65 to-black/55 backdrop-blur-md border border-[rgba(212,175,55,0.2)] rounded-2xl p-8 shadow-2xl shadow-black/50">
           <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-1 bg-gradient-to-r from-transparent via-[#d4af37] to-transparent rounded-full" />
 
           <div className="flex justify-center mb-8 mt-4">
@@ -82,18 +93,18 @@ export default function LoginPage() {
 
           <div className="text-center mb-8">
             <h1 className="font-serif text-2xl font-semibold text-[#f5f0e8] mb-2">Controle de Clientes</h1>
-            <p className="text-sm text-[#8a8070]">Acesse com suas credenciais</p>
+            <p className="text-sm text-[#cabfa8]">Acesse com suas credenciais</p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-5">
             <div className="space-y-2">
-              <label htmlFor="email" className="text-sm text-[#a09080]">E-mail</label>
-              <Input id="email" type="email" placeholder="seu@email.com" required value={email} onChange={(e) => setEmail(e.target.value)} className="bg-black/40 border-[rgba(212,175,55,0.25)] text-[#f5f0e8] placeholder:text-[#5a5040] focus:border-[#d4af37] focus:ring-[#d4af37]/20 h-12 backdrop-blur-sm" />
+              <label htmlFor="email" className="text-sm text-[#d8cdb8]">E-mail</label>
+              <Input id="email" type="email" placeholder="seu@email.com" required value={email} onChange={(e) => setEmail(e.target.value)} className="bg-black/55 border-[rgba(212,175,55,0.25)] text-[#f5f0e8] placeholder:text-[#8a8070] focus:border-[#d4af37] focus:ring-[#d4af37]/20 h-12 backdrop-blur-sm" />
             </div>
 
             <div className="space-y-2">
-              <label htmlFor="password" className="text-sm text-[#a09080]">Senha</label>
-              <Input id="password" type="password" placeholder="********" required value={password} onChange={(e) => setPassword(e.target.value)} className="bg-black/40 border-[rgba(212,175,55,0.25)] text-[#f5f0e8] placeholder:text-[#5a5040] focus:border-[#d4af37] focus:ring-[#d4af37]/20 h-12 backdrop-blur-sm" />
+              <label htmlFor="password" className="text-sm text-[#d8cdb8]">Senha</label>
+              <Input id="password" type="password" placeholder="********" required value={password} onChange={(e) => setPassword(e.target.value)} className="bg-black/55 border-[rgba(212,175,55,0.25)] text-[#f5f0e8] placeholder:text-[#8a8070] focus:border-[#d4af37] focus:ring-[#d4af37]/20 h-12 backdrop-blur-sm" />
             </div>
 
             {error && (
@@ -108,7 +119,7 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="text-center text-xs text-[#5a5040] mt-6">Grupo LR Multimarcas</p>
+        <p className="text-center text-xs text-[#b5aa95] mt-6">Grupo LR Multimarcas</p>
       </div>
     </div>
   )
