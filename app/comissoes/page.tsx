@@ -20,6 +20,7 @@ export default function ComissoesPage() {
   const [loading, setLoading] = useState(true)
   const [semAcesso, setSemAcesso] = useState(false)
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set())
+  const [rankModo, setRankModo] = useState<'pessoa' | 'equipe' | 'empresa'>('pessoa')
   const [aba, setAba] = useState<'vendas' | 'config' | 'mapa' | 'calculo' | 'ranking'>('vendas')
   const [mapas, setMapas] = useState<any[]>([])
   const [mapaSel, setMapaSel] = useState<string | null>(null)
@@ -289,6 +290,29 @@ export default function ComissoesPage() {
       const falta = (v.comissao_lr_total || 0) - (v.comissao_recebida_rs || 0)
       return soma + (falta > 0 ? falta : 0)
     }, 0)
+  })()
+
+  // Ranking de Faturamento: agrupa a comissão GERADA usando vendasFiltradas (o que já está na tela)
+  const nomeEmpresa = (id: string) => filtros.empresas.find((e: any) => e.id === id)?.nome || 'Sem empresa'
+  const nomeEquipe = (id: string) => filtros.equipes.find((e: any) => e.id === id)?.nome || 'Sem equipe'
+  const rankingFaturamento = (() => {
+    const mapa = new Map<string, { nome: string; valor: number; qtd: number }>()
+    for (const v of vendasFiltradas as any[]) {
+      let chave = '', nome = '', ganho = 0
+      if (rankModo === 'pessoa') {
+        chave = v.vendedor_id || 'sem'; nome = v.vendedor || 'Sem vendedor'
+        ganho = v.comissao_vendedor || 0
+      } else if (rankModo === 'equipe') {
+        chave = v.equipe_id || 'sem'; nome = nomeEquipe(v.equipe_id)
+        ganho = (v.comissao_vendedor || 0) + (v.comissao_supervisor || 0)
+      } else {
+        chave = v.empresa_id || 'sem'; nome = nomeEmpresa(v.empresa_id)
+        ganho = (v.comissao_vendedor || 0) + (v.comissao_supervisor || 0)
+      }
+      if (!mapa.has(chave)) mapa.set(chave, { nome, valor: 0, qtd: 0 })
+      const it = mapa.get(chave)!; it.valor += ganho; it.qtd += 1
+    }
+    return Array.from(mapa.values()).sort((a, b) => b.valor - a.valor)
   })()
 
   return (
