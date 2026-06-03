@@ -382,6 +382,11 @@ export default function ClientesPage() {
                   {filtrosOpc.vendedores.filter(vd => (!edEmpresa || vd.empresa_id === edEmpresa) && (vd.role === 'representante' || !edEquipe || vd.equipe_id === edEquipe)).map(vd => <option key={vd.id} value={vd.id} style={{ background: '#131313' }}>{vd.nome}{vd.role === 'representante' ? ' (Representante)' : ''}</option>)}
                 </select>
               </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Parcelas antecipadas</label>
+                <input type="number" min="0" value={edParcelas} onChange={(e) => setEdParcelas(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
+                <p className="text-[10px] mt-1" style={{ color: '#f59e0b' }}>Recalcula o valor do boleto e a próxima cobrança automaticamente.</p>
+              </div>
               <div className="flex gap-2 pt-1">
                 <button onClick={() => setEditarModal(null)} className="flex-1 rounded-lg py-2.5 text-sm" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text2)' }}>Cancelar</button>
                 <button onClick={salvarEdicao} disabled={salvandoEditar} className="flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #d4af37 0%, #c9a227 50%, #b8941f 100%)', color: '#0a0a0a' }}>{salvandoEditar ? <Loader2 size={14} className="animate-spin" /> : 'Salvar'}</button>
