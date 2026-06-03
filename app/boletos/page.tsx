@@ -15,6 +15,7 @@ interface Boleto {
   clientes?: { nome: string }
   vendas?: { numero_proposta: string; numero_contrato: string; grupo: string; cota: string; valor_credito: number }
   empresas?: { nome: string }
+  equipes?: { nome: string }
   usuarios?: { nome: string }
 }
 
@@ -276,6 +277,11 @@ O boleto está em anexo.`
                       {b.status === 'solicitado' && diasDesde(b.data_solicitacao) !== null && <span style={{ color: (diasDesde(b.data_solicitacao) || 0) >= 3 ? '#ef4444' : '#f59e0b' }}>solicitado há {diasDesde(b.data_solicitacao)} dia(s)</span>}
                       {b.status === 'aguardando_baixa' && diasDesde(b.data_pagamento) !== null && <span style={{ color: (diasDesde(b.data_pagamento) || 0) >= 1 ? '#a855f7' : 'var(--muted-color)' }}>aguardando baixa há {diasDesde(b.data_pagamento)} dia(s){(diasDesde(b.data_pagamento) || 0) >= 1 ? ' — verificar' : ''}</span>}
                       {b.pago_via_ted && <span style={{ color: '#a855f7' }}>via TED</span>}
+                    </div>
+                    <div className="flex gap-3 mt-1.5 text-[11px] flex-wrap" style={{ color: 'var(--muted-color)' }}>
+                      {b.usuarios?.nome && <span>👤 {b.usuarios.nome}</span>}
+                      {b.equipes?.nome && <span>🏷️ {b.equipes.nome}</span>}
+                      {b.empresas?.nome && <span style={{ color: 'var(--accent)' }}>🏢 {b.empresas.nome}</span>}
                     </div>
                   </div>
                   <div className="flex gap-2">
