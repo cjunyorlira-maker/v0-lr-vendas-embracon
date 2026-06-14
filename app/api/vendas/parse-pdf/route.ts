@@ -135,9 +135,43 @@ export async function POST(req: NextRequest) {
     // Busca planos pra detectar
     const { data: planos } = await supabaseAdmin
       .from('planos')
-      .select('id, sigla, nome_completo, bem, adesao_percent, faixa_credito_min, faixa_credito_max, ativo')
+      .select('id, sigla, nome_completo, bem, adesao_percent, faixa_credito_min, faixa_credito_max, ativo, categoria_comissao')
 
-    const planoDetectado = detectarPlano(planos || [], dados.bem_detectado, dados.valor_credito, adesao)
+    // Detecção da Parcelinha (TP/TEP): a Parcelinha tem adesão 0, então não é pega pela
+    // lógica normal. Detecta cruzando a 1ª parcela do PDF com a tabela de crédito da Parcelinha.
+    let planoDetectado = null
+    if (dados.bem_detectado === 'Imóvel' && dados.valor_credito && dados.valor_primeira_parcela) {
+      const planosParcelinha = (planos || []).filter(
+        (p) => p.categoria_comissao === 'imovel_parcelinha' && p.ativo &&
+          dados.valor_credito! >= (p.faixa_credito_min ?? 0) &&
+          dados.valor_credito! <= (p.faixa_credito_max ?? Infinity)
+      )
+      for (const p of planosParcelinha) {
+        // busca a faixa de crédito mais próxima na tabela da Parcelinha
+        const { data: faixas } = await supabaseAdmin
+          .from('tabelas_credito')
+          .select('credito, primeira_parcela')
+          .eq('sigla', p.sigla)
+        if (faixas && faixas.length > 0) {
+          // acha a faixa cujo crédito é o mais próximo do crédito da venda
+          const faixaProxima = faixas.reduce((melhor, f) =>
+            Math.abs(Number(f.credito) - dados.valor_credito!) < Math.abs(Number(melhor.credito) - dados.valor_credito!) ? f : melhor
+          )
+          // se a 1ª parcela do PDF bate com a parcela 1-12 da Parcelinha (tolerância de 3%), é Parcelinha
+          const p1Tabela = Number(faixaProxima.primeira_parcela)
+          const p1Pdf = dados.valor_primeira_parcela!
+          if (p1Tabela > 0 && Math.abs(p1Pdf - p1Tabela) / p1Tabela <= 0.03) {
+            planoDetectado = p
+            break
+          }
+        }
+      }
+    }
+
+    // Se não detectou Parcelinha, usa a detecção normal (pela adesão)
+    if (!planoDetectado) {
+      planoDetectado = detectarPlano(planos || [], dados.bem_detectado, dados.valor_credito, adesao)
+    }
 
     return NextResponse.json({
       success: true,
