@@ -16,6 +16,7 @@ interface Grupo {
   proxima_num_assembleia: number | null; total_clientes: number
   clientes_por_empresa: { empresa: string; clientes: number }[]
   tem_historico: boolean; historico: HistMes[]
+  empresa_ids: string[]; equipe_ids: string[]; vendedor_ids: string[]
 }
 
 const CATEGORIAS = [
@@ -39,15 +40,26 @@ export default function AssembleiasPage() {
   const [aberto, setAberto] = useState<string | null>(null)
   const [buscaGrupo, setBuscaGrupo] = useState('')
   const [modalResultado, setModalResultado] = useState<{ grupo: string; bem: string; mes: HistMes } | null>(null)
+  const [filtros, setFiltros] = useState<{ empresas: any[]; equipes: any[]; vendedores: any[] }>({ empresas: [], equipes: [], vendedores: [] })
+  const [fEmpresa, setFEmpresa] = useState('')
+  const [fEquipe, setFEquipe] = useState('')
+  const [fVendedor, setFVendedor] = useState('')
 
   useEffect(() => {
     fetch('/api/assembleias').then(r => r.json()).then(d => {
       if (d.grupos) setGrupos(d.grupos)
+      if (d.filtros) setFiltros(d.filtros)
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [])
 
-  const gruposDaCat = grupos.filter(g => g.bem === catAtiva && (!buscaGrupo || g.grupo.includes(buscaGrupo.trim()))).sort((a, b) => {
+  const gruposDaCat = grupos.filter(g =>
+    g.bem === catAtiva &&
+    (!buscaGrupo || g.grupo.includes(buscaGrupo.trim())) &&
+    (!fEmpresa || g.empresa_ids.includes(fEmpresa)) &&
+    (!fEquipe || g.equipe_ids.includes(fEquipe)) &&
+    (!fVendedor || g.vendedor_ids.includes(fVendedor))
+  ).sort((a, b) => {
     // grupos com assembleia mais próxima primeiro; novos por último
     if (a.proxima_assembleia === 'INAUGURAR') return 1
     if (b.proxima_assembleia === 'INAUGURAR') return -1
@@ -82,8 +94,8 @@ export default function AssembleiasPage() {
             })}
           </div>
 
-          {/* busca por grupo */}
-          <div className="mb-6">
+          {/* busca e filtros */}
+          <div className="mb-6 flex flex-col gap-2">
             <input
               type="text"
               value={buscaGrupo}
@@ -92,6 +104,26 @@ export default function AssembleiasPage() {
               className="w-full rounded-lg px-3 py-2 text-sm outline-none"
               style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}
             />
+            <div className="flex flex-wrap gap-2">
+              {filtros.empresas.length > 0 && (
+                <select value={fEmpresa} onChange={(e) => { setFEmpresa(e.target.value); setFEquipe(''); setFVendedor('') }} className="rounded-lg px-3 py-2 text-sm outline-none flex-1 min-w-[140px]" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                  <option value="" style={{ background: '#131313' }}>Todas as empresas</option>
+                  {filtros.empresas.map(e => <option key={e.id} value={e.id} style={{ background: '#131313' }}>{e.nome}</option>)}
+                </select>
+              )}
+              {filtros.equipes.length > 0 && (
+                <select value={fEquipe} onChange={(e) => { setFEquipe(e.target.value); setFVendedor('') }} className="rounded-lg px-3 py-2 text-sm outline-none flex-1 min-w-[140px]" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                  <option value="" style={{ background: '#131313' }}>Todas as equipes</option>
+                  {filtros.equipes.filter(eq => !fEmpresa || eq.empresa_id === fEmpresa).map(eq => <option key={eq.id} value={eq.id} style={{ background: '#131313' }}>{eq.nome}</option>)}
+                </select>
+              )}
+              {filtros.vendedores.length > 0 && (
+                <select value={fVendedor} onChange={(e) => setFVendedor(e.target.value)} className="rounded-lg px-3 py-2 text-sm outline-none flex-1 min-w-[140px]" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                  <option value="" style={{ background: '#131313' }}>Todos os vendedores</option>
+                  {filtros.vendedores.filter(v => (!fEmpresa || v.empresa_id === fEmpresa) && (!fEquipe || v.equipe_id === fEquipe)).map(v => <option key={v.id} value={v.id} style={{ background: '#131313' }}>{v.nome}</option>)}
+                </select>
+              )}
+            </div>
           </div>
 
           {loading ? (
