@@ -564,7 +564,7 @@ export default function ComissoesPage() {
                           })()}
                           <label className="block text-xs mb-2" style={{ color: 'var(--muted-color)' }}>Antecipou quantas parcelas?</label>
                           <div className="flex items-center gap-2 flex-wrap mb-3">
-                            {[0, 1, 2, 3, 4, 5, 6, 7, 8].slice(0, parcelas.length + 1).map(n => (
+                            {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].slice(0, parcelas.length + 1).map(n => (
                               <button key={n} onClick={() => setParcelasAntecip(n)} className="rounded-lg px-3 py-1.5 text-xs font-medium" style={{ background: parcelasAntecip === n ? 'rgba(212,175,55,0.2)' : 'rgba(255,255,255,0.03)', border: `1px solid ${parcelasAntecip === n ? 'var(--accent)' : 'var(--border)'}`, color: parcelasAntecip === n ? 'var(--accent)' : 'var(--muted-color)' }}>{n === 0 ? 'Tudo' : n}</button>
                             ))}
                           </div>
