@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { CalendarCheck, ChevronDown, ChevronUp, Users, Dices, Target, Gavel, Sparkles, Loader2, Share2, Upload, CheckCircle2, PartyPopper } from 'lucide-react'
+import { CalendarCheck, ChevronDown, ChevronUp, Users, Dices, Target, Gavel, Sparkles, Loader2, Share2, Upload, CheckCircle2, PartyPopper, BarChart3 } from 'lucide-react'
 import PassarResultado from '@/components/PassarResultado'
 
 interface HistMes {
@@ -46,6 +46,8 @@ export default function AssembleiasPage() {
   const [fVendedor, setFVendedor] = useState('')
   const [subindo, setSubindo] = useState(false)
   const [resultadoUpload, setResultadoUpload] = useState<any>(null)
+  const [visao, setVisao] = useState<'atual' | 'historico'>('historico')
+  const [ordenacao, setOrdenacao] = useState<'proxima' | 'contemplam'>('proxima')
 
   useEffect(() => {
     fetch('/api/assembleias').then(r => r.json()).then(d => {
@@ -73,14 +75,29 @@ export default function AssembleiasPage() {
     setSubindo(false)
   }
 
+  // mês corrente no formato YYYY-MM
+  const mesCorrente = new Date().toISOString().slice(0, 7)
+  // média de contemplados dos últimos meses do grupo
+  const mediaContemplados = (g: Grupo) => {
+    if (!g.historico || g.historico.length === 0) return 0
+    const soma = g.historico.reduce((s, h) => s + (h.total_contemplados || 0), 0)
+    return Math.round(soma / g.historico.length)
+  }
+
   const gruposDaCat = grupos.filter(g =>
     g.bem === catAtiva &&
     (!buscaGrupo || g.grupo.includes(buscaGrupo.trim())) &&
     (!fEmpresa || g.empresa_ids.includes(fEmpresa)) &&
     (!fEquipe || g.equipe_ids.includes(fEquipe)) &&
-    (!fVendedor || g.vendedor_ids.includes(fVendedor))
+    (!fVendedor || g.vendedor_ids.includes(fVendedor)) &&
+    // na visão "mês atual", só grupos que têm registro do mês corrente
+    (visao === 'historico' || g.historico?.some(h => h.mes_referencia === mesCorrente))
   ).sort((a, b) => {
-    // grupos com assembleia mais próxima primeiro; novos por último
+    if (ordenacao === 'contemplam') {
+      // ordena pela média de contemplados (maior primeiro)
+      return mediaContemplados(b) - mediaContemplados(a)
+    }
+    // ordena por próxima assembleia (novos por último)
     if (a.proxima_assembleia === 'INAUGURAR') return 1
     if (b.proxima_assembleia === 'INAUGURAR') return -1
     return (a.proxima_assembleia || '').localeCompare(b.proxima_assembleia || '')
@@ -130,6 +147,12 @@ export default function AssembleiasPage() {
             </div>
           )}
 
+          {/* abas mês atual / histórico */}
+          <div className="flex gap-2 mb-4">
+            <button onClick={() => { setVisao('atual'); setAberto(null) }} className="rounded-lg px-4 py-2 text-sm font-medium transition-colors" style={{ background: visao === 'atual' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${visao === 'atual' ? 'var(--accent)' : 'var(--border)'}`, color: visao === 'atual' ? 'var(--accent)' : 'var(--muted-color)' }}>Mês Atual</button>
+            <button onClick={() => { setVisao('historico'); setAberto(null) }} className="rounded-lg px-4 py-2 text-sm font-medium transition-colors" style={{ background: visao === 'historico' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${visao === 'historico' ? 'var(--accent)' : 'var(--border)'}`, color: visao === 'historico' ? 'var(--accent)' : 'var(--muted-color)' }}>Histórico</button>
+          </div>
+
           {/* abas de categoria */}
           <div className="flex gap-2 mb-6">
             {CATEGORIAS.map(c => {
@@ -153,6 +176,10 @@ export default function AssembleiasPage() {
               style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}
             />
             <div className="flex flex-wrap gap-2">
+              <select value={ordenacao} onChange={(e) => setOrdenacao(e.target.value as 'proxima' | 'contemplam')} className="rounded-lg px-3 py-2 text-sm outline-none flex-1 min-w-[140px]" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                <option value="proxima" style={{ background: '#131313' }}>Ordenar: Próxima assembleia</option>
+                <option value="contemplam" style={{ background: '#131313' }}>Ordenar: Mais contemplam</option>
+              </select>
               {filtros.empresas.length > 0 && (
                 <select value={fEmpresa} onChange={(e) => { setFEmpresa(e.target.value); setFEquipe(''); setFVendedor('') }} className="rounded-lg px-3 py-2 text-sm outline-none flex-1 min-w-[140px]" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
                   <option value="" style={{ background: '#131313' }}>Todas as empresas</option>
@@ -190,10 +217,11 @@ export default function AssembleiasPage() {
                         {!g.tem_historico && <span className="text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1" style={{ background: 'rgba(59,130,246,0.15)', color: '#3b82f6' }}><Sparkles size={10} />Sem assembleia ainda</span>}
                         {g.proxima_num_assembleia && <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)' }}>Próxima: {g.proxima_num_assembleia}ª assembleia</span>}
                       </div>
-                      <div className="flex items-center gap-3 text-xs" style={{ color: 'var(--muted-color)' }}>
+                      <div className="flex items-center gap-3 text-xs flex-wrap" style={{ color: 'var(--muted-color)' }}>
                         <span className="flex items-center gap-1"><Users size={12} /> {g.total_clientes} cliente(s)</span>
                         <span>Próx: {fmtData(g.proxima_assembleia)}</span>
                         {g.faixa_credito && <span>R$ {g.faixa_credito}</span>}
+                        {mediaContemplados(g) > 0 && <span className="flex items-center gap-1" style={{ color: '#22c55e' }}><BarChart3 size={12} /> Média: {mediaContemplados(g)} contemplados/mês</span>}
                       </div>
                       {/* clientes por empresa */}
                       <div className="flex flex-wrap gap-1.5 mt-2">
