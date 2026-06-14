@@ -56,10 +56,13 @@ export async function POST(req: NextRequest) {
       const novaQtd = parseInt(String(qtd_parcelas)) || 0
       const { data: venda } = await supabaseAdmin
         .from('vendas')
-        .select('grupo, valor_demais_parcelas')
+        .select('grupo, valor_demais_parcelas, valor_primeira_parcela, planos(categoria_comissao)')
         .eq('id', venda_id).single()
-      const demais = venda?.valor_demais_parcelas || 0
-      const novoValorBoleto = demais * novaQtd
+      const planoVenda = Array.isArray(venda?.planos) ? venda?.planos[0] : venda?.planos
+      const ehParcelinha = planoVenda?.categoria_comissao === 'imovel_parcelinha'
+      // Parcelinha: antecipa as parcelas 1-12 (valor da primeira_parcela). Outros: antecipa as demais.
+      const valorParcelaAntecipada = ehParcelinha ? (venda?.valor_primeira_parcela || 0) : (venda?.valor_demais_parcelas || 0)
+      const novoValorBoleto = valorParcelaAntecipada * novaQtd
       // recalcula a próxima cobrança: base (próximo vencimento do grupo) + (qtd+1) meses
       let novaCobranca: string | null = null
       if (venda?.grupo) {
