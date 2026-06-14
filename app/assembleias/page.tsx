@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { CalendarCheck, ChevronDown, ChevronUp, Users, Dices, Target, Gavel, Sparkles, Loader2 } from 'lucide-react'
+import { CalendarCheck, ChevronDown, ChevronUp, Users, Dices, Target, Gavel, Sparkles, Loader2, Share2 } from 'lucide-react'
+import PassarResultado from '@/components/PassarResultado'
 
 interface HistMes {
   mes_referencia: string; mes_label: string; numero_assembleia: number | null
@@ -36,6 +37,8 @@ export default function AssembleiasPage() {
   const [loading, setLoading] = useState(true)
   const [catAtiva, setCatAtiva] = useState('Imóvel')
   const [aberto, setAberto] = useState<string | null>(null)
+  const [buscaGrupo, setBuscaGrupo] = useState('')
+  const [modalResultado, setModalResultado] = useState<{ grupo: string; bem: string; mes: HistMes } | null>(null)
 
   useEffect(() => {
     fetch('/api/assembleias').then(r => r.json()).then(d => {
@@ -44,7 +47,7 @@ export default function AssembleiasPage() {
     }).catch(() => setLoading(false))
   }, [])
 
-  const gruposDaCat = grupos.filter(g => g.bem === catAtiva).sort((a, b) => {
+  const gruposDaCat = grupos.filter(g => g.bem === catAtiva && (!buscaGrupo || g.grupo.includes(buscaGrupo.trim()))).sort((a, b) => {
     // grupos com assembleia mais próxima primeiro; novos por último
     if (a.proxima_assembleia === 'INAUGURAR') return 1
     if (b.proxima_assembleia === 'INAUGURAR') return -1
@@ -77,6 +80,18 @@ export default function AssembleiasPage() {
                 </button>
               )
             })}
+          </div>
+
+          {/* busca por grupo */}
+          <div className="mb-6">
+            <input
+              type="text"
+              value={buscaGrupo}
+              onChange={(e) => setBuscaGrupo(e.target.value)}
+              placeholder="Buscar por número do grupo..."
+              className="w-full rounded-lg px-3 py-2 text-sm outline-none"
+              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}
+            />
           </div>
 
           {loading ? (
@@ -117,7 +132,12 @@ export default function AssembleiasPage() {
                         <div key={h.mes_referencia} className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)' }}>
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{h.mes_label} {h.numero_assembleia ? `· ${h.numero_assembleia}ª assembleia` : ''}</span>
-                            <span className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>{h.total_contemplados} contemplados</span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-semibold" style={{ color: 'var(--accent)' }}>{h.total_contemplados} contemplados</span>
+                              <button onClick={() => setModalResultado({ grupo: g.grupo, bem: g.bem, mes: h })} className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-md" style={{ background: 'rgba(212,175,55,0.15)', color: 'var(--accent)', border: '1px solid rgba(212,175,55,0.3)' }} title="Passar resultado ao cliente">
+                                <Share2 size={11} /> Passar resultado
+                              </button>
+                            </div>
                           </div>
                           <div className="grid grid-cols-2 gap-2 text-xs">
                             <div className="flex items-center gap-1.5" style={{ color: 'var(--text2)' }}><Dices size={13} style={{ color: '#22c55e' }} /> Sorteio: <b>{h.sorteio_qt}</b></div>
@@ -139,8 +159,9 @@ export default function AssembleiasPage() {
               ))}
             </div>
           )}
-        </main>
+      </main>
       </div>
-    </div>
+      {modalResultado && <PassarResultado grupo={modalResultado.grupo} bem={modalResultado.bem} mes={modalResultado.mes} onClose={() => setModalResultado(null)} />}
+      </div>
   )
-}
+  }
