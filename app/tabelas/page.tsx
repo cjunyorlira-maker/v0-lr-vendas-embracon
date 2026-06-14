@@ -90,9 +90,9 @@ export default function TabelasPage() {
                                       <thead>
                                         <tr style={{ borderBottom: '1px solid var(--border)' }}>
                                           <th className="p-2 text-left" style={{ color: 'var(--muted-color)' }}>Crédito</th>
-                                          <th className="p-2 text-right" style={{ color: 'var(--muted-color)' }}>1ª parcela</th>
+                                          <th className="p-2 text-right" style={{ color: 'var(--muted-color)' }}>{(p.sigla === 'TP' || p.sigla === 'TEP') ? '1ª a 12ª parcela' : '1ª parcela'}</th>
                                           <th className="p-2 text-right" style={{ color: 'var(--muted-color)' }}>Demais (cada)</th>
-                                          {p.sigla === 'SP' ? (
+                                          {(p.sigla === 'TP' || p.sigla === 'TEP') ? null : p.sigla === 'SP' ? (
                                             <>
                                               <th className="p-2 text-right" style={{ color: '#22c55e' }}>Garantir comissão<br/><span className="text-[9px]" style={{ color: 'var(--muted-color)' }}>(1ª + 3 = 4x)</span></th>
                                               <th className="p-2 text-right" style={{ color: '#f59e0b' }}>Não estornar<br/><span className="text-[9px]" style={{ color: 'var(--muted-color)' }}>(1ª + 5 = 6x)</span></th>
@@ -111,7 +111,7 @@ export default function TabelasPage() {
                                             <td className="p-2 font-medium" style={{ color: 'var(--text)' }}>{fmtMoeda(f.credito)}</td>
                                             <td className="p-2 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda2(f.primeira_parcela)}</td>
                                             <td className="p-2 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda2(f.demais_parcela)}</td>
-                                            {p.sigla === 'SP' ? (
+                                            {(p.sigla === 'TP' || p.sigla === 'TEP') ? null : p.sigla === 'SP' ? (
                                               <>
                                                 <td className="p-2 text-right" style={{ color: '#22c55e' }}>{fmtMoeda2(f.total_nao_estornar)}</td>
                                                 <td className="p-2 text-right" style={{ color: '#f59e0b' }}>{fmtMoeda2(f.primeira_parcela + f.demais_parcela * 5)}</td>
