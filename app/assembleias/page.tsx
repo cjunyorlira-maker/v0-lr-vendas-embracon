@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { CalendarCheck, ChevronDown, ChevronUp, Users, Dices, Target, Gavel, Sparkles, Loader2, Share2 } from 'lucide-react'
+import { CalendarCheck, ChevronDown, ChevronUp, Users, Dices, Target, Gavel, Sparkles, Loader2, Share2, Upload, CheckCircle2, PartyPopper } from 'lucide-react'
 import PassarResultado from '@/components/PassarResultado'
 
 interface HistMes {
@@ -44,6 +44,8 @@ export default function AssembleiasPage() {
   const [fEmpresa, setFEmpresa] = useState('')
   const [fEquipe, setFEquipe] = useState('')
   const [fVendedor, setFVendedor] = useState('')
+  const [subindo, setSubindo] = useState(false)
+  const [resultadoUpload, setResultadoUpload] = useState<any>(null)
 
   useEffect(() => {
     fetch('/api/assembleias').then(r => r.json()).then(d => {
@@ -52,6 +54,24 @@ export default function AssembleiasPage() {
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [])
+
+  const recarregar = () => {
+    fetch('/api/assembleias').then(r => r.json()).then(d => { if (d.grupos) setGrupos(d.grupos) })
+  }
+
+  const subirResultado = async (file: File) => {
+    setSubindo(true)
+    setResultadoUpload(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const r = await fetch('/api/assembleias/upload', { method: 'POST', body: fd })
+      const d = await r.json()
+      if (d.error) { alert('Erro: ' + d.error) }
+      else { setResultadoUpload(d); recarregar() }
+    } catch (e) { alert('Erro ao subir o arquivo.') }
+    setSubindo(false)
+  }
 
   const gruposDaCat = grupos.filter(g =>
     g.bem === catAtiva &&
@@ -74,13 +94,41 @@ export default function AssembleiasPage() {
       <div className="relative lg:ml-60" style={{ zIndex: 1 }}>
         <Header title="Assembleias" />
         <main className="mx-auto max-w-4xl px-6 py-8 lg:px-8">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.25)' }}><CalendarCheck size={18} style={{ color: 'var(--accent)' }} /></div>
-            <div>
-              <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Resultados de Assembleia</h2>
-              <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Histórico de contemplações por grupo</p>
+          <div className="flex items-center justify-between mb-6 gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.25)' }}><CalendarCheck size={18} style={{ color: 'var(--accent)' }} /></div>
+              <div>
+                <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Resultados de Assembleia</h2>
+                <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Histórico de contemplações por grupo</p>
+              </div>
             </div>
+            <label className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold cursor-pointer transition-transform hover:scale-105" style={{ background: 'linear-gradient(135deg, #d4af37 0%, #c9a227 50%, #b8941f 100%)', color: '#0a0a0a' }}>
+              {subindo ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
+              {subindo ? 'Processando...' : 'Subir Resultado'}
+              <input type="file" accept="application/pdf" className="hidden" disabled={subindo} onChange={(e) => { const f = e.target.files?.[0]; if (f) subirResultado(f); e.target.value = '' }} />
+            </label>
           </div>
+
+          {/* feedback do upload */}
+          {resultadoUpload && (
+            <div className="mb-6 rounded-xl p-4" style={{ background: resultadoUpload.cotas_nossas?.length > 0 ? 'rgba(34,197,94,0.1)' : 'rgba(212,175,55,0.08)', border: `1px solid ${resultadoUpload.cotas_nossas?.length > 0 ? 'rgba(34,197,94,0.3)' : 'var(--border)'}` }}>
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle2 size={16} style={{ color: '#22c55e' }} />
+                <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Grupo {resultadoUpload.grupo} · {resultadoUpload.mes_label} processado!</span>
+              </div>
+              <p className="text-xs mb-2" style={{ color: 'var(--muted-color)' }}>
+                Total: {resultadoUpload.resumo?.total} · Sorteio: {resultadoUpload.resumo?.sorteio} · Fixo 50%: {resultadoUpload.resumo?.fixo50} · Fixo 25%: {resultadoUpload.resumo?.fixo25} · Livre: {resultadoUpload.resumo?.livre}
+              </p>
+              {resultadoUpload.cotas_nossas?.length > 0 ? (
+                <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: '#22c55e' }}>
+                  <PartyPopper size={16} /> {resultadoUpload.cotas_nossas.length} cota(s) NOSSA(S) contemplada(s)! ({resultadoUpload.cotas_nossas.map((c: any) => `${c.cota} ${c.modalidade}`).join(', ')})
+                </div>
+              ) : (
+                <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Nenhuma cota nossa contemplada neste grupo desta vez.</p>
+              )}
+              <button onClick={() => setResultadoUpload(null)} className="text-[10px] mt-2 underline" style={{ color: 'var(--muted-color)' }}>Fechar</button>
+            </div>
+          )}
 
           {/* abas de categoria */}
           <div className="flex gap-2 mb-6">
