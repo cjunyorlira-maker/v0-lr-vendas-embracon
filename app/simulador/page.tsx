@@ -6,7 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import { Calculator, CreditCard, Loader2, AlertTriangle } from 'lucide-react'
 
-interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number; estorno_ate_pgto: number | null }
+interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number; estorno_ate_pgto: number | null; categoria_comissao: string | null }
 interface FaixaCredito { credito: number; primeira_parcela: number; demais_parcela: number; total_nao_estornar: number }
 
 const fmtMoeda = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
