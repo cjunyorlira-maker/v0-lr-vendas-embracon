@@ -36,6 +36,7 @@ export default function AssembleiasPage() {
   const [loading, setLoading] = useState(true)
   const [catAtiva, setCatAtiva] = useState('Imóvel')
   const [aberto, setAberto] = useState<string | null>(null)
+  const [buscaGrupo, setBuscaGrupo] = useState('')
 
   useEffect(() => {
     fetch('/api/assembleias').then(r => r.json()).then(d => {
@@ -44,7 +45,7 @@ export default function AssembleiasPage() {
     }).catch(() => setLoading(false))
   }, [])
 
-  const gruposDaCat = grupos.filter(g => g.bem === catAtiva).sort((a, b) => {
+  const gruposDaCat = grupos.filter(g => g.bem === catAtiva && (!buscaGrupo || g.grupo.includes(buscaGrupo.trim()))).sort((a, b) => {
     // grupos com assembleia mais próxima primeiro; novos por último
     if (a.proxima_assembleia === 'INAUGURAR') return 1
     if (b.proxima_assembleia === 'INAUGURAR') return -1
@@ -77,6 +78,18 @@ export default function AssembleiasPage() {
                 </button>
               )
             })}
+          </div>
+
+          {/* busca por grupo */}
+          <div className="mb-6">
+            <input
+              type="text"
+              value={buscaGrupo}
+              onChange={(e) => setBuscaGrupo(e.target.value)}
+              placeholder="Buscar por número do grupo..."
+              className="w-full rounded-lg px-3 py-2 text-sm outline-none"
+              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}
+            />
           </div>
 
           {loading ? (
