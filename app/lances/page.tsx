@@ -195,8 +195,11 @@ export default function LancesPage() {
   }
 
   function CardLance({ lance, piscar }: { lance: Lance; piscar: boolean }) {
+    const hojeStr = new Date().toISOString().slice(0, 10)
+    const em7diasStr = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
+    const estaSemana = !!lance.data_assembleia && !lance.contemplado && lance.data_assembleia >= hojeStr && lance.data_assembleia <= em7diasStr
     return (
-      <div className="rounded-xl p-4" style={{ background: lance.contemplado ? 'rgba(34,197,94,0.08)' : 'rgba(0,0,0,0.12)', backdropFilter: 'blur(4px)', border: lance.contemplado ? '1px solid rgba(34,197,94,0.4)' : '1px solid var(--border)', animation: piscar ? 'piscaLance 1.5s ease-in-out infinite' : 'none' }}>
+      <div className="rounded-xl p-4" style={{ background: lance.contemplado ? 'rgba(34,197,94,0.08)' : (estaSemana ? 'rgba(239,68,68,0.06)' : 'rgba(0,0,0,0.12)'), backdropFilter: 'blur(4px)', border: lance.contemplado ? '1px solid rgba(34,197,94,0.4)' : (estaSemana ? '1px solid rgba(239,68,68,0.4)' : '1px solid var(--border)'), animation: piscar ? 'piscaLance 1.5s ease-in-out infinite' : 'none' }}>
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{lance.clientes?.nome}</span>
           <div className="flex items-center gap-2">
@@ -210,6 +213,9 @@ export default function LancesPage() {
           {lance.usuarios?.nome && <span className="flex items-center gap-1">Vend: {lance.usuarios.nome}</span>}
           {lance.equipes?.nome && <span className="flex items-center gap-1">Equipe: {lance.equipes.nome}</span>}
           {lance.data_assembleia && <span className="flex items-center gap-1"><Clock size={11} />Assemb: {fmtData(lance.data_assembleia)}</span>}
+          {estaSemana && (
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded font-semibold" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}><Clock size={11} />Esta semana</span>
+          )}
           {lance.lances_config?.recorrente && <span style={{ color: '#a855f7' }}>{'\u267b'} recorrente</span>}
         </div>
         {lance.lances_config?.observacao && <p className="text-xs mb-3 italic" style={{ color: 'var(--muted-color)' }}>{'"'}{lance.lances_config.observacao}{'"'}</p>}
