@@ -45,13 +45,14 @@ export async function POST(req: Request) {
     const parsed = await pdfParse(buffer, { pagerender: renderPage, max: 1 })
     const txt = (parsed.text || '').replace(/\u00a0/g, ' ')
 
-    // extrai grupo
-    const grupoM = txt.match(/Grupo:[\s\S]*?(\d{6})/)
-    const grupo = grupoM ? grupoM[1].replace(/^0+/, '') : null
+    // extrai grupo e prazo (layout: labels juntos, depois valores juntos, após "Encerramento previsto:")
+    const bloco1 = txt.match(/Encerramento previsto:\s*\n(\d{6})\s*\n(\d+)/)
+    const grupo = bloco1 ? bloco1[1].replace(/^0+/, '') : null
     if (!grupo) return NextResponse.json({ error: "Não consegui identificar o grupo no PDF" }, { status: 400 })
+    const prazoInicialPdf = bloco1 ? parseInt(bloco1[2]) : null
 
-    // próxima assembleia número
-    const proxNumM = txt.match(/Número:[\s\S]*?(\d+)/)
+    // número da próxima assembleia (explícito no PDF, após "Cidade:")
+    const proxNumM = txt.match(/Informações sobre a próxima assembleia[\s\S]*?Cidade:\s*\n(\d+)/)
     const proximaNum = proxNumM ? parseInt(proxNumM[1]) : null
     // assembleia deste resultado
     const assembM = txt.match(/Assembleia:\s*(\d+)/)
@@ -64,13 +65,18 @@ export async function POST(req: Request) {
       mesRef = `${ano}-${String(mes).padStart(2,'0')}`
       mesLabel = `${MESES[mes-1].charAt(0).toUpperCase() + MESES[mes-1].slice(1)}/${ano}`
     }
-    // prazos
-    const prazoM = txt.match(/Prazo:[\s\S]*?(\d+)/)
-    const prazoInicial = prazoM ? parseInt(prazoM[1]) : null
-    const realizadasM = txt.match(/Assembleias realizadas:[\s\S]*?(\d+)/)
-    const realizadas = realizadasM ? parseInt(realizadasM[1]) : null
-    const arealizarM = txt.match(/Assembleias à realizar:[\s\S]*?(\d+)/)
-    const prazoRestante = arealizarM ? parseInt(arealizarM[1]) : null
+    // prazos: após "Assembleias à realizar:" vêm dois números (à realizar e realizadas, na ordem)
+    const prazoInicial = prazoInicialPdf
+    const blocoPrazo = txt.match(/Assembleias à realizar:\s*\n(\d+)\s*\n(\d+)/)
+    let prazoRestante: number | null = null
+    if (blocoPrazo) {
+      const a = parseInt(blocoPrazo[1]), b = parseInt(blocoPrazo[2])
+      // à realizar é o maior (faltam mais assembleias); realizadas é o menor
+      prazoRestante = Math.max(a, b)
+    } else if (proximaNum != null && prazoInicial != null) {
+      // fallback: se não achou, calcula pelo número da próxima (realizadas = proximaNum - 1)
+      prazoRestante = prazoInicial - (proximaNum - 1)
+    }
 
     // contagem por modalidade (lista de contemplações confirmadas)
     const iniCont = txt.indexOf('Contemplações Confirmadas')
