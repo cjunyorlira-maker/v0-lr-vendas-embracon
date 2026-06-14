@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   Home, Upload, Users, FileText, Target, Trophy, Users2,
   DollarSign, Settings, LogOut, Menu, X, Camera, Trash2,
-  Calculator, BookOpen,
+  Calculator, BookOpen, CalendarCheck,
 } from 'lucide-react'
 
 interface NavItem {
@@ -25,6 +25,7 @@ const mainNav: NavItem[] = [
   { icon: <Trophy size={16} />, label: 'Ranking', href: '/ranking' },
   { icon: <Calculator size={16} />, label: 'Simulador', href: '/simulador' },
   { icon: <BookOpen size={16} />, label: 'Tabelas', href: '/tabelas' },
+  { icon: <CalendarCheck size={16} />, label: 'Assembleias', href: '/assembleias' },
   { icon: <Users2 size={16} />, label: 'Equipe', href: '/equipe' },
 ]
 
