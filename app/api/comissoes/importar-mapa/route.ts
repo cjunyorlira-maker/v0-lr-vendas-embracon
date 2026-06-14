@@ -182,10 +182,9 @@ export async function POST(req: NextRequest) {
     await supabaseAdmin.from('vendas').update({ comissao_recebida_rs: 0, comissao_recebida_percent: 0 }).gt('valor_credito', 0)
 
     // aplica o recebido em cada venda que tem contrato correspondente
-    const naoEncontrados: string[] = []
     for (const [contrato, recebido] of recebidoTotalPorContrato) {
       const venda = vendaPorContrato.get(contrato)
-      if (!venda) { naoEncontrados.push(contrato); continue }
+      if (!venda) continue
       const credito = venda.valor_credito || 0
       const percentRecebido = credito > 0 ? (recebido / credito) * 100 : 0
       await supabaseAdmin.from('vendas').update({
@@ -194,6 +193,12 @@ export async function POST(req: NextRequest) {
       }).eq('id', venda.id)
       // vincula as linhas desse contrato à venda
       await supabaseAdmin.from('mapa_linhas').update({ venda_id: venda.id }).eq('contrato', contrato)
+    }
+
+    // não encontrados = SÓ os contratos DESTE mapa (não a soma de todos os mapas)
+    const naoEncontrados: string[] = []
+    for (const contrato of contratosUnicos) {
+      if (!vendaPorContrato.get(contrato)) naoEncontrados.push(contrato)
     }
 
     return NextResponse.json({
