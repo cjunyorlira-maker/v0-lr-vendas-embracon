@@ -89,9 +89,11 @@ export async function GET() {
       // risco de estorno
       const qtdParc = boleto?.qtd_parcelas || 0
       const pgtosCobertos = 1 + qtdParc
+      // Parcelinha (imovel_parcelinha) NÃO tem estorno: estorno_ate_pgto é null e nunca está em risco
+      const semEstorno = plano?.categoria_comissao === 'imovel_parcelinha' || plano?.estorno_ate_pgto == null
       const pgtoSeg = plano?.estorno_ate_pgto || 8
-      const emRisco = pgtosCobertos < pgtoSeg
-      const estorno = plano?.estorno_percent ? credito * (plano.estorno_percent / 100) : 0
+      const emRisco = semEstorno ? false : pgtosCobertos < pgtoSeg
+      const estorno = semEstorno ? 0 : (plano?.estorno_percent ? credito * (plano.estorno_percent / 100) : 0)
       return {
         id: v.id, criado_em: v.criado_em, data_venda: v.data_venda || v.criado_em, empresa_id: v.empresa_id, equipe_id: v.equipe_id, vendedor_id: v.vendedor_id, cliente: cliente?.nome || '-', vendedor: vendedor?.nome || '-',
         plano: plano?.sigla || '-', adesao: plano?.adesao_percent ?? null, bem: plano?.bem || '-', credito,
