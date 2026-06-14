@@ -24,7 +24,8 @@ export default function PassarResultado({ grupo, bem, mes, onClose }: Props) {
     fixo50: true,
     fixo25: true,
     livre: true,
-    percentuais: false, // desmarcado por padrão (não assustar o cliente)
+    ocultarFixo: false,  // quando true, junta fixo 50% + 25% em "Lance Fixo: total"
+    ocultarLivrePct: true, // quando true, esconde o maior/menor % do lance livre (padrão seguro)
   })
   const [gerando, setGerando] = useState(false)
   const arteRef = useRef<HTMLDivElement>(null)
@@ -65,7 +66,8 @@ export default function PassarResultado({ grupo, bem, mes, onClose }: Props) {
               { k: 'fixo50', label: `Lance Fixo 50% (${mes.lance_fixo_50_qt})` },
               { k: 'fixo25', label: `Lance Fixo 25% (${mes.lance_fixo_25_qt})` },
               { k: 'livre', label: `Lance Livre (${mes.lance_livre_qt})` },
-              { k: 'percentuais', label: `Percentuais de lance livre (maior/menor)` },
+              { k: 'ocultarFixo', label: `Ocultar % do lance fixo (juntar 50% e 25%)` },
+              { k: 'ocultarLivrePct', label: `Ocultar % do lance livre (maior/menor)` },
             ].map(item => (
               <label key={item.k} className="flex items-center gap-2 cursor-pointer text-sm" style={{ color: 'var(--text2)' }}>
                 <input type="checkbox" checked={mostrar[item.k as keyof typeof mostrar]} onChange={() => toggle(item.k as keyof typeof mostrar)} className="accent-yellow-600" />
@@ -104,23 +106,34 @@ export default function PassarResultado({ grupo, bem, mes, onClose }: Props) {
                     <span style={{ fontSize: 16, fontWeight: 800, color: '#22a043' }}>{mes.sorteio_qt}</span>
                   </div>
                 )}
-                {mostrar.fixo50 && (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#fff', borderRadius: 10, border: '1px solid #eee' }}>
-                    <span style={{ fontSize: 14, color: '#333' }}>🎯 Lance Fixo 50%</span>
-                    <span style={{ fontSize: 16, fontWeight: 800, color: '#e8870b' }}>{mes.lance_fixo_50_qt}</span>
-                  </div>
-                )}
-                {mostrar.fixo25 && (
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#fff', borderRadius: 10, border: '1px solid #eee' }}>
-                    <span style={{ fontSize: 14, color: '#333' }}>🎯 Lance Fixo 25%</span>
-                    <span style={{ fontSize: 16, fontWeight: 800, color: '#9333ea' }}>{mes.lance_fixo_25_qt}</span>
-                  </div>
+                {mostrar.ocultarFixo ? (
+                  (mostrar.fixo50 || mostrar.fixo25) && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#fff', borderRadius: 10, border: '1px solid #eee' }}>
+                      <span style={{ fontSize: 14, color: '#333' }}>🎯 Lance Fixo</span>
+                      <span style={{ fontSize: 16, fontWeight: 800, color: '#e8870b' }}>{(mostrar.fixo50 ? mes.lance_fixo_50_qt : 0) + (mostrar.fixo25 ? mes.lance_fixo_25_qt : 0)}</span>
+                    </div>
+                  )
+                ) : (
+                  <>
+                    {mostrar.fixo50 && (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#fff', borderRadius: 10, border: '1px solid #eee' }}>
+                        <span style={{ fontSize: 14, color: '#333' }}>🎯 Lance Fixo 50%</span>
+                        <span style={{ fontSize: 16, fontWeight: 800, color: '#e8870b' }}>{mes.lance_fixo_50_qt}</span>
+                      </div>
+                    )}
+                    {mostrar.fixo25 && (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#fff', borderRadius: 10, border: '1px solid #eee' }}>
+                        <span style={{ fontSize: 14, color: '#333' }}>🎯 Lance Fixo 25%</span>
+                        <span style={{ fontSize: 16, fontWeight: 800, color: '#9333ea' }}>{mes.lance_fixo_25_qt}</span>
+                      </div>
+                    )}
+                  </>
                 )}
                 {mostrar.livre && (
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#fff', borderRadius: 10, border: '1px solid #eee' }}>
                     <div style={{ display: 'flex', flexDirection: 'column' }}>
                       <span style={{ fontSize: 14, color: '#333' }}>⚖️ Lance Livre</span>
-                      {mostrar.percentuais && mes.lance_livre_qt > 0 && (
+                      {!mostrar.ocultarLivrePct && mes.lance_livre_qt > 0 && (
                         <span style={{ fontSize: 10, color: '#999' }}>maior {fmtPct(mes.lance_livre_maior)} · menor {fmtPct(mes.lance_livre_menor)}</span>
                       )}
                     </div>
@@ -131,7 +144,7 @@ export default function PassarResultado({ grupo, bem, mes, onClose }: Props) {
 
               {/* rodapé motivacional */}
               <div style={{ textAlign: 'center', marginTop: 16, paddingTop: 12, borderTop: '1px solid #eee' }}>
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#c91a1a' }}>A próxima contemplação pode ser a sua! 🚀</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#c91a1a' }}>Possíveis cotas reservas podem ser chamadas</div>
               </div>
             </div>
           </div>
