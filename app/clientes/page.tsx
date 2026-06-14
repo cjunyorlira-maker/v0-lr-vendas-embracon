@@ -12,7 +12,7 @@ interface Cota {
   data_assembleia: string | null; data_venda: string | null
   vendedor: string | null; equipe_nome: string | null; vendedor_id: string; equipe_id: string; empresa_id: string
   status_boleto: string; qtd_parcelas: number; proxima_cobranca: string | null; status_cliente: string
-  status_lance: string | null; checado: boolean; pdf_proposta_url: string | null
+  status_lance: string | null; checado: boolean; pdf_proposta_url: string | null; observacoes?: string | null
 }
 interface ClienteAgr { cliente_id: string; nome: string; cpf: string; telefone: string; cotas: Cota[] }
 
@@ -278,6 +278,7 @@ export default function ClientesPage() {
                           {cl.cotas.map((c, i) => (
                             <span key={'gc'+i} className="text-xs" style={{ color: 'var(--muted-color)' }}>
                               Prop. {c.numero_proposta || c.numero_contrato || '-'} · Grupo {c.grupo}/{c.cota}
+                              {c.observacoes && <span className="flex items-center gap-1 italic mt-0.5" style={{ color: '#eab308' }}><FileText size={11} /> {c.observacoes}</span>}
                             </span>
                           ))}
                         </div>
