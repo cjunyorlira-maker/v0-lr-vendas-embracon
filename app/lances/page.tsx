@@ -112,6 +112,11 @@ export default function LancesPage() {
   const pendentes = lancesFiltrados.filter(l => l.status === 'pendente')
   const solicitados = lancesFiltrados.filter(l => l.status === 'solicitado')
   const ofertados = lancesFiltrados.filter(l => l.status === 'ofertado')
+  // estatísticas pro resumo
+  const totalContemplados = lancesFiltrados.filter(l => l.contemplado).length
+  const hojeStr = new Date().toISOString().slice(0, 10)
+  const em7dias = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
+  const assembleiaEstaSemana = lancesFiltrados.filter(l => l.data_assembleia && l.data_assembleia >= hojeStr && l.data_assembleia <= em7dias && !l.contemplado).length
 
   function handlePdf(file: File) {
     if (file.type !== 'application/pdf' && !file.type.startsWith('image/')) { alert('Anexe PDF ou imagem'); return }
@@ -190,8 +195,11 @@ export default function LancesPage() {
   }
 
   function CardLance({ lance, piscar }: { lance: Lance; piscar: boolean }) {
+    const hojeStr = new Date().toISOString().slice(0, 10)
+    const em7diasStr = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
+    const estaSemana = !!lance.data_assembleia && !lance.contemplado && lance.data_assembleia >= hojeStr && lance.data_assembleia <= em7diasStr
     return (
-      <div className="rounded-xl p-4" style={{ background: lance.contemplado ? 'rgba(34,197,94,0.08)' : 'rgba(0,0,0,0.12)', backdropFilter: 'blur(4px)', border: lance.contemplado ? '1px solid rgba(34,197,94,0.4)' : '1px solid var(--border)', animation: piscar ? 'piscaLance 1.5s ease-in-out infinite' : 'none' }}>
+      <div className="rounded-xl p-4" style={{ background: lance.contemplado ? 'rgba(34,197,94,0.08)' : (estaSemana ? 'rgba(239,68,68,0.06)' : 'rgba(0,0,0,0.12)'), backdropFilter: 'blur(4px)', border: lance.contemplado ? '1px solid rgba(34,197,94,0.4)' : (estaSemana ? '1px solid rgba(239,68,68,0.4)' : '1px solid var(--border)'), animation: piscar ? 'piscaLance 1.5s ease-in-out infinite' : 'none' }}>
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{lance.clientes?.nome}</span>
           <div className="flex items-center gap-2">
@@ -205,6 +213,9 @@ export default function LancesPage() {
           {lance.usuarios?.nome && <span className="flex items-center gap-1">Vend: {lance.usuarios.nome}</span>}
           {lance.equipes?.nome && <span className="flex items-center gap-1">Equipe: {lance.equipes.nome}</span>}
           {lance.data_assembleia && <span className="flex items-center gap-1"><Clock size={11} />Assemb: {fmtData(lance.data_assembleia)}</span>}
+          {estaSemana && (
+            <span className="flex items-center gap-1 px-2 py-0.5 rounded font-semibold" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444' }}><Clock size={11} />Esta semana</span>
+          )}
           {lance.lances_config?.recorrente && <span style={{ color: '#a855f7' }}>{'\u267b'} recorrente</span>}
         </div>
         {lance.lances_config?.observacao && <p className="text-xs mb-3 italic" style={{ color: 'var(--muted-color)' }}>{'"'}{lance.lances_config.observacao}{'"'}</p>}
@@ -265,9 +276,31 @@ export default function LancesPage() {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.25)' }}><Target size={18} style={{ color: 'var(--accent)' }} /></div>
             <div>
               <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Lances do mês</h2>
-              <p className="text-xs" style={{ color: 'var(--muted-color)' }}>{mesRef} · {pendentes.length} pendente{pendentes.length !== 1 ? 's' : ''} · {ofertados.length} ofertado{ofertados.length !== 1 ? 's' : ''}</p>
+              <p className="text-xs" style={{ color: 'var(--muted-color)' }}>{mesRef}</p>
             </div>
           </div>
+
+          {/* resumo */}
+          {!loading && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+              <div className="rounded-xl p-4" style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.25)' }}>
+                <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Pendentes</p>
+                <p className="text-2xl font-bold" style={{ color: '#eab308' }}>{pendentes.length}</p>
+              </div>
+              <div className="rounded-xl p-4" style={{ background: 'rgba(249,115,22,0.08)', border: '1px solid rgba(249,115,22,0.25)' }}>
+                <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Ofertados</p>
+                <p className="text-2xl font-bold" style={{ color: '#f97316' }}>{ofertados.length}</p>
+              </div>
+              <div className="rounded-xl p-4" style={{ background: assembleiaEstaSemana > 0 ? 'rgba(239,68,68,0.1)' : 'rgba(0,0,0,0.12)', border: `1px solid ${assembleiaEstaSemana > 0 ? 'rgba(239,68,68,0.3)' : 'var(--border)'}` }}>
+                <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Assembleia esta semana</p>
+                <p className="text-2xl font-bold" style={{ color: assembleiaEstaSemana > 0 ? '#ef4444' : 'var(--text)' }}>{assembleiaEstaSemana}</p>
+              </div>
+              <div className="rounded-xl p-4" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)' }}>
+                <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Contemplados</p>
+                <p className="text-2xl font-bold" style={{ color: '#22c55e' }}>{totalContemplados}</p>
+              </div>
+            </div>
+          )}
 
           {loading ? (
             <div className="flex items-center justify-center py-12"><Loader2 size={20} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
