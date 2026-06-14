@@ -49,17 +49,20 @@ export async function GET() {
     const nomeEmpresa: Record<string, string> = {}
     for (const e of (empresas || [])) nomeEmpresa[e.id] = e.nome
 
-    // agrupa clientes por grupo e por empresa
-    const clientesPorGrupo: Record<string, { total: Set<string>; porEmpresa: Record<string, Set<string>> }> = {}
+    // agrupa clientes por grupo e por empresa, e registra empresas/equipes/vendedores de cada grupo (pro filtro)
+    const clientesPorGrupo: Record<string, { total: Set<string>; porEmpresa: Record<string, Set<string>>; empresaIds: Set<string>; equipeIds: Set<string>; vendedorIds: Set<string> }> = {}
     for (const v of (vendas || [])) {
       const g = String(v.grupo).trim()
-      if (!clientesPorGrupo[g]) clientesPorGrupo[g] = { total: new Set(), porEmpresa: {} }
+      if (!clientesPorGrupo[g]) clientesPorGrupo[g] = { total: new Set(), porEmpresa: {}, empresaIds: new Set(), equipeIds: new Set(), vendedorIds: new Set() }
       if (v.cliente_id) {
         clientesPorGrupo[g].total.add(v.cliente_id)
         const emp = v.empresa_id ? (nomeEmpresa[v.empresa_id] || 'Sem empresa') : 'Sem empresa'
         if (!clientesPorGrupo[g].porEmpresa[emp]) clientesPorGrupo[g].porEmpresa[emp] = new Set()
         clientesPorGrupo[g].porEmpresa[emp].add(v.cliente_id)
       }
+      if (v.empresa_id) clientesPorGrupo[g].empresaIds.add(v.empresa_id)
+      if (v.equipe_id) clientesPorGrupo[g].equipeIds.add(v.equipe_id)
+      if (v.vendedor_id) clientesPorGrupo[g].vendedorIds.add(v.vendedor_id)
     }
 
     // monta a lista de grupos: só os grupos onde temos cliente (após o filtro de escopo)
@@ -78,6 +81,9 @@ export async function GET() {
       }
       const porEmpresa = Object.entries(cpg.porEmpresa).map(([nome, set]) => ({ empresa: nome, clientes: set.size })).sort((a, b) => b.clientes - a.clientes)
       return {
+        empresa_ids: Array.from(cpg.empresaIds),
+        equipe_ids: Array.from(cpg.equipeIds),
+        vendedor_ids: Array.from(cpg.vendedorIds),
         grupo: g,
         bem: info.bem || hist[0]?.bem || '-',
         faixa_credito: info.faixa_credito || null,
