@@ -6,7 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import { Calculator, CreditCard, Loader2, AlertTriangle } from 'lucide-react'
 
-interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number; estorno_ate_pgto: number | null }
+interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number; estorno_ate_pgto: number | null; categoria_comissao: string | null }
 interface FaixaCredito { credito: number; primeira_parcela: number; demais_parcela: number; total_nao_estornar: number }
 
 const fmtMoeda = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -15,6 +15,7 @@ const fmtMoeda = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'curre
 const CATEGORIAS: Record<string, { label: string; siglas: string[] }> = {
   imovel_1: { label: 'Imóvel 1%', siglas: ['EI1', 'SUE'] },
   imovel_2: { label: 'Imóvel 2%', siglas: ['PSE', 'SEP'] },
+  imovel_parcelinha: { label: 'Imóvel Parcelinha', siglas: ['TP', 'TEP'] },
   auto_1: { label: 'Auto 1%', siglas: ['ETA'] },
   auto_2: { label: 'Auto 2%', siglas: ['PE2'] },
   pesados_2: { label: 'Pesados 2%', siglas: ['SP'] },
@@ -31,7 +32,7 @@ export default function SimuladorPage() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.from('planos').select('id, sigla, nome_completo, bem, adesao_percent, estorno_ate_pgto').eq('ativo', true).order('bem').then(({ data }) => {
+    supabase.from('planos').select('id, sigla, nome_completo, bem, adesao_percent, estorno_ate_pgto, categoria_comissao').eq('ativo', true).order('bem').then(({ data }) => {
       if (data) setPlanos(data as Plano[]); setLoading(false)
     })
   }, [])
@@ -51,9 +52,13 @@ export default function SimuladorPage() {
   const qtd = parseInt(qtdAntecipar) || 0
   const p1 = faixa?.primeira_parcela || 0
   const pd = faixa?.demais_parcela || 0
-  const totalCliente = p1 + pd * qtd
-  // não estornar = pagar até a parcela limite de estorno do plano (1ª + demais até o limite)
   const planoAtual = planos.find(p => p.sigla === planoSigla)
+  // Parcelinha: as parcelas 1 a 12 são iguais (valor maior). Antecipar = antecipar as parcelas 1-12.
+  const ehParcelinha = planoAtual?.categoria_comissao === 'imovel_parcelinha'
+  // antecipadas: na Parcelinha o cliente antecipa as parcelas 1-12 (valor p1); nos outros antecipa as demais (pd)
+  const valorAntecipadas = ehParcelinha ? p1 * qtd : pd * qtd
+  const totalCliente = ehParcelinha ? p1 * qtd : p1 + pd * qtd
+  // não estornar (só planos com estorno; Parcelinha não tem)
   const limiteEstorno = planoAtual?.estorno_ate_pgto || 0
   const totalNaoEstornar = limiteEstorno > 0 ? p1 + pd * (limiteEstorno - 1) : (faixa?.total_nao_estornar || 0)
 
@@ -111,10 +116,10 @@ export default function SimuladorPage() {
                 <div className="rounded-xl p-5" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
                   <div className="flex items-center gap-3 mb-4"><CreditCard size={18} style={{ color: '#3b82f6' }} /><h3 className="text-sm font-semibold" style={{ color: '#3b82f6' }}>Quanto o cliente paga</h3></div>
                   <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>1ª parcela</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(p1)}</p></div>
+                    <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>{ehParcelinha ? 'Parcela (1ª a 12ª)' : '1ª parcela'}</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(p1)}</p></div>
                     <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Demais (cada)</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(pd)}</p></div>
-                    <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>+ {qtd} antecipadas</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(pd * qtd)}</p></div>
-                    <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Total p/ não estornar{limiteEstorno > 0 ? ` (1ª + ${limiteEstorno - 1})` : ''}</p><p className="text-lg font-semibold" style={{ color: '#f59e0b' }}>{fmtMoeda(totalNaoEstornar)}</p></div>
+                    <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>+ {qtd} antecipadas</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(valorAntecipadas)}</p></div>
+                    {!ehParcelinha && <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Total p/ não estornar{limiteEstorno > 0 ? ` (1ª + ${limiteEstorno - 1})` : ''}</p><p className="text-lg font-semibold" style={{ color: '#f59e0b' }}>{fmtMoeda(totalNaoEstornar)}</p></div>}
                   </div>
                   <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
                     <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Total que o cliente desembolsa (1ª + {qtd})</p>
