@@ -173,12 +173,18 @@ export async function POST(req: NextRequest) {
       planoDetectado = detectarPlano(planos || [], dados.bem_detectado, dados.valor_credito, adesao)
     }
 
+    // Parcelinha: adesão é 0 (não tem) e as parcelas 1 a 12 são iguais (demais = primeira)
+    const ehParcelinhaDetectada = planoDetectado?.categoria_comissao === 'imovel_parcelinha'
+    const adesaoFinal = ehParcelinhaDetectada ? 0 : adesao
+    const demaisFinal = ehParcelinhaDetectada ? dados.valor_primeira_parcela : dados.valor_demais_parcelas
+
     return NextResponse.json({
       success: true,
       parse_falhou: false,
       dados: {
         ...dados,
-        adesao_calculada: adesao,
+        valor_demais_parcelas: demaisFinal,
+        adesao_calculada: adesaoFinal,
       },
       plano_detectado: planoDetectado ? {
         id: planoDetectado.id,
