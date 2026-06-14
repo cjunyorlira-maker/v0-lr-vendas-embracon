@@ -51,6 +51,7 @@ export default function ComissoesPage() {
   const CATEGORIAS = [
     { key: 'imovel_1', label: 'Imóvel 1%', planos: 'EI1, SUE' },
     { key: 'imovel_2', label: 'Imóvel 2%', planos: 'PSE, SEP' },
+    { key: 'imovel_parcelinha', label: 'Imóvel Parcelinha', planos: 'TP, TEP' },
     { key: 'auto_1', label: 'Auto 1%', planos: 'ETA' },
     { key: 'auto_2', label: 'Auto 2%', planos: 'PE2' },
     { key: 'pesados_2', label: 'Pesados 2%', planos: 'SP' },
