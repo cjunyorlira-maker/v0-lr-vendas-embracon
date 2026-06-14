@@ -25,7 +25,7 @@ export async function GET() {
 
     // busca vendas com escopo
     let q = supabaseAdmin.from('vendas')
-      .select('id, cliente_id, numero_proposta, numero_contrato, grupo, cota, valor_credito, adesao_percent, data_assembleia_entrada, data_venda, empresa_id, equipe_id, vendedor_id, checado, status_cliente, pdf_proposta_url, planos(sigla, nome_completo, bem, adesao_percent), clientes(id, nome, cpf_cnpj, telefone), usuarios:vendedor_id(nome), equipes(nome), boletos(status, qtd_parcelas, data_proxima_cobranca)')
+      .select('id, cliente_id, numero_proposta, numero_contrato, grupo, cota, valor_credito, adesao_percent, data_assembleia_entrada, data_venda, empresa_id, equipe_id, vendedor_id, checado, status_cliente, pdf_proposta_url, observacoes, planos(sigla, nome_completo, bem, adesao_percent), clientes(id, nome, cpf_cnpj, telefone), usuarios:vendedor_id(nome), equipes(nome), boletos(status, qtd_parcelas, data_proxima_cobranca)')
       .order('data_assembleia_entrada', { ascending: true })
 
     const { escopoGlobal } = await getEscopo(me)
@@ -67,6 +67,7 @@ export async function GET() {
         proxima_cobranca: boleto?.data_proxima_cobranca || null,
         status_lance: statusLance, checado: v.checado || false,
         pdf_proposta_url: v.pdf_proposta_url,
+        observacoes: v.observacoes || null,
       }
     })
 

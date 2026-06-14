@@ -13,7 +13,7 @@ interface Boleto {
   status: string
   boleto_pdf_url: string | null
   clientes?: { nome: string }
-  vendas?: { numero_proposta: string; numero_contrato: string; grupo: string; cota: string; valor_credito: number }
+  vendas?: { numero_proposta: string; numero_contrato: string; grupo: string; cota: string; valor_credito: number; observacoes?: string | null }
   empresas?: { nome: string }
   equipes?: { nome: string }
   usuarios?: { nome: string }
@@ -293,6 +293,7 @@ O boleto está em anexo.`
                       <span>Grupo/Cota: {b.vendas?.grupo}/{b.vendas?.cota}</span>
                       <span>{b.qtd_parcelas} parc.</span>
                       <span className="font-semibold" style={{ color: statusAtual?.cor }}>{fmtMoeda(b.valor_boleto)}</span>
+                      {b.vendas?.observacoes && <span className="flex items-center gap-1 w-full mt-1 italic" style={{ color: '#eab308' }}><FileText size={11} /> {b.vendas.observacoes}</span>}
                       {b.boleto_pdf_url && <span className="flex items-center gap-1" style={{ color: '#22c55e' }}><Paperclip size={11} />boleto anexado</span>}
                       {b.status === 'pendente' && <span style={{ color: (horasDesde((b as any).criado_em) || 0) >= 24 ? '#ef4444' : '#eab308' }}>pendente {tempoDecorrido((b as any).criado_em)}</span>}
                       {b.status === 'solicitado' && <span style={{ color: (horasDesde(b.data_solicitacao) || 0) >= 72 ? '#ef4444' : '#f97316' }}>solicitado {tempoDecorrido(b.data_solicitacao)}</span>}
