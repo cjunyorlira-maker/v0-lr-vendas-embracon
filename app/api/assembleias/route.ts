@@ -65,15 +65,19 @@ export async function GET() {
       if (v.vendedor_id) clientesPorGrupo[g].vendedorIds.add(v.vendedor_id)
     }
 
-    // monta a lista de grupos: só os grupos onde temos cliente (após o filtro de escopo)
-    const gruposComCliente = Object.keys(clientesPorGrupo)
+    // monta a lista: TODOS os grupos mapeados (todos veem todos), contagem respeita visibilidade
     const infoMap: Record<string, any> = {}
     for (const gi of (gruposInfo || [])) infoMap[String(gi.grupo).trim()] = gi
+    // grupos = todos os mapeados em assembleias_grupos_info + qualquer grupo que tenha histórico ou cliente
+    const todosGrupos = new Set<string>()
+    for (const gi of (gruposInfo || [])) todosGrupos.add(String(gi.grupo).trim())
+    for (const h of (historico || [])) todosGrupos.add(String(h.grupo).trim())
+    for (const g of Object.keys(clientesPorGrupo)) todosGrupos.add(g)
 
-    const grupos = gruposComCliente.map(g => {
+    const grupos = Array.from(todosGrupos).map(g => {
       const info = infoMap[g] || {}
       const hist = (historico || []).filter(h => String(h.grupo).trim() === g)
-      const cpg = clientesPorGrupo[g]
+      const cpg = clientesPorGrupo[g] || { total: new Set(), porEmpresa: {}, empresaIds: new Set(), equipeIds: new Set(), vendedorIds: new Set() }
       // número da próxima assembleia: prazo_inicial - prazo_restante + 1
       let proxNum: number | null = null
       if (info.prazo_inicial != null && info.prazo_restante != null) {
