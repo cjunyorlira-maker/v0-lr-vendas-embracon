@@ -58,6 +58,7 @@ export default function LancesPage() {
   const [justificativa, setJustificativa] = useState('')
   const [fGrupo, setFGrupo] = useState('')
   const [busca, setBusca] = useState('')
+  const [filtroMes, setFiltroMes] = useState<'atual' | 'todos'>('atual')
   const [filtrosOpc, setFiltrosOpc] = useState<{ empresas: any[]; equipes: any[]; vendedores: any[] }>({ empresas: [], equipes: [], vendedores: [] })
   const [fEmpresa, setFEmpresa] = useState('')
   const [fEquipe, setFEquipe] = useState('')
@@ -101,6 +102,12 @@ export default function LancesPage() {
     if (fEquipe && l.equipe_id !== fEquipe) return false
     if (fVendedor && l.vendedor_id !== fVendedor) return false
     if (fGrupo && String(l.grupo) !== fGrupo) return false
+    if (filtroMes === 'atual') {
+      const mesCorrente = new Date().toISOString().slice(0, 7)
+      // mostra os do mês corrente (pela assembleia ou pelo mês de referência)
+      const mesDoLance = l.data_assembleia ? l.data_assembleia.slice(0, 7) : (l.mes_referencia || '')
+      if (mesDoLance !== mesCorrente) return false
+    }
     if (busca) {
       const b = busca.toLowerCase()
       const bate = (l.clientes?.nome || '').toLowerCase().includes(b) || String(l.grupo || '').includes(b) || String(l.numero_proposta || '').includes(b)
@@ -307,6 +314,10 @@ export default function LancesPage() {
           ) : (
             <>
             <div className="flex items-center gap-2 mb-5 flex-wrap">
+              <div className="flex gap-1 rounded-lg p-0.5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
+                <button onClick={() => setFiltroMes('atual')} className="rounded-md px-3 py-1.5 text-xs font-medium transition-colors" style={{ background: filtroMes === 'atual' ? 'var(--accent)' : 'transparent', color: filtroMes === 'atual' ? '#0a0a0a' : 'var(--muted-color)' }}>Mês Atual</button>
+                <button onClick={() => setFiltroMes('todos')} className="rounded-md px-3 py-1.5 text-xs font-medium transition-colors" style={{ background: filtroMes === 'todos' ? 'var(--accent)' : 'transparent', color: filtroMes === 'todos' ? '#0a0a0a' : 'var(--muted-color)' }}>Todos</button>
+              </div>
               <div className="relative">
                 <Search size={15} style={{ color: 'var(--muted-color)', position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
                 <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar cliente, grupo, proposta..." className="rounded-lg pl-8 pr-3 py-2 text-sm outline-none w-64" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }} />
