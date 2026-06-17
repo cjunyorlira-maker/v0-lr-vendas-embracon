@@ -98,7 +98,6 @@ export default function AssembleiasPage() {
   }
 
   const podeSubirExtrato = ['adm', 'master', 'representante'].includes(meuRole)
-  const extratoDoGrupo = (grupo: string) => extratos.find(e => e.grupo === grupo)
 
   const subirExtrato = async (file: File) => {
     setSubindoExtrato('subindo')
@@ -279,27 +278,25 @@ export default function AssembleiasPage() {
                     </div>
                   )}
                   <div className="flex flex-col gap-2">
-                    {gruposDaCat.map(g => {
-                      const ext = extratoDoGrupo(g.grupo)
-                      return (
-                        <div key={g.grupo} className="flex items-center justify-between rounded-xl p-3" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+                    {extratos
+                      .filter(e => e.bem === catAtiva && (!buscaGrupo || e.grupo.includes(buscaGrupo.trim())))
+                      .map(e => (
+                        <div key={e.grupo} className="flex items-center justify-between rounded-xl p-3" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
                           <div className="flex items-center gap-2">
-                            <FileText size={15} style={{ color: ext ? 'var(--accent)' : 'var(--muted-color)' }} />
+                            <FileText size={15} style={{ color: 'var(--accent)' }} />
                             <div>
-                              <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>Grupo {g.grupo}</span>
-                              {ext ? <span className="text-[10px] block" style={{ color: 'var(--muted-color)' }}>Atualizado em {new Date(ext.atualizado_em).toLocaleDateString('pt-BR')}</span> : <span className="text-[10px] block" style={{ color: 'var(--muted-color)' }}>Sem extrato</span>}
+                              <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>Grupo {e.grupo}</span>
+                              <span className="text-[10px] block" style={{ color: 'var(--muted-color)' }}>Atualizado em {new Date(e.atualizado_em).toLocaleDateString('pt-BR')}</span>
                             </div>
                           </div>
-                          {ext ? (
-                            <button onClick={() => baixarExtrato(g.grupo)} className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg font-medium" style={{ background: 'rgba(212,175,55,0.15)', color: 'var(--accent)', border: '1px solid rgba(212,175,55,0.3)' }}>
-                              <Download size={13} /> Baixar
-                            </button>
-                          ) : (
-                            <span className="text-xs" style={{ color: 'var(--muted-color)' }}>—</span>
-                          )}
+                          <button onClick={() => baixarExtrato(e.grupo)} className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg font-medium" style={{ background: 'rgba(212,175,55,0.15)', color: 'var(--accent)', border: '1px solid rgba(212,175,55,0.3)' }}>
+                            <Download size={13} /> Baixar
+                          </button>
                         </div>
-                      )
-                    })}
+                      ))}
+                    {extratos.filter(e => e.bem === catAtiva && (!buscaGrupo || e.grupo.includes(buscaGrupo.trim()))).length === 0 && (
+                      <p className="text-sm text-center py-6" style={{ color: 'var(--muted-color)' }}>Nenhum extrato nesta categoria ainda.</p>
+                    )}
                   </div>
                 </div>
               )}
