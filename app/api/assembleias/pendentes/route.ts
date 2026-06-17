@@ -23,6 +23,16 @@ export async function GET() {
     // histórico já subido
     const { data: historico } = await supabaseAdmin
       .from('assembleias_historico').select('grupo, mes_referencia')
+    // primeira assembleia que cada grupo realmente participou (entrada das vendas)
+    const { data: vendasAssemb } = await supabaseAdmin
+      .from('vendas').select('grupo, data_assembleia_entrada').not('grupo', 'is', null).not('data_assembleia_entrada', 'is', null)
+    const primeiraAssembGrupo: Record<string, string> = {}
+    for (const v of (vendasAssemb || [])) {
+      const g = String(v.grupo).trim()
+      if (!primeiraAssembGrupo[g] || v.data_assembleia_entrada < primeiraAssembGrupo[g]) {
+        primeiraAssembGrupo[g] = v.data_assembleia_entrada
+      }
+    }
 
     const hoje = new Date().toISOString().slice(0, 10)
     const linhaDe: Record<string, string> = {}
@@ -35,9 +45,12 @@ export async function GET() {
       if (gi.proxima_assembleia === 'INAUGURAR') continue
       const linha = linhaDe[grupo]
       if (!linha) continue
-      // última assembleia que já aconteceu (data real do calendário)
+      // a partir de quando o grupo participou (não pega assembleias de antes da entrada)
+      const inicioGrupo = primeiraAssembGrupo[grupo]
+      if (!inicioGrupo) continue // grupo sem venda com assembleia ainda → não cobra resultado
+      // última assembleia que já aconteceu (data real do calendário), a partir da entrada do grupo
       const assembsPassadas = (calendario || [])
-        .filter(c => c.linha_calendario === linha && c.data_assembleia <= hoje)
+        .filter(c => c.linha_calendario === linha && c.data_assembleia <= hoje && c.data_assembleia >= inicioGrupo)
         .map(c => c.data_assembleia)
         .sort()
       if (assembsPassadas.length === 0) continue
