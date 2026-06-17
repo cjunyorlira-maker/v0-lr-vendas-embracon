@@ -44,12 +44,16 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ grup
       if (cal) calendario = cal
     }
 
-    // Próxima assembleia e vencimento (a partir de hoje)
+    // Próxima assembleia (Regra B): escolhe a primeira cujo VENCIMENTO ainda não passou.
+    // Se o vencimento do mês já passou, o cliente não paga a 1ª parcela a tempo → vai pro mês seguinte.
+    const hojeStr = hoje.toISOString().slice(0, 10)
     let proxima: any = null
     for (const a of calendario) {
-      if (new Date(a.data_assembleia) >= hoje) { proxima = a; break }
+      // usa o vencimento como corte; se não tiver vencimento, usa a própria assembleia
+      const corte = a.data_vencimento || a.data_assembleia
+      if (corte >= hojeStr) { proxima = a; break }
     }
-    if (!proxima && calendario.length > 0) proxima = calendario[0]
+    if (!proxima && calendario.length > 0) proxima = calendario[calendario.length - 1]
 
     return NextResponse.json({
       encontrado: true,
