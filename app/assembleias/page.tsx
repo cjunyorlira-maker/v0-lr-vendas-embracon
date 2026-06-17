@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { CalendarCheck, ChevronDown, ChevronUp, Users, Dices, Target, Gavel, Sparkles, Loader2, Share2, Upload, CheckCircle2, PartyPopper, BarChart3 } from 'lucide-react'
+import { CalendarCheck, ChevronDown, ChevronUp, Users, Dices, Target, Gavel, Sparkles, Loader2, Share2, Upload, CheckCircle2, PartyPopper, BarChart3, AlertTriangle } from 'lucide-react'
 import PassarResultado from '@/components/PassarResultado'
 
 interface HistMes {
@@ -46,9 +46,14 @@ export default function AssembleiasPage() {
   const [fVendedor, setFVendedor] = useState('')
   const [subindo, setSubindo] = useState(false)
   const [resultadoUpload, setResultadoUpload] = useState<any>(null)
+  const [pendentes, setPendentes] = useState<{ grupo: string; bem: string; data_assembleia: string; mes: string }[]>([])
   const [visao, setVisao] = useState<'atual' | 'historico'>('historico')
   const [ordenacao, setOrdenacao] = useState<'proxima' | 'contemplam'>('proxima')
 
+  const carregarPendentes = () => {
+    fetch('/api/assembleias/pendentes').then(r => r.json()).then(d => { if (d.pendentes) setPendentes(d.pendentes) }).catch(() => {})
+  }
+  useEffect(() => { carregarPendentes() }, [])
   useEffect(() => {
     fetch('/api/assembleias').then(r => r.json()).then(d => {
       if (d.grupos) setGrupos(d.grupos)
@@ -70,7 +75,7 @@ export default function AssembleiasPage() {
       const r = await fetch('/api/assembleias/upload', { method: 'POST', body: fd })
       const d = await r.json()
       if (d.error) { alert('Erro: ' + d.error) }
-      else { setResultadoUpload(d); recarregar() }
+      else { setResultadoUpload(d); recarregar(); carregarPendentes() }
     } catch (e) { alert('Erro ao subir o arquivo.') }
     setSubindo(false)
   }
@@ -125,6 +130,26 @@ export default function AssembleiasPage() {
               <input type="file" accept="application/pdf" className="hidden" disabled={subindo} onChange={(e) => { const f = e.target.files?.[0]; if (f) subirResultado(f); e.target.value = '' }} />
             </label>
           </div>
+
+          {/* alerta: grupos pendentes de subir resultado */}
+          {pendentes.length > 0 && (
+            <div className="mb-6 rounded-xl p-4" style={{ background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.35)' }}>
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle size={16} style={{ color: '#eab308' }} />
+                <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Subir resultados — assembleias já realizadas</span>
+              </div>
+              <p className="text-xs mb-2" style={{ color: 'var(--muted-color)' }}>
+                {pendentes.length} grupo{pendentes.length !== 1 ? 's' : ''} com assembleia realizada e resultado ainda não cadastrado:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {pendentes.map(p => (
+                  <span key={p.grupo} className="text-xs px-2 py-1 rounded-md font-medium" style={{ background: 'rgba(234,179,8,0.15)', color: '#eab308', border: '1px solid rgba(234,179,8,0.3)' }}>
+                    Grupo {p.grupo} · {new Date(p.data_assembleia + 'T00:00:00').toLocaleDateString('pt-BR')}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* feedback do upload */}
           {resultadoUpload && (

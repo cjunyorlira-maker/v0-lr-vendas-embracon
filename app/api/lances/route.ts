@@ -84,13 +84,20 @@ export async function GET() {
       }
       const proxAssembleia = await proximaAssembleiaGrupo(grupo, lanceAtivo.data_assembleia)
 
+      // o mês de referência do novo lance é o mês da PRÓXIMA assembleia (não o mês atual),
+      // pra não colidir com a constraint UNIQUE(lance_config_id, mes_referencia) do lance encerrado
+      const mesNovoLance = proxAssembleia ? proxAssembleia.slice(0, 7) : mesRef
+
       // recorrente → volta como solicitado; não-recorrente → volta como pendente (vendedor solicita)
       const statusInicial = cfg.recorrente ? 'solicitado' : 'pendente'
-      await supabaseAdmin.from('lances_mensais').insert({
+      const { error: errNovo } = await supabaseAdmin.from('lances_mensais').insert({
         lance_config_id: cfg.id, empresa_id: cfg.empresa_id, cliente_id: cfg.cliente_id,
         vendedor_id: cfg.vendedor_id, equipe_id: cfg.equipe_id,
-        mes_referencia: mesRef, data_assembleia: proxAssembleia, status: statusInicial,
+        mes_referencia: mesNovoLance, data_assembleia: proxAssembleia, status: statusInicial,
       })
+      if (errNovo) {
+        console.error('Erro ao gerar próximo lance da config', cfg.id, errNovo.message)
+      }
     }
 
     // 2. LISTA os lances ATIVOS (não contemplados/cancelados), independente do mês.
