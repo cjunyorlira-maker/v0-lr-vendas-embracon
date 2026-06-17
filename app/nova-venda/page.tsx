@@ -66,6 +66,22 @@ export default function NovaVendaPage() {
     })
   }, [])
 
+  // quando a data de assembleia muda, o vencimento base passa a ser o do mesmo mês (do calendário do grupo)
+  useEffect(() => {
+    if (!dataAssembleia || calendarioGrupo.length === 0) return
+    const d = new Date(dataAssembleia + 'T00:00:00')
+    const mes = d.getMonth() + 1
+    const ano = d.getFullYear()
+    const ent = calendarioGrupo.find((c: any) => {
+      if (!c.data_assembleia) return false
+      const da = new Date(c.data_assembleia + 'T00:00:00')
+      return da.getMonth() + 1 === mes && da.getFullYear() === ano
+    })
+    if (ent?.data_vencimento && ent.data_vencimento !== dataVencimento) {
+      setDataVencimento(ent.data_vencimento)
+    }
+  }, [dataAssembleia, calendarioGrupo])
+
   useEffect(() => { setProximaCobranca(calcularProximaCobranca()) }, [dataVencimento, qtdParcelas, calendarioGrupo])
 
   const valorBoletoCalc = (() => {
