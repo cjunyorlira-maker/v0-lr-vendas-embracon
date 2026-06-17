@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { CalendarCheck, ChevronDown, ChevronUp, Users, Dices, Target, Gavel, Sparkles, Loader2, Share2, Upload, CheckCircle2, PartyPopper, BarChart3, AlertTriangle } from 'lucide-react'
+import { CalendarCheck, ChevronDown, ChevronUp, Users, Dices, Target, Gavel, Sparkles, Loader2, Share2, Upload, CheckCircle2, PartyPopper, BarChart3, AlertTriangle, FileText, Download } from 'lucide-react'
 import PassarResultado from '@/components/PassarResultado'
 
 interface HistMes {
@@ -47,17 +47,25 @@ export default function AssembleiasPage() {
   const [subindo, setSubindo] = useState(false)
   const [resultadoUpload, setResultadoUpload] = useState<any>(null)
   const [pendentes, setPendentes] = useState<{ grupo: string; bem: string; data_assembleia: string; mes: string }[]>([])
-  const [visao, setVisao] = useState<'atual' | 'historico'>('historico')
+  const [visao, setVisao] = useState<'atual' | 'historico' | 'extrato'>('historico')
+  const [meuRole, setMeuRole] = useState<string>('')
+  const [extratos, setExtratos] = useState<{ grupo: string; bem: string; arquivo_nome: string; atualizado_em: string }[]>([])
+  const [subindoExtrato, setSubindoExtrato] = useState<string | null>(null)
   const [ordenacao, setOrdenacao] = useState<'proxima' | 'contemplam'>('proxima')
 
   const carregarPendentes = () => {
     fetch('/api/assembleias/pendentes').then(r => r.json()).then(d => { if (d.pendentes) setPendentes(d.pendentes) }).catch(() => {})
   }
   useEffect(() => { carregarPendentes() }, [])
+  const carregarExtratos = () => {
+    fetch('/api/assembleias/extrato').then(r => r.json()).then(d => { if (d.extratos) setExtratos(d.extratos) }).catch(() => {})
+  }
+  useEffect(() => { carregarExtratos() }, [])
   useEffect(() => {
     fetch('/api/assembleias').then(r => r.json()).then(d => {
       if (d.grupos) setGrupos(d.grupos)
       if (d.filtros) setFiltros(d.filtros)
+      if (d.meu_role) setMeuRole(d.meu_role)
       setLoading(false)
     }).catch(() => setLoading(false))
   }, [])
@@ -87,6 +95,31 @@ export default function AssembleiasPage() {
     if (!g.historico || g.historico.length === 0) return 0
     const soma = g.historico.reduce((s, h) => s + (h.total_contemplados || 0), 0)
     return Math.round(soma / g.historico.length)
+  }
+
+  const podeSubirExtrato = ['adm', 'master', 'representante'].includes(meuRole)
+  const extratoDoGrupo = (grupo: string) => extratos.find(e => e.grupo === grupo)
+
+  const subirExtrato = async (file: File) => {
+    setSubindoExtrato('subindo')
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const r = await fetch('/api/assembleias/extrato', { method: 'POST', body: fd })
+      const d = await r.json()
+      if (d.error) alert('Erro: ' + d.error)
+      else { alert(`Extrato do grupo ${d.grupo} salvo!`); carregarExtratos() }
+    } catch (e) { alert('Erro ao subir o extrato.') }
+    setSubindoExtrato(null)
+  }
+
+  const baixarExtrato = async (grupo: string) => {
+    try {
+      const r = await fetch(`/api/assembleias/extrato/download?grupo=${grupo}`)
+      const d = await r.json()
+      if (d.error) { alert('Erro: ' + d.error); return }
+      if (d.url) window.open(d.url, '_blank')
+    } catch (e) { alert('Erro ao baixar.') }
   }
 
   const gruposDaCat = grupos.filter(g =>
@@ -176,6 +209,7 @@ export default function AssembleiasPage() {
           <div className="flex gap-2 mb-4">
             <button onClick={() => { setVisao('atual'); setAberto(null) }} className="rounded-lg px-4 py-2 text-sm font-medium transition-colors" style={{ background: visao === 'atual' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${visao === 'atual' ? 'var(--accent)' : 'var(--border)'}`, color: visao === 'atual' ? 'var(--accent)' : 'var(--muted-color)' }}>Mês Atual</button>
             <button onClick={() => { setVisao('historico'); setAberto(null) }} className="rounded-lg px-4 py-2 text-sm font-medium transition-colors" style={{ background: visao === 'historico' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${visao === 'historico' ? 'var(--accent)' : 'var(--border)'}`, color: visao === 'historico' ? 'var(--accent)' : 'var(--muted-color)' }}>Histórico</button>
+            <button onClick={() => { setVisao('extrato'); setAberto(null) }} className="rounded-lg px-4 py-2 text-sm font-medium transition-colors" style={{ background: visao === 'extrato' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${visao === 'extrato' ? 'var(--accent)' : 'var(--border)'}`, color: visao === 'extrato' ? 'var(--accent)' : 'var(--muted-color)' }}>Extrato do Grupo</button>
           </div>
 
           {/* abas de categoria */}
@@ -232,7 +266,45 @@ export default function AssembleiasPage() {
             <p className="text-sm text-center py-16" style={{ color: 'var(--muted-color)' }}>Nenhum grupo nesta categoria.</p>
           ) : (
             <div className="flex flex-col gap-3">
-              {gruposDaCat.map(g => (
+              {visao === 'extrato' && (
+                <div className="mb-4">
+                  {podeSubirExtrato && (
+                    <div className="mb-4 rounded-xl p-4" style={{ background: 'rgba(212,175,55,0.08)', border: '1px solid var(--border)' }}>
+                      <label className="flex items-center gap-2 cursor-pointer text-sm font-semibold" style={{ color: 'var(--accent)' }}>
+                        {subindoExtrato ? <Loader2 size={16} className="animate-spin" /> : <Upload size={16} />}
+                        {subindoExtrato ? 'Processando...' : 'Subir / Atualizar Extrato (PDF)'}
+                        <input type="file" accept="application/pdf" className="hidden" disabled={!!subindoExtrato} onChange={(e) => { const f = e.target.files?.[0]; if (f) subirExtrato(f); e.target.value = '' }} />
+                      </label>
+                      <p className="text-xs mt-1" style={{ color: 'var(--muted-color)' }}>O grupo é identificado automaticamente pelo PDF. Substitui o extrato anterior.</p>
+                    </div>
+                  )}
+                  <div className="flex flex-col gap-2">
+                    {gruposDaCat.map(g => {
+                      const ext = extratoDoGrupo(g.grupo)
+                      return (
+                        <div key={g.grupo} className="flex items-center justify-between rounded-xl p-3" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+                          <div className="flex items-center gap-2">
+                            <FileText size={15} style={{ color: ext ? 'var(--accent)' : 'var(--muted-color)' }} />
+                            <div>
+                              <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>Grupo {g.grupo}</span>
+                              {ext ? <span className="text-[10px] block" style={{ color: 'var(--muted-color)' }}>Atualizado em {new Date(ext.atualizado_em).toLocaleDateString('pt-BR')}</span> : <span className="text-[10px] block" style={{ color: 'var(--muted-color)' }}>Sem extrato</span>}
+                            </div>
+                          </div>
+                          {ext ? (
+                            <button onClick={() => baixarExtrato(g.grupo)} className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg font-medium" style={{ background: 'rgba(212,175,55,0.15)', color: 'var(--accent)', border: '1px solid rgba(212,175,55,0.3)' }}>
+                              <Download size={13} /> Baixar
+                            </button>
+                          ) : (
+                            <span className="text-xs" style={{ color: 'var(--muted-color)' }}>—</span>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {visao !== 'extrato' && gruposDaCat.map(g => (
                 <div key={g.grupo} className="rounded-xl overflow-hidden" style={inputStyle}>
                   {/* cabeçalho do grupo */}
                   <button onClick={() => setAberto(aberto === g.grupo ? null : g.grupo)} className="w-full flex items-center justify-between p-4 text-left">
