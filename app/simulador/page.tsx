@@ -205,8 +205,14 @@ export default function SimuladorPage() {
     doc.setTextColor(...RED); doc.setFont('helvetica','bold'); doc.setFontSize(11)
     doc.text('Demonstrativo de taxa', 108 + 44, ry2 + 8, { align: 'center' })
     ry2 += 16
-    badge(112, ry2, 22, 'Mês'); doc.setDrawColor(180,220,210); doc.setFillColor(200,230,220); doc.roundedRect(138, ry2+1, 20, 5, 2.5, 2.5, 'F'); valor(162, ry2, '0,10%'); ry2 += 11
-    badge(112, ry2, 22, 'Ano'); doc.setFillColor(235,200,205); doc.roundedRect(138, ry2+1, 44, 5, 2.5, 2.5, 'F'); valor(186, ry2, '1,20%'); ry2 += 16
+    const admTopo = planoAtual.tx_adm_topo || 0
+    const taxaMes = admTopo / 240
+    const taxaAno = taxaMes * 12
+    const fmtPct = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%'
+    const barMes = 18
+    badge(112, ry2, 22, 'Mês'); doc.setDrawColor(180,220,210); doc.setFillColor(200,230,220); doc.roundedRect(138, ry2+1, barMes, 5, 2.5, 2.5, 'F'); valor(138 + barMes + 4, ry2, fmtPct(taxaMes)); ry2 += 11
+    const barAno = Math.min(barMes * 12, 44)
+    badge(112, ry2, 22, 'Ano'); doc.setFillColor(235,200,205); doc.roundedRect(138, ry2+1, barAno, 5, 2.5, 2.5, 'F'); valor(138 + barAno + 4, ry2, fmtPct(taxaAno)); ry2 += 16
 
     // Avisos
     doc.setTextColor(120,120,120); doc.setFont('helvetica','normal'); doc.setFontSize(7.5)
