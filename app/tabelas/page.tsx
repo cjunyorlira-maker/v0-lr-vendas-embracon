@@ -113,24 +113,32 @@ export default function TabelasPage() {
                                         </tr>
                                       </thead>
                                       <tbody>
-                                        {faixas.map(f => (
+                                        {faixas.map(f => {
+                                          const seg = comSeguro ? Math.round(f.credito * (p.seguro_pct || 0) * 100) / 100 : 0
+                                          const p1 = f.primeira_parcela + seg
+                                          const pd = f.demais_parcela + seg
+                                          const naoEstornarParc = p.parcelas_nao_estornar || 8
+                                          const totalNaoEst = f.total_nao_estornar + seg * naoEstornarParc
+                                          const mais7Seg = f.mais_7 + seg * 7
+                                          return (
                                           <tr key={f.credito} style={{ borderBottom: '1px solid var(--border)' }}>
                                             <td className="p-2 font-medium" style={{ color: 'var(--text)' }}>{fmtMoeda(f.credito)}</td>
-                                            <td className="p-2 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda2(f.primeira_parcela + (comSeguro ? Math.round(f.credito * (p.seguro_pct || 0) * 100) / 100 : 0))}</td>
-                                            <td className="p-2 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda2(f.demais_parcela + (comSeguro ? Math.round(f.credito * (p.seguro_pct || 0) * 100) / 100 : 0))}</td>
+                                            <td className="p-2 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda2(p1)}</td>
+                                            <td className="p-2 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda2(pd)}</td>
                                             {(p.sigla === 'TP' || p.sigla === 'TEP') ? null : p.sigla === 'SP' ? (
                                               <>
-                                                <td className="p-2 text-right" style={{ color: '#22c55e' }}>{fmtMoeda2(f.total_nao_estornar)}</td>
-                                                <td className="p-2 text-right" style={{ color: '#f59e0b' }}>{fmtMoeda2(f.primeira_parcela + f.demais_parcela * 5)}</td>
+                                                <td className="p-2 text-right" style={{ color: '#22c55e' }}>{fmtMoeda2(totalNaoEst)}</td>
+                                                <td className="p-2 text-right" style={{ color: '#f59e0b' }}>{fmtMoeda2(p1 + pd * 5)}</td>
                                               </>
                                             ) : (
                                               <>
-                                                <td className="p-2 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda2(f.mais_7)}</td>
-                                                <td className="p-2 text-right" style={{ color: '#f59e0b' }}>{fmtMoeda2(f.total_nao_estornar)}</td>
+                                                <td className="p-2 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda2(mais7Seg)}</td>
+                                                <td className="p-2 text-right" style={{ color: '#f59e0b' }}>{fmtMoeda2(totalNaoEst)}</td>
                                               </>
                                             )}
                                           </tr>
-                                        ))}
+                                          )
+                                        })}
                                       </tbody>
                                     </table>
                                   </div>
