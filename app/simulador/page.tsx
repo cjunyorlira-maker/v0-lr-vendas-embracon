@@ -100,17 +100,27 @@ export default function SimuladorPage() {
 
   const inputStyle = { background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }
 
+  const formatarMoeda = (valor: string) => {
+    const num = valor.replace(/\D/g, '')
+    if (!num) return ''
+    const n = parseInt(num) / 100
+    return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
+
   const gerarPDF = () => {
     if (!faixa || !planoAtual) return
     const doc = new jsPDF()
+    doc.setLanguage('pt-BR')
     const RED: [number,number,number] = [200, 32, 46]
     const DARK: [number,number,number] = [55, 55, 55]
     const fmt = (n: number) => 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
     const W = 210
 
-    // Badge pílula vermelha com texto branco
+    // Badge pílula vermelha com texto branco (canto suave + sombra sutil)
     const badge = (x: number, yy: number, w: number, label: string) => {
-      doc.setFillColor(...RED); doc.roundedRect(x, yy, w, 7, 3.5, 3.5, 'F')
+      doc.setFillColor(220, 220, 220)
+      doc.roundedRect(x + 0.4, yy + 0.5, w, 7, 4, 4, 'F')
+      doc.setFillColor(...RED); doc.roundedRect(x, yy, w, 7, 4, 4, 'F')
       doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(8)
       doc.text(label, x + w/2, yy + 4.8, { align: 'center' })
     }
@@ -118,13 +128,26 @@ export default function SimuladorPage() {
       doc.setTextColor(...DARK); doc.setFont('helvetica','bold'); doc.setFontSize(9)
       doc.text(txt, x, yy + 4.8)
     }
+    const caixaSombra = (x: number, yy: number, w: number, h: number) => {
+      doc.setFillColor(235, 235, 235)
+      doc.roundedRect(x + 1, yy + 1.2, w, h, 3, 3, 'F')
+      doc.setDrawColor(228, 228, 228); doc.setFillColor(255, 255, 255)
+      doc.roundedRect(x, yy, w, h, 3, 3, 'FD')
+    }
 
-    // HEADER vermelho
-    doc.setFillColor(...RED); doc.rect(0, 0, W, 30, 'F')
+    // Header com gradiente vermelho (escuro -> claro)
+    for (let i = 0; i < 30; i++) {
+      const t = i / 30
+      const r = Math.round(160 + (210 - 160) * t)
+      const g = Math.round(20 + (45 - 20) * t)
+      const b = Math.round(34 + (55 - 34) * t)
+      doc.setFillColor(r, g, b)
+      doc.rect(0, i, W, 1, 'F')
+    }
     doc.setTextColor(255,255,255); doc.setFont('helvetica','normal'); doc.setFontSize(15)
     doc.text('Oi, ' + (nomeCliente || 'Cliente'), 14, 13)
     doc.setFontSize(11)
-    doc.text('Aqui esta a sua simulacao de credito.', 14, 21)
+    doc.text('Aqui está a sua simulação de crédito.', 14, 21)
     // logo sobre faixa branca (pra logo preta aparecer legível no header vermelho)
     if (logoBase64) {
       try {
@@ -143,7 +166,7 @@ export default function SimuladorPage() {
 
     // Bloco cliente (3 linhas com badge)
     let y = 40
-    badge(14, y, 38, 'Cliente'); valor(56, y, nomeCliente || 'Simulacao'); y += 10
+    badge(14, y, 38, 'Cliente'); valor(56, y, nomeCliente || 'Simulação'); y += 10
     badge(14, y, 38, 'Criada em'); valor(56, y, new Date().toLocaleDateString('pt-BR') + ' ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})); y += 10
     badge(14, y, 38, 'Interesse'); valor(56, y, planoAtual.bem); y += 14
 
@@ -154,15 +177,14 @@ export default function SimuladorPage() {
     const colY = y
     // ===== COLUNA ESQUERDA =====
     // Caixa Resumo
-    doc.setDrawColor(225,225,225); doc.setFillColor(252,252,252)
-    doc.roundedRect(14, colY, 88, 92, 2, 2, 'FD')
+    caixaSombra(14, colY, 88, 92)
     doc.setTextColor(...RED); doc.setFont('helvetica','bold'); doc.setFontSize(11)
     doc.text('Resumo', 14 + 44, colY + 8, { align: 'center' })
     let ry = colY + 14
     const resumoItens: [string,string,number][] = [
-      ['Credito total', fmt(faixa.credito), 40],
+      ['Crédito total', fmt(faixa.credito), 40],
       ['Lance embutido', fmt(lanceNum), 40],
-      ['Credito liquido', fmt(creditoLiquido), 40],
+      ['Crédito líquido', fmt(creditoLiquido), 40],
       ['Prazo', prazoRestante + ' meses', 30],
       ['Taxa adm', (planoAtual.tx_adm_topo || '-') + '%', 30],
       ['Taxa antecipada', planoAtual.adesao_percent + '%', 36],
@@ -170,24 +192,27 @@ export default function SimuladorPage() {
     ]
     resumoItens.forEach(([k,v,bw]) => { badge(18, ry, bw, k); valor(18 + bw + 4, ry, v); ry += 10.5 })
 
-    // Caixa Investimento com seguro
+    // Investimento com seguro (fundo claro)
     const segMensal = Math.round(faixa.credito * (planoAtual.seguro_pct || 0) * 100) / 100
+    // Primeiro pagamento = 1ª parcela + parcelas antecipadas (qtd)
+    const primeiroPagamentoSem = faixa.primeira_parcela + (faixa.demais_parcela * qtd)
+    const primeiroPagamentoCom = (faixa.primeira_parcela + segMensal) + ((faixa.demais_parcela + segMensal) * qtd)
     let y2 = colY + 100
-    doc.roundedRect(14, y2, 88, 44, 2, 2, 'FD')
+    caixaSombra(14, y2, 88, 44)
     doc.setTextColor(...RED); doc.setFont('helvetica','bold'); doc.setFontSize(10)
     doc.text('Investimento com seguro', 14 + 44, y2 + 8, { align: 'center' })
     let iy = y2 + 14
-    badge(18, iy, 30, '1a parcela'); valor(52, iy, fmt(faixa.primeira_parcela + segMensal)); iy += 10
+    badge(18, iy, 38, '1º pagamento'); valor(60, iy, fmt(primeiroPagamentoCom)); iy += 10
     badge(18, iy, 38, 'Demais parcelas'); valor(60, iy, fmt(faixa.demais_parcela + segMensal)); iy += 10
     badge(18, iy, 36, 'Valor do seguro'); valor(58, iy, fmt(segMensal))
 
-    // Caixa Investimento sem seguro
+    // Investimento sem seguro (fundo claro)
     let y3 = y2 + 52
-    doc.roundedRect(14, y3, 88, 34, 2, 2, 'FD')
+    caixaSombra(14, y3, 88, 34)
     doc.setTextColor(...RED); doc.setFont('helvetica','bold'); doc.setFontSize(10)
     doc.text('Investimento sem seguro', 14 + 44, y3 + 8, { align: 'center' })
     let sy = y3 + 14
-    badge(18, sy, 30, '1a parcela'); valor(52, sy, fmt(faixa.primeira_parcela)); sy += 10
+    badge(18, sy, 38, '1º pagamento'); valor(60, sy, fmt(primeiroPagamentoSem)); sy += 10
     badge(18, sy, 38, 'Demais parcelas'); valor(60, sy, fmt(faixa.demais_parcela))
 
     // ===== COLUNA DIREITA =====
@@ -195,16 +220,22 @@ export default function SimuladorPage() {
     doc.setTextColor(...RED); doc.setFont('helvetica','bold'); doc.setFontSize(11)
     doc.text('Demonstrativo de taxa', 108 + 44, ry2 + 8, { align: 'center' })
     ry2 += 16
-    badge(112, ry2, 22, 'Mes'); doc.setDrawColor(180,220,210); doc.setFillColor(200,230,220); doc.roundedRect(138, ry2+1, 20, 5, 2.5, 2.5, 'F'); valor(162, ry2, '0,10%'); ry2 += 11
-    badge(112, ry2, 22, 'Ano'); doc.setFillColor(235,200,205); doc.roundedRect(138, ry2+1, 44, 5, 2.5, 2.5, 'F'); valor(186, ry2, '1,20%'); ry2 += 16
+    const admTopo = planoAtual.tx_adm_topo || 0
+    const taxaMes = admTopo / 240
+    const taxaAno = taxaMes * 12
+    const fmtPct = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%'
+    const barMes = 18
+    badge(112, ry2, 22, 'Mês'); doc.setDrawColor(180,220,210); doc.setFillColor(200,230,220); doc.roundedRect(138, ry2+1, barMes, 5, 2.5, 2.5, 'F'); valor(138 + barMes + 4, ry2, fmtPct(taxaMes)); ry2 += 11
+    const barAno = Math.min(barMes * 12, 44)
+    badge(112, ry2, 22, 'Ano'); doc.setFillColor(235,200,205); doc.roundedRect(138, ry2+1, barAno, 5, 2.5, 2.5, 'F'); valor(138 + barAno + 4, ry2, fmtPct(taxaAno)); ry2 += 16
 
     // Avisos
     doc.setTextColor(120,120,120); doc.setFont('helvetica','normal'); doc.setFontSize(7.5)
     const avisos = [
-      '* Proposta sujeita a alteracoes, segundo criterios de disponibilidade de vagas no grupo de consorcio.',
-      '* Os termos desta proposta tem validade de dois dias, contados a partir da simulacao.',
-      '* O credito e parcelas sao atualizados no aniversario da cota pelos indices: INCC (imovel) ou IPCA (demais).',
-      '* Os valores das parcelas poderao ser reajustados apos a contemplacao.',
+      '* Proposta sujeita a alterações, segundo critérios de disponibilidade de vagas no grupo de consórcio.',
+      '* Os termos desta proposta têm validade de dois dias, contados a partir da simulação.',
+      '* O crédito e parcelas são atualizados no aniversário da cota pelos índices: INCC (imóvel) ou IPCA (demais).',
+      '* Os valores das parcelas poderão ser reajustados após a contemplação.',
     ]
     avisos.forEach(a => { doc.text(a, 108, ry2, { maxWidth: 90 }); ry2 += 11 })
     doc.setTextColor(90,90,90); doc.setFontSize(8)
@@ -256,8 +287,8 @@ export default function SimuladorPage() {
                     </select>
                     {faixa && seguroPct > 0 && (
                       <div className="flex items-center gap-2 mt-3">
-                        <button onClick={() => setComSeguro(false)} className="flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-colors" style={{ background: !comSeguro ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${!comSeguro ? 'var(--accent)' : 'var(--border)'}`, color: !comSeguro ? 'var(--accent)' : 'var(--muted-color)' }}>Sem seguro</button>
-                        <button onClick={() => setComSeguro(true)} className="flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-colors" style={{ background: comSeguro ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${comSeguro ? 'var(--accent)' : 'var(--border)'}`, color: comSeguro ? 'var(--accent)' : 'var(--muted-color)' }}>Com seguro</button>
+                        <button onClick={() => setComSeguro(false)} className="flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-colors" style={{ background: !comSeguro ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', border: `1px solid ${!comSeguro ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.12)'}`, color: !comSeguro ? 'var(--accent)' : 'var(--muted-color)' }}>Sem seguro</button>
+                        <button onClick={() => setComSeguro(true)} className="flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-colors" style={{ background: comSeguro ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', border: `1px solid ${comSeguro ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.12)'}`, color: comSeguro ? 'var(--accent)' : 'var(--muted-color)' }}>Com seguro</button>
                       </div>
                     )}
                     {comSeguro && seguroMensal > 0 && (
@@ -274,15 +305,18 @@ export default function SimuladorPage() {
                   <div className="mt-4 pt-4 space-y-2" style={{ borderTop: '1px solid var(--border)' }}>
                     <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Gerar PDF da proposta</label>
                     <input value={nomeCliente} onChange={e => setNomeCliente(e.target.value)} placeholder="Nome do cliente" className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
-                    <input value={lanceEmbutido} onChange={e => setLanceEmbutido(e.target.value)} placeholder="Lance embutido (R$) - opcional" className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--muted-color)' }}>R$</span>
+                      <input value={lanceEmbutido} onChange={e => setLanceEmbutido(formatarMoeda(e.target.value))} placeholder="Lance embutido (opcional)" inputMode="numeric" className="w-full rounded-lg pl-9 pr-3 py-2 text-sm outline-none" style={inputStyle} />
+                    </div>
                     <p className="text-[11px]" style={{ color: 'var(--muted-color)' }}>Prazo da proposta: {prazoRestante} meses</p>
-                    <button onClick={gerarPDF} className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors" style={{ background: '#C8202E', color: '#fff' }}>Gerar PDF da proposta</button>
+                    <button onClick={gerarPDF} className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors" style={{ background: 'linear-gradient(135deg, rgba(200,32,46,0.85), rgba(160,20,34,0.85))', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.18)', color: '#fff', boxShadow: '0 8px 24px rgba(200,32,46,0.25)' }}>Gerar PDF da proposta</button>
                   </div>
                 )}
               </div>
 
               {faixa && (
-                <div className="rounded-xl p-5" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+                <div className="rounded-xl p-5" style={{ background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}>
                   <div className="flex items-center gap-3 mb-4"><CreditCard size={18} style={{ color: '#3b82f6' }} /><h3 className="text-sm font-semibold" style={{ color: '#3b82f6' }}>Quanto o cliente paga</h3></div>
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>{ehParcelinha ? 'Parcela (1ª a 12ª)' : '1ª parcela'}</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(p1)}</p></div>
@@ -297,7 +331,7 @@ export default function SimuladorPage() {
 
                   <p className="text-xs mt-3" style={{ color: 'var(--muted-color)' }}>Prazo: 240 meses {planoAtual?.tx_adm_topo ? `· Taxa adm. total: ${planoAtual.tx_adm_topo}%` : ''}</p>
                   {cheiaInc > 0 && faixa && (
-                    <button onClick={() => setVerCheia(v => !v)} className="mt-3 rounded-lg px-3 py-2 text-xs font-medium transition-colors w-full" style={{ background: verCheia ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${verCheia ? 'var(--accent)' : 'var(--border)'}`, color: verCheia ? 'var(--accent)' : 'var(--muted-color)' }}>
+                    <button onClick={() => setVerCheia(v => !v)} className="mt-3 rounded-lg px-3 py-2 text-xs font-medium transition-colors w-full" style={{ background: verCheia ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', border: `1px solid ${verCheia ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.12)'}`, color: verCheia ? 'var(--accent)' : 'var(--muted-color)' }}>
                       {verCheia ? 'Ocultar parcela cheia' : 'Ver parcela cheia (sem redução)'}
                     </button>
                   )}
@@ -313,7 +347,7 @@ export default function SimuladorPage() {
               )}
 
               {planoAtual?.bem === 'Imóvel' && faixa && (
-                <div className="rounded-xl p-4 animate-pulse" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.4)' }}>
+                <div className="rounded-xl p-4 animate-pulse" style={{ background: 'rgba(212,175,55,0.1)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(212,175,55,0.35)', boxShadow: '0 4px 16px rgba(212,175,55,0.15)' }}>
                   <p className="text-sm font-medium text-center" style={{ color: 'var(--accent)' }}>
                     😮 Dica de venda: nos planos de imóvel, vendendo com 2% de adesão em vez de 1%, a taxa de administração total cai de 26% para 22%! Melhor pro cliente e mais comissão pra você.
                   </p>
