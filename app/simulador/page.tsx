@@ -140,6 +140,14 @@ export default function SimuladorPage() {
                 </div>
               )}
 
+              {planoAtual?.bem === 'Imóvel' && faixa && (
+                <div className="rounded-xl p-4 animate-pulse" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.4)' }}>
+                  <p className="text-sm font-medium text-center" style={{ color: 'var(--accent)' }}>
+                    😮 Dica de venda: nos planos de imóvel, vendendo com 2% de adesão em vez de 1%, a taxa de administração total cai de 26% para 22%! Melhor pro cliente e mais comissão pra você.
+                  </p>
+                </div>
+              )}
+
               <div className="flex items-start gap-2 rounded-lg p-3" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
                 <AlertTriangle size={15} style={{ color: '#f59e0b', marginTop: 1 }} />
                 <p className="text-xs" style={{ color: '#f59e0b' }}>Se a venda for gerada em menos meses no sistema da Embracon, o valor das parcelas pode mudar. Confira a proposta final.</p>
