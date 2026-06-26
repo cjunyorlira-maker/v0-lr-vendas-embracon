@@ -116,9 +116,11 @@ export default function SimuladorPage() {
     const fmt = (n: number) => 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
     const W = 210
 
-    // Badge pílula vermelha com texto branco
+    // Badge pílula vermelha com texto branco (canto suave + sombra sutil)
     const badge = (x: number, yy: number, w: number, label: string) => {
-      doc.setFillColor(...RED); doc.roundedRect(x, yy, w, 7, 3.5, 3.5, 'F')
+      doc.setFillColor(220, 220, 220)
+      doc.roundedRect(x + 0.4, yy + 0.5, w, 7, 4, 4, 'F')
+      doc.setFillColor(...RED); doc.roundedRect(x, yy, w, 7, 4, 4, 'F')
       doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(8)
       doc.text(label, x + w/2, yy + 4.8, { align: 'center' })
     }
@@ -126,9 +128,22 @@ export default function SimuladorPage() {
       doc.setTextColor(...DARK); doc.setFont('helvetica','bold'); doc.setFontSize(9)
       doc.text(txt, x, yy + 4.8)
     }
+    const caixaSombra = (x: number, yy: number, w: number, h: number) => {
+      doc.setFillColor(235, 235, 235)
+      doc.roundedRect(x + 1, yy + 1.2, w, h, 3, 3, 'F')
+      doc.setDrawColor(228, 228, 228); doc.setFillColor(255, 255, 255)
+      doc.roundedRect(x, yy, w, h, 3, 3, 'FD')
+    }
 
-    // HEADER vermelho
-    doc.setFillColor(...RED); doc.rect(0, 0, W, 30, 'F')
+    // Header com gradiente vermelho (escuro -> claro)
+    for (let i = 0; i < 30; i++) {
+      const t = i / 30
+      const r = Math.round(160 + (210 - 160) * t)
+      const g = Math.round(20 + (45 - 20) * t)
+      const b = Math.round(34 + (55 - 34) * t)
+      doc.setFillColor(r, g, b)
+      doc.rect(0, i, W, 1, 'F')
+    }
     doc.setTextColor(255,255,255); doc.setFont('helvetica','normal'); doc.setFontSize(15)
     doc.text('Oi, ' + (nomeCliente || 'Cliente'), 14, 13)
     doc.setFontSize(11)
@@ -162,8 +177,7 @@ export default function SimuladorPage() {
     const colY = y
     // ===== COLUNA ESQUERDA =====
     // Caixa Resumo
-    doc.setDrawColor(225,225,225); doc.setFillColor(252,252,252)
-    doc.roundedRect(14, colY, 88, 92, 2, 2, 'FD')
+    caixaSombra(14, colY, 88, 92)
     doc.setTextColor(...RED); doc.setFont('helvetica','bold'); doc.setFontSize(11)
     doc.text('Resumo', 14 + 44, colY + 8, { align: 'center' })
     let ry = colY + 14
@@ -184,8 +198,7 @@ export default function SimuladorPage() {
     const primeiroPagamentoSem = faixa.primeira_parcela + (faixa.demais_parcela * qtd)
     const primeiroPagamentoCom = (faixa.primeira_parcela + segMensal) + ((faixa.demais_parcela + segMensal) * qtd)
     let y2 = colY + 100
-    doc.setDrawColor(225,225,225); doc.setFillColor(252,252,252)
-    doc.roundedRect(14, y2, 88, 44, 2, 2, 'FD')
+    caixaSombra(14, y2, 88, 44)
     doc.setTextColor(...RED); doc.setFont('helvetica','bold'); doc.setFontSize(10)
     doc.text('Investimento com seguro', 14 + 44, y2 + 8, { align: 'center' })
     let iy = y2 + 14
@@ -195,8 +208,7 @@ export default function SimuladorPage() {
 
     // Investimento sem seguro (fundo claro)
     let y3 = y2 + 52
-    doc.setDrawColor(225,225,225); doc.setFillColor(252,252,252)
-    doc.roundedRect(14, y3, 88, 34, 2, 2, 'FD')
+    caixaSombra(14, y3, 88, 34)
     doc.setTextColor(...RED); doc.setFont('helvetica','bold'); doc.setFontSize(10)
     doc.text('Investimento sem seguro', 14 + 44, y3 + 8, { align: 'center' })
     let sy = y3 + 14
