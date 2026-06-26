@@ -100,6 +100,13 @@ export default function SimuladorPage() {
 
   const inputStyle = { background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }
 
+  const formatarMoeda = (valor: string) => {
+    const num = valor.replace(/\D/g, '')
+    if (!num) return ''
+    const n = parseInt(num) / 100
+    return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
+
   const gerarPDF = () => {
     if (!faixa || !planoAtual) return
     const doc = new jsPDF()
@@ -277,7 +284,10 @@ export default function SimuladorPage() {
                   <div className="mt-4 pt-4 space-y-2" style={{ borderTop: '1px solid var(--border)' }}>
                     <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Gerar PDF da proposta</label>
                     <input value={nomeCliente} onChange={e => setNomeCliente(e.target.value)} placeholder="Nome do cliente" className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
-                    <input value={lanceEmbutido} onChange={e => setLanceEmbutido(e.target.value)} placeholder="Lance embutido (R$) - opcional" className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--muted-color)' }}>R$</span>
+                      <input value={lanceEmbutido} onChange={e => setLanceEmbutido(formatarMoeda(e.target.value))} placeholder="Lance embutido (opcional)" inputMode="numeric" className="w-full rounded-lg pl-9 pr-3 py-2 text-sm outline-none" style={inputStyle} />
+                    </div>
                     <p className="text-[11px]" style={{ color: 'var(--muted-color)' }}>Prazo da proposta: {prazoRestante} meses</p>
                     <button onClick={gerarPDF} className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors" style={{ background: '#C8202E', color: '#fff' }}>Gerar PDF da proposta</button>
                   </div>
