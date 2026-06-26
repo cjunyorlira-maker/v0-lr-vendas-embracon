@@ -6,7 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import { BookOpen, Loader2, Home, Car, Truck, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react'
 
-interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number; estorno_ate_pgto: number | null; parcelas_nao_estornar: number | null }
+interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number; estorno_ate_pgto: number | null; parcelas_nao_estornar: number | null; seguro_pct?: number | null; tx_adm_topo: number | null; cheia_incremento_pct: number | null }
 interface Faixa { credito: number; primeira_parcela: number; demais_parcela: number; mais_7: number; total_nao_estornar: number; taxa_antecip: number }
 
 const fmtMoeda = (v: number | null) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
@@ -21,10 +21,11 @@ export default function TabelasPage() {
   const [expandido, setExpandido] = useState<string | null>(null)
   const [faixasPorSigla, setFaixasPorSigla] = useState<Record<string, Faixa[]>>({})
   const [comSeguro, setComSeguro] = useState(false)
+  const [verCheia, setVerCheia] = useState(false)
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.from('planos').select('id, sigla, nome_completo, bem, adesao_percent, estorno_ate_pgto, parcelas_nao_estornar, seguro_pct').eq('ativo', true).order('bem').then(({ data, error }) => {
+    supabase.from('planos').select('id, sigla, nome_completo, bem, adesao_percent, estorno_ate_pgto, parcelas_nao_estornar, seguro_pct, tx_adm_topo, cheia_incremento_pct').eq('ativo', true).order('bem').then(({ data, error }) => {
       if (error) console.error('Erro ao buscar planos:', error)
       if (data) setPlanos(data as Plano[])
       setLoading(false)
@@ -78,6 +79,8 @@ export default function TabelasPage() {
                                 <span className="font-mono text-xs font-bold px-2 py-1 rounded" style={{ background: `${cor}20`, color: cor }}>{p.sigla}</span>
                                 <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{p.nome_completo}</span>
                                 <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)' }}>Adesão {p.adesao_percent}%</span>
+                                {p.tx_adm_topo && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--muted-color)' }}>Taxa adm. {p.tx_adm_topo}%</span>}
+                                <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--muted-color)' }}>240 meses</span>
                               </div>
                               {aberto ? <ChevronUp size={16} style={{ color: 'var(--muted-color)' }} /> : <ChevronDown size={16} style={{ color: 'var(--muted-color)' }} />}
                             </div>
@@ -91,6 +94,14 @@ export default function TabelasPage() {
                                       <div className="flex items-center gap-2 mb-2">
                                         <button onClick={() => setComSeguro(false)} className="rounded-md px-3 py-1 text-[11px] font-semibold transition-colors" style={{ background: !comSeguro ? 'rgba(212,175,55,0.2)' : 'rgba(255,255,255,0.03)', border: `1px solid ${!comSeguro ? 'var(--accent)' : 'var(--border)'}`, color: !comSeguro ? 'var(--accent)' : 'var(--muted-color)' }}>SEM SEGURO</button>
                                         <button onClick={() => setComSeguro(true)} className="rounded-md px-3 py-1 text-[11px] font-semibold transition-colors" style={{ background: comSeguro ? 'rgba(212,175,55,0.2)' : 'rgba(255,255,255,0.03)', border: `1px solid ${comSeguro ? 'var(--accent)' : 'var(--border)'}`, color: comSeguro ? 'var(--accent)' : 'var(--muted-color)' }}>COM SEGURO</button>
+                                        {(p.cheia_incremento_pct || 0) > 0 && (
+                                          <button onClick={() => setVerCheia(v => !v)} className="rounded-md px-3 py-1 text-[11px] font-semibold transition-colors" style={{ background: verCheia ? 'rgba(212,175,55,0.2)' : 'rgba(255,255,255,0.03)', border: `1px solid ${verCheia ? 'var(--accent)' : 'var(--border)'}`, color: verCheia ? 'var(--accent)' : 'var(--muted-color)' }}>{verCheia ? 'PARCELA CHEIA' : 'VER CHEIA'}</button>
+                                        )}
+                                      </div>
+                                    )}
+                                    {!(p.seguro_pct > 0) && (p.cheia_incremento_pct || 0) > 0 && (
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <button onClick={() => setVerCheia(v => !v)} className="rounded-md px-3 py-1 text-[11px] font-semibold transition-colors" style={{ background: verCheia ? 'rgba(212,175,55,0.2)' : 'rgba(255,255,255,0.03)', border: `1px solid ${verCheia ? 'var(--accent)' : 'var(--border)'}`, color: verCheia ? 'var(--accent)' : 'var(--muted-color)' }}>{verCheia ? 'PARCELA CHEIA' : 'VER CHEIA'}</button>
                                       </div>
                                     )}
                                     <table className="w-full text-xs">
@@ -115,8 +126,9 @@ export default function TabelasPage() {
                                       <tbody>
                                         {faixas.map(f => {
                                           const seg = comSeguro ? Math.round(f.credito * (p.seguro_pct || 0) * 100) / 100 : 0
-                                          const p1 = f.primeira_parcela + seg
-                                          const pd = f.demais_parcela + seg
+                                          const incCheia = verCheia ? Math.round(f.credito * (p.cheia_incremento_pct || 0) * 100) / 100 : 0
+                                          const p1 = f.primeira_parcela + seg + incCheia
+                                          const pd = f.demais_parcela + seg + incCheia
                                           const naoEstornarParc = p.parcelas_nao_estornar || 8
                                           const totalNaoEst = f.total_nao_estornar + seg * naoEstornarParc
                                           const mais7Seg = f.mais_7 + seg * 7
