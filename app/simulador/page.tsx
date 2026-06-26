@@ -46,20 +46,23 @@ export default function SimuladorPage() {
   }, [])
 
   useEffect(() => {
+    // carrega uma imagem (URL ou caminho público) e converte pra base64 pro PDF
+    const carregarLogo = (url: string) => {
+      fetch(url)
+        .then(res => res.blob())
+        .then(blob => {
+          const reader = new FileReader()
+          reader.onloadend = () => setLogoBase64(reader.result as string)
+          reader.readAsDataURL(blob)
+        })
+        .catch(() => setLogoBase64(null))
+    }
     fetch('/api/simulador/empresa').then(r => r.json()).then(d => {
       setEmpresaNome(d.empresa_nome || '')
       setEmpresaLogo(d.logo_url || null)
-      if (d.logo_url) {
-        fetch(d.logo_url)
-          .then(res => res.blob())
-          .then(blob => {
-            const reader = new FileReader()
-            reader.onloadend = () => setLogoBase64(reader.result as string)
-            reader.readAsDataURL(blob)
-          })
-          .catch(() => setLogoBase64(null))
-      }
-    }).catch(() => {})
+      // usa a logo própria da empresa; sem logo (ou LR Multimarcas) cai pra logo da LR do projeto
+      carregarLogo(d.logo_url || '/logo-lr.png')
+    }).catch(() => carregarLogo('/logo-lr.png'))
   }, [])
 
   // planos da categoria escolhida
@@ -122,11 +125,13 @@ export default function SimuladorPage() {
     doc.text('Oi, ' + (nomeCliente || 'Cliente'), 14, 13)
     doc.setFontSize(11)
     doc.text('Aqui esta a sua simulacao de credito.', 14, 21)
-    // logo da empresa (ou nome se não tiver logo)
+    // logo sobre faixa branca (pra logo preta aparecer legível no header vermelho)
     if (logoBase64) {
       try {
         const fmtImg = logoBase64.includes('image/png') ? 'PNG' : 'JPEG'
-        doc.addImage(logoBase64, fmtImg, W - 52, 5, 38, 20, undefined, 'FAST')
+        doc.setFillColor(255, 255, 255)
+        doc.roundedRect(W - 60, 4, 50, 22, 2, 2, 'F')
+        doc.addImage(logoBase64, fmtImg, W - 58, 6, 46, 18, undefined, 'FAST')
       } catch (e) {
         doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(255,255,255)
         doc.text(empresaNome || 'LR MULTIMARCAS', W - 14, 16, { align: 'right' })
