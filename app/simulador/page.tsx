@@ -28,11 +28,12 @@ export default function SimuladorPage() {
   const [planoSigla, setPlanoSigla] = useState('')
   const [faixas, setFaixas] = useState<FaixaCredito[]>([])
   const [creditoSel, setCreditoSel] = useState('')
+  const [comSeguro, setComSeguro] = useState(false)
   const [qtdAntecipar, setQtdAntecipar] = useState('2')
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.from('planos').select('id, sigla, nome_completo, bem, adesao_percent, estorno_ate_pgto, categoria_comissao').eq('ativo', true).order('bem').then(({ data }) => {
+    supabase.from('planos').select('id, sigla, nome_completo, bem, adesao_percent, estorno_ate_pgto, categoria_comissao, seguro_pct').eq('ativo', true).order('bem').then(({ data }) => {
       if (data) setPlanos(data as Plano[]); setLoading(false)
     })
   }, [])
@@ -50,9 +51,11 @@ export default function SimuladorPage() {
 
   const faixa = faixas.find(f => String(f.credito) === creditoSel)
   const qtd = parseInt(qtdAntecipar) || 0
-  const p1 = faixa?.primeira_parcela || 0
-  const pd = faixa?.demais_parcela || 0
   const planoAtual = planos.find(p => p.sigla === planoSigla)
+  const seguroPct = planoAtual?.seguro_pct || 0
+  const seguroMensal = (comSeguro && faixa) ? Math.round(faixa.credito * seguroPct * 100) / 100 : 0
+  const p1 = (faixa?.primeira_parcela || 0) + seguroMensal
+  const pd = (faixa?.demais_parcela || 0) + seguroMensal
   // Parcelinha: as parcelas 1 a 12 são iguais (valor maior). Antecipar = antecipar as parcelas 1-12.
   const ehParcelinha = planoAtual?.categoria_comissao === 'imovel_parcelinha'
   // antecipadas: na Parcelinha o cliente antecipa as parcelas 1-12 (valor p1); nos outros antecipa as demais (pd)
@@ -104,6 +107,15 @@ export default function SimuladorPage() {
                       <option value="" style={{ background: '#131313' }}>Selecione</option>
                       {faixas.map(f => <option key={f.credito} value={String(f.credito)} style={{ background: '#131313' }}>{fmtMoeda(f.credito)}</option>)}
                     </select>
+                    {faixa && seguroPct > 0 && (
+                      <div className="flex items-center gap-2 mt-3">
+                        <button onClick={() => setComSeguro(false)} className="flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-colors" style={{ background: !comSeguro ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${!comSeguro ? 'var(--accent)' : 'var(--border)'}`, color: !comSeguro ? 'var(--accent)' : 'var(--muted-color)' }}>Sem seguro</button>
+                        <button onClick={() => setComSeguro(true)} className="flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-colors" style={{ background: comSeguro ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${comSeguro ? 'var(--accent)' : 'var(--border)'}`, color: comSeguro ? 'var(--accent)' : 'var(--muted-color)' }}>Com seguro</button>
+                      </div>
+                    )}
+                    {comSeguro && seguroMensal > 0 && (
+                      <p className="text-[11px] mt-2" style={{ color: 'var(--muted-color)' }}>Seguro de R$ {seguroMensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês incluído em cada parcela.</p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Parcelas a antecipar</label>
@@ -125,6 +137,14 @@ export default function SimuladorPage() {
                     <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Total que o cliente desembolsa (1ª + {qtd})</p>
                     <p className="text-2xl font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(totalCliente)}</p>
                   </div>
+                </div>
+              )}
+
+              {planoAtual?.bem === 'Imóvel' && faixa && (
+                <div className="rounded-xl p-4 animate-pulse" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.4)' }}>
+                  <p className="text-sm font-medium text-center" style={{ color: 'var(--accent)' }}>
+                    😮 Dica de venda: nos planos de imóvel, vendendo com 2% de adesão em vez de 1%, a taxa de administração total cai de 26% para 22%! Melhor pro cliente e mais comissão pra você.
+                  </p>
                 </div>
               )}
 

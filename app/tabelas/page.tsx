@@ -20,10 +20,11 @@ export default function TabelasPage() {
   const [loading, setLoading] = useState(true)
   const [expandido, setExpandido] = useState<string | null>(null)
   const [faixasPorSigla, setFaixasPorSigla] = useState<Record<string, Faixa[]>>({})
+  const [comSeguro, setComSeguro] = useState(false)
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.from('planos').select('id, sigla, nome_completo, bem, adesao_percent, estorno_ate_pgto, parcelas_nao_estornar').eq('ativo', true).order('bem').then(({ data, error }) => {
+    supabase.from('planos').select('id, sigla, nome_completo, bem, adesao_percent, estorno_ate_pgto, parcelas_nao_estornar, seguro_pct').eq('ativo', true).order('bem').then(({ data, error }) => {
       if (error) console.error('Erro ao buscar planos:', error)
       if (data) setPlanos(data as Plano[])
       setLoading(false)
@@ -86,6 +87,12 @@ export default function TabelasPage() {
                                   <div className="flex items-center justify-center py-4"><Loader2 size={16} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
                                 ) : (
                                   <div className="overflow-x-auto">
+                                    {p.seguro_pct > 0 && (
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <button onClick={() => setComSeguro(false)} className="rounded-md px-3 py-1 text-[11px] font-semibold transition-colors" style={{ background: !comSeguro ? 'rgba(212,175,55,0.2)' : 'rgba(255,255,255,0.03)', border: `1px solid ${!comSeguro ? 'var(--accent)' : 'var(--border)'}`, color: !comSeguro ? 'var(--accent)' : 'var(--muted-color)' }}>SEM SEGURO</button>
+                                        <button onClick={() => setComSeguro(true)} className="rounded-md px-3 py-1 text-[11px] font-semibold transition-colors" style={{ background: comSeguro ? 'rgba(212,175,55,0.2)' : 'rgba(255,255,255,0.03)', border: `1px solid ${comSeguro ? 'var(--accent)' : 'var(--border)'}`, color: comSeguro ? 'var(--accent)' : 'var(--muted-color)' }}>COM SEGURO</button>
+                                      </div>
+                                    )}
                                     <table className="w-full text-xs">
                                       <thead>
                                         <tr style={{ borderBottom: '1px solid var(--border)' }}>
@@ -106,24 +113,32 @@ export default function TabelasPage() {
                                         </tr>
                                       </thead>
                                       <tbody>
-                                        {faixas.map(f => (
+                                        {faixas.map(f => {
+                                          const seg = comSeguro ? Math.round(f.credito * (p.seguro_pct || 0) * 100) / 100 : 0
+                                          const p1 = f.primeira_parcela + seg
+                                          const pd = f.demais_parcela + seg
+                                          const naoEstornarParc = p.parcelas_nao_estornar || 8
+                                          const totalNaoEst = f.total_nao_estornar + seg * naoEstornarParc
+                                          const mais7Seg = f.mais_7 + seg * 7
+                                          return (
                                           <tr key={f.credito} style={{ borderBottom: '1px solid var(--border)' }}>
                                             <td className="p-2 font-medium" style={{ color: 'var(--text)' }}>{fmtMoeda(f.credito)}</td>
-                                            <td className="p-2 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda2(f.primeira_parcela)}</td>
-                                            <td className="p-2 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda2(f.demais_parcela)}</td>
+                                            <td className="p-2 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda2(p1)}</td>
+                                            <td className="p-2 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda2(pd)}</td>
                                             {(p.sigla === 'TP' || p.sigla === 'TEP') ? null : p.sigla === 'SP' ? (
                                               <>
-                                                <td className="p-2 text-right" style={{ color: '#22c55e' }}>{fmtMoeda2(f.total_nao_estornar)}</td>
-                                                <td className="p-2 text-right" style={{ color: '#f59e0b' }}>{fmtMoeda2(f.primeira_parcela + f.demais_parcela * 5)}</td>
+                                                <td className="p-2 text-right" style={{ color: '#22c55e' }}>{fmtMoeda2(totalNaoEst)}</td>
+                                                <td className="p-2 text-right" style={{ color: '#f59e0b' }}>{fmtMoeda2(p1 + pd * 5)}</td>
                                               </>
                                             ) : (
                                               <>
-                                                <td className="p-2 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda2(f.mais_7)}</td>
-                                                <td className="p-2 text-right" style={{ color: '#f59e0b' }}>{fmtMoeda2(f.total_nao_estornar)}</td>
+                                                <td className="p-2 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda2(mais7Seg)}</td>
+                                                <td className="p-2 text-right" style={{ color: '#f59e0b' }}>{fmtMoeda2(totalNaoEst)}</td>
                                               </>
                                             )}
                                           </tr>
-                                        ))}
+                                          )
+                                        })}
                                       </tbody>
                                     </table>
                                   </div>
