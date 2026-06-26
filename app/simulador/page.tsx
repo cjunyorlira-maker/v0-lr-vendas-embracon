@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import { Calculator, CreditCard, Loader2, AlertTriangle } from 'lucide-react'
+import { jsPDF } from 'jspdf'
 
 interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number; estorno_ate_pgto: number | null; categoria_comissao: string | null; seguro_pct?: number | null; tx_adm_topo?: number | null; cheia_incremento_pct?: number | null }
 interface FaixaCredito { credito: number; primeira_parcela: number; demais_parcela: number; total_nao_estornar: number }
@@ -31,6 +32,8 @@ export default function SimuladorPage() {
   const [comSeguro, setComSeguro] = useState(false)
   const [verCheia, setVerCheia] = useState(false)
   const [qtdAntecipar, setQtdAntecipar] = useState('2')
+  const [nomeCliente, setNomeCliente] = useState('')
+  const [lanceEmbutido, setLanceEmbutido] = useState('')
 
   useEffect(() => {
     const supabase = createClient()
@@ -68,8 +71,113 @@ export default function SimuladorPage() {
   // não estornar (só planos com estorno; Parcelinha não tem)
   const limiteEstorno = planoAtual?.estorno_ate_pgto || 0
   const totalNaoEstornar = limiteEstorno > 0 ? p1 + pd * (limiteEstorno - 1) : (faixa?.total_nao_estornar || 0)
+  const lanceNum = parseFloat((lanceEmbutido || '').replace(/\./g, '').replace(',', '.')) || 0
+  const prazoRestante = Math.max(0, 240 - (1 + qtd))
+  const creditoLiquido = faixa ? faixa.credito - lanceNum : 0
 
   const inputStyle = { background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }
+
+  const gerarPDF = () => {
+    if (!faixa || !planoAtual) return
+    const doc = new jsPDF()
+    const RED: [number,number,number] = [200, 32, 46]
+    const DARK: [number,number,number] = [55, 55, 55]
+    const fmt = (n: number) => 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
+    const W = 210
+
+    // Badge pílula vermelha com texto branco
+    const badge = (x: number, yy: number, w: number, label: string) => {
+      doc.setFillColor(...RED); doc.roundedRect(x, yy, w, 7, 3.5, 3.5, 'F')
+      doc.setTextColor(255,255,255); doc.setFont('helvetica','bold'); doc.setFontSize(8)
+      doc.text(label, x + w/2, yy + 4.8, { align: 'center' })
+    }
+    const valor = (x: number, yy: number, txt: string) => {
+      doc.setTextColor(...DARK); doc.setFont('helvetica','bold'); doc.setFontSize(9)
+      doc.text(txt, x, yy + 4.8)
+    }
+
+    // HEADER vermelho
+    doc.setFillColor(...RED); doc.rect(0, 0, W, 30, 'F')
+    doc.setTextColor(255,255,255); doc.setFont('helvetica','normal'); doc.setFontSize(15)
+    doc.text('Oi, ' + (nomeCliente || 'Cliente'), 14, 13)
+    doc.setFontSize(11)
+    doc.text('Aqui esta a sua simulacao de credito.', 14, 21)
+    // marca LR no lugar da logo
+    doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(255,255,255)
+    doc.text('LR MULTIMARCAS', W - 14, 16, { align: 'right' })
+
+    // Bloco cliente (3 linhas com badge)
+    let y = 40
+    badge(14, y, 38, 'Cliente'); valor(56, y, nomeCliente || 'Simulacao'); y += 10
+    badge(14, y, 38, 'Criada em'); valor(56, y, new Date().toLocaleDateString('pt-BR') + ' ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})); y += 10
+    badge(14, y, 38, 'Interesse'); valor(56, y, planoAtual.bem); y += 14
+
+    // Título central
+    doc.setTextColor(...RED); doc.setFont('helvetica','bold'); doc.setFontSize(15)
+    doc.text('Detalhes da proposta', W/2, y, { align: 'center' }); y += 10
+
+    const colY = y
+    // ===== COLUNA ESQUERDA =====
+    // Caixa Resumo
+    doc.setDrawColor(225,225,225); doc.setFillColor(252,252,252)
+    doc.roundedRect(14, colY, 88, 92, 2, 2, 'FD')
+    doc.setTextColor(...RED); doc.setFont('helvetica','bold'); doc.setFontSize(11)
+    doc.text('Resumo', 14 + 44, colY + 8, { align: 'center' })
+    let ry = colY + 14
+    const resumoItens: [string,string,number][] = [
+      ['Credito total', fmt(faixa.credito), 40],
+      ['Lance embutido', fmt(lanceNum), 40],
+      ['Credito liquido', fmt(creditoLiquido), 40],
+      ['Prazo', prazoRestante + ' meses', 30],
+      ['Taxa adm', (planoAtual.tx_adm_topo || '-') + '%', 30],
+      ['Taxa antecipada', planoAtual.adesao_percent + '%', 36],
+      ['Fundo reserva', '2%', 34],
+    ]
+    resumoItens.forEach(([k,v,bw]) => { badge(18, ry, bw, k); valor(18 + bw + 4, ry, v); ry += 10.5 })
+
+    // Caixa Investimento com seguro
+    const segMensal = Math.round(faixa.credito * (planoAtual.seguro_pct || 0) * 100) / 100
+    let y2 = colY + 100
+    doc.roundedRect(14, y2, 88, 44, 2, 2, 'FD')
+    doc.setTextColor(...RED); doc.setFont('helvetica','bold'); doc.setFontSize(10)
+    doc.text('Investimento com seguro', 14 + 44, y2 + 8, { align: 'center' })
+    let iy = y2 + 14
+    badge(18, iy, 30, '1a parcela'); valor(52, iy, fmt(faixa.primeira_parcela + segMensal)); iy += 10
+    badge(18, iy, 38, 'Demais parcelas'); valor(60, iy, fmt(faixa.demais_parcela + segMensal)); iy += 10
+    badge(18, iy, 36, 'Valor do seguro'); valor(58, iy, fmt(segMensal))
+
+    // Caixa Investimento sem seguro
+    let y3 = y2 + 52
+    doc.roundedRect(14, y3, 88, 34, 2, 2, 'FD')
+    doc.setTextColor(...RED); doc.setFont('helvetica','bold'); doc.setFontSize(10)
+    doc.text('Investimento sem seguro', 14 + 44, y3 + 8, { align: 'center' })
+    let sy = y3 + 14
+    badge(18, sy, 30, '1a parcela'); valor(52, sy, fmt(faixa.primeira_parcela)); sy += 10
+    badge(18, sy, 38, 'Demais parcelas'); valor(60, sy, fmt(faixa.demais_parcela))
+
+    // ===== COLUNA DIREITA =====
+    let ry2 = colY
+    doc.setTextColor(...RED); doc.setFont('helvetica','bold'); doc.setFontSize(11)
+    doc.text('Demonstrativo de taxa', 108 + 44, ry2 + 8, { align: 'center' })
+    ry2 += 16
+    badge(112, ry2, 22, 'Mes'); doc.setDrawColor(180,220,210); doc.setFillColor(200,230,220); doc.roundedRect(138, ry2+1, 20, 5, 2.5, 2.5, 'F'); valor(162, ry2, '0,10%'); ry2 += 11
+    badge(112, ry2, 22, 'Ano'); doc.setFillColor(235,200,205); doc.roundedRect(138, ry2+1, 44, 5, 2.5, 2.5, 'F'); valor(186, ry2, '1,20%'); ry2 += 16
+
+    // Avisos
+    doc.setTextColor(120,120,120); doc.setFont('helvetica','normal'); doc.setFontSize(7.5)
+    const avisos = [
+      '* Proposta sujeita a alteracoes, segundo criterios de disponibilidade de vagas no grupo de consorcio.',
+      '* Os termos desta proposta tem validade de dois dias, contados a partir da simulacao.',
+      '* O credito e parcelas sao atualizados no aniversario da cota pelos indices: INCC (imovel) ou IPCA (demais).',
+      '* Os valores das parcelas poderao ser reajustados apos a contemplacao.',
+    ]
+    avisos.forEach(a => { doc.text(a, 108, ry2, { maxWidth: 90 }); ry2 += 11 })
+    doc.setTextColor(90,90,90); doc.setFontSize(8)
+    doc.text('TABELA ' + planoAtual.nome_completo, 108, ry2, { maxWidth: 90 }); ry2 += 5
+    doc.text('Tipo: Mais por menos', 108, ry2)
+
+    doc.save('Proposta_' + (nomeCliente || 'cliente').replace(/\s+/g, '_') + '.pdf')
+  }
 
   return (
     <div className="relative min-h-screen font-sans">
@@ -126,6 +234,16 @@ export default function SimuladorPage() {
                     <input type="number" min="0" value={qtdAntecipar} onChange={(e) => setQtdAntecipar(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
                   </div>
                 </div>
+
+                {faixa && (
+                  <div className="mt-4 pt-4 space-y-2" style={{ borderTop: '1px solid var(--border)' }}>
+                    <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Gerar PDF da proposta</label>
+                    <input value={nomeCliente} onChange={e => setNomeCliente(e.target.value)} placeholder="Nome do cliente" className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
+                    <input value={lanceEmbutido} onChange={e => setLanceEmbutido(e.target.value)} placeholder="Lance embutido (R$) - opcional" className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
+                    <p className="text-[11px]" style={{ color: 'var(--muted-color)' }}>Prazo da proposta: {prazoRestante} meses</p>
+                    <button onClick={gerarPDF} className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors" style={{ background: '#C8202E', color: '#fff' }}>Gerar PDF da proposta</button>
+                  </div>
+                )}
               </div>
 
               {faixa && (
