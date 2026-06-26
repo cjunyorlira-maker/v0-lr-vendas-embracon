@@ -34,12 +34,32 @@ export default function SimuladorPage() {
   const [qtdAntecipar, setQtdAntecipar] = useState('2')
   const [nomeCliente, setNomeCliente] = useState('')
   const [lanceEmbutido, setLanceEmbutido] = useState('')
+  const [empresaNome, setEmpresaNome] = useState('')
+  const [empresaLogo, setEmpresaLogo] = useState<string | null>(null)
+  const [logoBase64, setLogoBase64] = useState<string | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
     supabase.from('planos').select('id, sigla, nome_completo, bem, adesao_percent, estorno_ate_pgto, categoria_comissao, seguro_pct, tx_adm_topo, cheia_incremento_pct').eq('ativo', true).order('bem').then(({ data }) => {
       if (data) setPlanos(data as Plano[]); setLoading(false)
     })
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/simulador/empresa').then(r => r.json()).then(d => {
+      setEmpresaNome(d.empresa_nome || '')
+      setEmpresaLogo(d.logo_url || null)
+      if (d.logo_url) {
+        fetch(d.logo_url)
+          .then(res => res.blob())
+          .then(blob => {
+            const reader = new FileReader()
+            reader.onloadend = () => setLogoBase64(reader.result as string)
+            reader.readAsDataURL(blob)
+          })
+          .catch(() => setLogoBase64(null))
+      }
+    }).catch(() => {})
   }, [])
 
   // planos da categoria escolhida
@@ -102,9 +122,19 @@ export default function SimuladorPage() {
     doc.text('Oi, ' + (nomeCliente || 'Cliente'), 14, 13)
     doc.setFontSize(11)
     doc.text('Aqui esta a sua simulacao de credito.', 14, 21)
-    // marca LR no lugar da logo
-    doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.setTextColor(255,255,255)
-    doc.text('LR MULTIMARCAS', W - 14, 16, { align: 'right' })
+    // logo da empresa (ou nome se não tiver logo)
+    if (logoBase64) {
+      try {
+        const fmtImg = logoBase64.includes('image/png') ? 'PNG' : 'JPEG'
+        doc.addImage(logoBase64, fmtImg, W - 52, 5, 38, 20, undefined, 'FAST')
+      } catch (e) {
+        doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(255,255,255)
+        doc.text(empresaNome || 'LR MULTIMARCAS', W - 14, 16, { align: 'right' })
+      }
+    } else {
+      doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(255,255,255)
+      doc.text(empresaNome || 'LR MULTIMARCAS', W - 14, 16, { align: 'right' })
+    }
 
     // Bloco cliente (3 linhas com badge)
     let y = 40
