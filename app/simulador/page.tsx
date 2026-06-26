@@ -103,6 +103,7 @@ export default function SimuladorPage() {
   const gerarPDF = () => {
     if (!faixa || !planoAtual) return
     const doc = new jsPDF()
+    doc.setLanguage('pt-BR')
     const RED: [number,number,number] = [200, 32, 46]
     const DARK: [number,number,number] = [55, 55, 55]
     const fmt = (n: number) => 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
@@ -124,7 +125,7 @@ export default function SimuladorPage() {
     doc.setTextColor(255,255,255); doc.setFont('helvetica','normal'); doc.setFontSize(15)
     doc.text('Oi, ' + (nomeCliente || 'Cliente'), 14, 13)
     doc.setFontSize(11)
-    doc.text('Aqui esta a sua simulacao de credito.', 14, 21)
+    doc.text('Aqui está a sua simulação de crédito.', 14, 21)
     // logo sobre faixa branca (pra logo preta aparecer legível no header vermelho)
     if (logoBase64) {
       try {
@@ -143,7 +144,7 @@ export default function SimuladorPage() {
 
     // Bloco cliente (3 linhas com badge)
     let y = 40
-    badge(14, y, 38, 'Cliente'); valor(56, y, nomeCliente || 'Simulacao'); y += 10
+    badge(14, y, 38, 'Cliente'); valor(56, y, nomeCliente || 'Simulação'); y += 10
     badge(14, y, 38, 'Criada em'); valor(56, y, new Date().toLocaleDateString('pt-BR') + ' ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})); y += 10
     badge(14, y, 38, 'Interesse'); valor(56, y, planoAtual.bem); y += 14
 
@@ -160,9 +161,9 @@ export default function SimuladorPage() {
     doc.text('Resumo', 14 + 44, colY + 8, { align: 'center' })
     let ry = colY + 14
     const resumoItens: [string,string,number][] = [
-      ['Credito total', fmt(faixa.credito), 40],
+      ['Crédito total', fmt(faixa.credito), 40],
       ['Lance embutido', fmt(lanceNum), 40],
-      ['Credito liquido', fmt(creditoLiquido), 40],
+      ['Crédito líquido', fmt(creditoLiquido), 40],
       ['Prazo', prazoRestante + ' meses', 30],
       ['Taxa adm', (planoAtual.tx_adm_topo || '-') + '%', 30],
       ['Taxa antecipada', planoAtual.adesao_percent + '%', 36],
@@ -170,24 +171,26 @@ export default function SimuladorPage() {
     ]
     resumoItens.forEach(([k,v,bw]) => { badge(18, ry, bw, k); valor(18 + bw + 4, ry, v); ry += 10.5 })
 
-    // Caixa Investimento com seguro
+    // Investimento com seguro (fundo claro)
     const segMensal = Math.round(faixa.credito * (planoAtual.seguro_pct || 0) * 100) / 100
     let y2 = colY + 100
+    doc.setDrawColor(225,225,225); doc.setFillColor(252,252,252)
     doc.roundedRect(14, y2, 88, 44, 2, 2, 'FD')
     doc.setTextColor(...RED); doc.setFont('helvetica','bold'); doc.setFontSize(10)
     doc.text('Investimento com seguro', 14 + 44, y2 + 8, { align: 'center' })
     let iy = y2 + 14
-    badge(18, iy, 30, '1a parcela'); valor(52, iy, fmt(faixa.primeira_parcela + segMensal)); iy += 10
+    badge(18, iy, 30, '1ª parcela'); valor(52, iy, fmt(faixa.primeira_parcela + segMensal)); iy += 10
     badge(18, iy, 38, 'Demais parcelas'); valor(60, iy, fmt(faixa.demais_parcela + segMensal)); iy += 10
     badge(18, iy, 36, 'Valor do seguro'); valor(58, iy, fmt(segMensal))
 
-    // Caixa Investimento sem seguro
+    // Investimento sem seguro (fundo claro)
     let y3 = y2 + 52
+    doc.setDrawColor(225,225,225); doc.setFillColor(252,252,252)
     doc.roundedRect(14, y3, 88, 34, 2, 2, 'FD')
     doc.setTextColor(...RED); doc.setFont('helvetica','bold'); doc.setFontSize(10)
     doc.text('Investimento sem seguro', 14 + 44, y3 + 8, { align: 'center' })
     let sy = y3 + 14
-    badge(18, sy, 30, '1a parcela'); valor(52, sy, fmt(faixa.primeira_parcela)); sy += 10
+    badge(18, sy, 30, '1ª parcela'); valor(52, sy, fmt(faixa.primeira_parcela)); sy += 10
     badge(18, sy, 38, 'Demais parcelas'); valor(60, sy, fmt(faixa.demais_parcela))
 
     // ===== COLUNA DIREITA =====
@@ -195,16 +198,16 @@ export default function SimuladorPage() {
     doc.setTextColor(...RED); doc.setFont('helvetica','bold'); doc.setFontSize(11)
     doc.text('Demonstrativo de taxa', 108 + 44, ry2 + 8, { align: 'center' })
     ry2 += 16
-    badge(112, ry2, 22, 'Mes'); doc.setDrawColor(180,220,210); doc.setFillColor(200,230,220); doc.roundedRect(138, ry2+1, 20, 5, 2.5, 2.5, 'F'); valor(162, ry2, '0,10%'); ry2 += 11
+    badge(112, ry2, 22, 'Mês'); doc.setDrawColor(180,220,210); doc.setFillColor(200,230,220); doc.roundedRect(138, ry2+1, 20, 5, 2.5, 2.5, 'F'); valor(162, ry2, '0,10%'); ry2 += 11
     badge(112, ry2, 22, 'Ano'); doc.setFillColor(235,200,205); doc.roundedRect(138, ry2+1, 44, 5, 2.5, 2.5, 'F'); valor(186, ry2, '1,20%'); ry2 += 16
 
     // Avisos
     doc.setTextColor(120,120,120); doc.setFont('helvetica','normal'); doc.setFontSize(7.5)
     const avisos = [
-      '* Proposta sujeita a alteracoes, segundo criterios de disponibilidade de vagas no grupo de consorcio.',
-      '* Os termos desta proposta tem validade de dois dias, contados a partir da simulacao.',
-      '* O credito e parcelas sao atualizados no aniversario da cota pelos indices: INCC (imovel) ou IPCA (demais).',
-      '* Os valores das parcelas poderao ser reajustados apos a contemplacao.',
+      '* Proposta sujeita a alterações, segundo critérios de disponibilidade de vagas no grupo de consórcio.',
+      '* Os termos desta proposta têm validade de dois dias, contados a partir da simulação.',
+      '* O crédito e parcelas são atualizados no aniversário da cota pelos índices: INCC (imóvel) ou IPCA (demais).',
+      '* Os valores das parcelas poderão ser reajustados após a contemplação.',
     ]
     avisos.forEach(a => { doc.text(a, 108, ry2, { maxWidth: 90 }); ry2 += 11 })
     doc.setTextColor(90,90,90); doc.setFontSize(8)
