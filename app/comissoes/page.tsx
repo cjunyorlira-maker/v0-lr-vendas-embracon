@@ -252,6 +252,17 @@ export default function ComissoesPage() {
   const totalSupervisorPropria = vendasFiltradas.reduce((s, v: any) => s + (v.comissao_supervisor_propria || 0), 0)
   // Master: 0,25% sobre toda a produção (crédito) do filtro atual
   const producaoTotal = vendasFiltradas.reduce((s, v) => s + (v.credito || 0), 0)
+  // Master (minha metade = 0,25%): só o GARANTIDO conforme parcelas pagas até o estorno
+  const calcMasterGarantido = (credito: number, parcelasPagas: number, estornoAte: number) => {
+    if (!credito || !parcelasPagas || parcelasPagas <= 0) return 0
+    const limite = estornoAte || 8
+    const pagas = Math.min(parcelasPagas, limite)
+    const demais = limite - 1
+    const porPrimeira = credito * 0.0010
+    const porDemais = demais > 0 ? (credito * 0.0015) / demais : 0
+    return porPrimeira + Math.max(0, pagas - 1) * porDemais
+  }
+  const comissaoMasterGarantido = vendasFiltradas.reduce((s: number, v: any) => s + calcMasterGarantido(v.credito, v.parcelas_pagas, v.pgto_seguranca), 0)
   const comissaoMaster = producaoTotal * 0.0025
   const liquidoRep = totalLR - totalVendedores - totalSupervisores - totalSupervisorPropria
   // helpers de papel
@@ -375,8 +386,9 @@ export default function ComissoesPage() {
             )}
             {meuRole === 'master' && (
               <div className="rounded-xl p-4" style={{ background: 'linear-gradient(135deg, rgba(212,175,55,0.15) 0%, rgba(212,175,55,0.04) 100%)', border: '1px solid rgba(212,175,55,0.3)' }}>
-                <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Comissão Master (0,25%)</p>
-                <p className="text-xl font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(comissaoMaster)}</p>
+                <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Comissão Master — Garantido</p>
+                <p className="text-xl font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(comissaoMasterGarantido)}</p>
+                <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>Potencial total: {fmtMoeda(comissaoMaster)} (0,25% se todos pagarem até o estorno)</p>
                 <p className="text-[10px] mt-0.5" style={{ color: 'var(--muted-color)' }}>sobre {fmtMoeda(producaoTotal)} de produção</p>
               </div>
             )}
