@@ -180,13 +180,16 @@ export default function SimuladorPage() {
 
     // Investimento com seguro (fundo claro)
     const segMensal = Math.round(faixa.credito * (planoAtual.seguro_pct || 0) * 100) / 100
+    // Primeiro pagamento = 1ª parcela + parcelas antecipadas (qtd)
+    const primeiroPagamentoSem = faixa.primeira_parcela + (faixa.demais_parcela * qtd)
+    const primeiroPagamentoCom = (faixa.primeira_parcela + segMensal) + ((faixa.demais_parcela + segMensal) * qtd)
     let y2 = colY + 100
     doc.setDrawColor(225,225,225); doc.setFillColor(252,252,252)
     doc.roundedRect(14, y2, 88, 44, 2, 2, 'FD')
     doc.setTextColor(...RED); doc.setFont('helvetica','bold'); doc.setFontSize(10)
     doc.text('Investimento com seguro', 14 + 44, y2 + 8, { align: 'center' })
     let iy = y2 + 14
-    badge(18, iy, 30, '1ª parcela'); valor(52, iy, fmt(faixa.primeira_parcela + segMensal)); iy += 10
+    badge(18, iy, 38, '1º pagamento'); valor(60, iy, fmt(primeiroPagamentoCom)); iy += 10
     badge(18, iy, 38, 'Demais parcelas'); valor(60, iy, fmt(faixa.demais_parcela + segMensal)); iy += 10
     badge(18, iy, 36, 'Valor do seguro'); valor(58, iy, fmt(segMensal))
 
@@ -197,7 +200,7 @@ export default function SimuladorPage() {
     doc.setTextColor(...RED); doc.setFont('helvetica','bold'); doc.setFontSize(10)
     doc.text('Investimento sem seguro', 14 + 44, y3 + 8, { align: 'center' })
     let sy = y3 + 14
-    badge(18, sy, 30, '1ª parcela'); valor(52, sy, fmt(faixa.primeira_parcela)); sy += 10
+    badge(18, sy, 38, '1º pagamento'); valor(60, sy, fmt(primeiroPagamentoSem)); sy += 10
     badge(18, sy, 38, 'Demais parcelas'); valor(60, sy, fmt(faixa.demais_parcela))
 
     // ===== COLUNA DIREITA =====
