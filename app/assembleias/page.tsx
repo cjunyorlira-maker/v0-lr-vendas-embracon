@@ -20,9 +20,9 @@ interface Grupo {
 }
 
 const CATEGORIAS = [
-  { key: 'Imóvel', label: 'Imóvel' },
-  { key: 'Veículo', label: 'Auto' },
-  { key: 'Pesados', label: 'Pesados' },
+    { key: 'Imóvel', label: '🏠 Imóvel' },
+    { key: 'Veículo', label: '🚗 Auto' },
+    { key: 'Pesados', label: '🚛 Pesados' },
 ]
 
 const fmtPct = (v: number | null) => v == null || v === 0 ? '-' : (v * 100).toFixed(2).replace('.', ',') + '%'
@@ -216,7 +216,7 @@ export default function AssembleiasPage() {
             {CATEGORIAS.map(c => {
               const qtd = grupos.filter(g => g.bem === c.key).length
               return (
-                <button key={c.key} onClick={() => { setCatAtiva(c.key); setAberto(null) }} className="rounded-lg px-4 py-2 text-sm font-medium transition-colors" style={{ background: catAtiva === c.key ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${catAtiva === c.key ? 'var(--accent)' : 'var(--border)'}`, color: catAtiva === c.key ? 'var(--accent)' : 'var(--muted-color)' }}>
+                <button key={c.key} onClick={() => { setCatAtiva(c.key); setAberto(null) }} className="rounded-lg px-4 py-2 text-sm font-medium transition-colors" style={{ background: catAtiva === c.key ? 'linear-gradient(135deg, #d4af37, #b8941f)' : 'rgba(255,255,255,0.06)', border: `1px solid ${catAtiva === c.key ? '#d4af37' : 'rgba(255,255,255,0.1)'}`, color: catAtiva === c.key ? '#131313' : 'var(--text)', fontWeight: catAtiva === c.key ? 700 : 500, boxShadow: catAtiva === c.key ? '0 4px 14px rgba(212,175,55,0.3)' : 'none' }}>
                   {c.label} <span className="text-xs opacity-70">({qtd})</span>
                 </button>
               )
