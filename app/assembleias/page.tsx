@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { CalendarCheck, ChevronDown, ChevronUp, Users, Dices, Target, Gavel, Sparkles, Loader2, Share2, Upload, CheckCircle2, PartyPopper, BarChart3, AlertTriangle, FileText, Download } from 'lucide-react'
+import { CalendarCheck, ChevronDown, ChevronUp, Users, Dices, Target, Gavel, Sparkles, Loader2, Share2, Upload, CheckCircle2, PartyPopper, BarChart3, AlertTriangle, FileText, Download, MessageCircle } from 'lucide-react'
 import PassarResultado from '@/components/PassarResultado'
 
 interface HistMes {
@@ -52,6 +52,9 @@ export default function AssembleiasPage() {
   const [extratos, setExtratos] = useState<{ grupo: string; bem: string; arquivo_nome: string; atualizado_em: string }[]>([])
   const [subindoExtrato, setSubindoExtrato] = useState<string | null>(null)
   const [ordenacao, setOrdenacao] = useState<'proxima' | 'contemplam'>('proxima')
+  const [clientesGrupo, setClientesGrupo] = useState<any[]>([])
+  const [grupoAberto, setGrupoAberto] = useState<string | null>(null)
+  const [carregandoClientes, setCarregandoClientes] = useState(false)
 
   const carregarPendentes = () => {
     fetch('/api/assembleias/pendentes').then(r => r.json()).then(d => { if (d.pendentes) setPendentes(d.pendentes) }).catch(() => {})
@@ -139,6 +142,23 @@ export default function AssembleiasPage() {
     if (b.proxima_assembleia === 'INAUGURAR') return -1
     return (a.proxima_assembleia || '').localeCompare(b.proxima_assembleia || '')
   })
+
+  const verClientesGrupo = async (grupo: string) => {
+    if (grupoAberto === grupo) { setGrupoAberto(null); setClientesGrupo([]); return }
+    setCarregandoClientes(true); setGrupoAberto(grupo)
+    try {
+      const res = await fetch(`/api/assembleias/clientes-grupo?grupo=${grupo}`)
+      const data = await res.json()
+      setClientesGrupo(data.clientes || [])
+    } catch { setClientesGrupo([]) }
+    setCarregandoClientes(false)
+  }
+  const abrirWhatsApp = (telefone: string, nome: string, grupo: string) => {
+    const num = (telefone || '').replace(/\D/g, '')
+    const numFull = num.length <= 11 ? '55' + num : num
+    const msg = encodeURIComponent(`Olá ${nome}, tudo bem? Sou da LR Multimarcas e tenho novidades sobre a assembleia do seu grupo ${grupo}.`)
+    window.open(`https://wa.me/${numFull}?text=${msg}`, '_blank')
+  }
 
   const inputStyle = { background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)' }
 
@@ -326,6 +346,34 @@ export default function AssembleiasPage() {
                     </div>
                     {g.tem_historico && (aberto === g.grupo ? <ChevronUp size={18} style={{ color: 'var(--muted-color)' }} /> : <ChevronDown size={18} style={{ color: 'var(--muted-color)' }} />)}
                   </button>
+
+                  {/* ver meus clientes do grupo */}
+                  <div className="px-4 pb-4">
+                    <button onClick={(e) => { e.stopPropagation(); verClientesGrupo(g.grupo) }} className="rounded-lg px-4 py-2 text-xs font-semibold transition-all" style={{ background: grupoAberto === g.grupo ? 'linear-gradient(135deg, #25D366, #128C7E)' : 'linear-gradient(135deg, rgba(212,175,55,0.2), rgba(212,175,55,0.08))', border: `1px solid ${grupoAberto === g.grupo ? '#25D366' : 'rgba(212,175,55,0.4)'}`, color: grupoAberto === g.grupo ? '#fff' : 'var(--accent)' }}>
+                      {grupoAberto === g.grupo ? 'Ocultar clientes' : '👥 Ver Meus Clientes'}
+                    </button>
+                    {grupoAberto === g.grupo && (
+                      <div className="mt-3 rounded-lg p-3" style={{ background: 'rgba(17,18,22,0.6)', border: '1px solid var(--border)' }}>
+                        {carregandoClientes ? <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Carregando...</p> : clientesGrupo.length === 0 ? <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Nenhum cliente seu neste grupo.</p> : (
+                          <div className="space-y-2">
+                            {clientesGrupo.map((c, i) => (
+                              <div key={i} className="flex items-center justify-between gap-2 py-1.5" style={{ borderBottom: i < clientesGrupo.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
+                                <div>
+                                  <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>{c.nome}</p>
+                                  <p className="text-[10px]" style={{ color: 'var(--muted-color)' }}>Cota {c.cota}{c.vendedor && c.vendedor !== '-' ? ` · ${c.vendedor}` : ''}</p>
+                                </div>
+                                {c.telefone && (
+                                  <button onClick={(e) => { e.stopPropagation(); abrirWhatsApp(c.telefone, c.nome, g.grupo) }} className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5" style={{ background: 'linear-gradient(135deg, #25D366, #128C7E)', color: '#fff' }}>
+                                    <MessageCircle size={13} /> WhatsApp
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
 
                   {/* histórico expandido */}
                   {aberto === g.grupo && g.tem_historico && (
