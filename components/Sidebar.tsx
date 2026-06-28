@@ -17,32 +17,42 @@ interface NavItem {
 }
 
 const mainNav: NavItem[] = [
-  { icon: <Home size={16} />, label: 'Dashboard', href: '/', active: true },
-  { icon: <Upload size={16} />, label: 'Nova Venda', href: '/nova-venda' },
-  { icon: <Users size={16} />, label: 'Clientes', href: '/clientes' },
-  { icon: <FileText size={16} />, label: 'Boletos', href: '/boletos' },
-  { icon: <Target size={16} />, label: 'Lances', href: '/lances' },
-  { icon: <Trophy size={16} />, label: 'Ranking', href: '/ranking' },
-  { icon: <Calculator size={16} />, label: 'Simulador', href: '/simulador' },
-  { icon: <BookOpen size={16} />, label: 'Tabelas', href: '/tabelas' },
-  { icon: <CalendarCheck size={16} />, label: 'Assembleias', href: '/assembleias' },
-  { icon: <Users2 size={16} />, label: 'Equipe', href: '/equipe' },
+  { icon: <Home size={16} />, label: '🏠 Dashboard', href: '/', active: true },
+  { icon: <Upload size={16} />, label: '📤 Nova Venda', href: '/nova-venda' },
+  { icon: <Users size={16} />, label: '👥 Clientes', href: '/clientes' },
+  { icon: <FileText size={16} />, label: '🧾 Boletos', href: '/boletos' },
+  { icon: <Target size={16} />, label: '🎯 Lances', href: '/lances' },
+  { icon: <Trophy size={16} />, label: '🏆 Ranking', href: '/ranking' },
+  { icon: <Calculator size={16} />, label: '🧮 Simulador', href: '/simulador' },
+  { icon: <BookOpen size={16} />, label: '📖 Tabelas', href: '/tabelas' },
+  { icon: <CalendarCheck size={16} />, label: '📅 Assembleias', href: '/assembleias' },
+  { icon: <Users2 size={16} />, label: '🤝 Equipe', href: '/equipe' },
 ]
 
 const adminNav: NavItem[] = [
-  { icon: <DollarSign size={16} />, label: 'Comissões', href: '/comissoes' },
-  { icon: <Settings size={16} />, label: 'Planos', href: '/planos' },
+  { icon: <DollarSign size={16} />, label: '💰 Comissões', href: '/comissoes' },
+  { icon: <Settings size={16} />, label: '⚙️ Planos', href: '/planos' },
 ]
 
 function NavLink({ item }: { item: NavItem }) {
   return (
     <a
       href={item.href}
-      className="group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-150 cursor-pointer"
-      style={item.active ? { background: 'var(--accent-bg)', color: 'var(--accent)', borderLeft: '2px solid var(--accent)', paddingLeft: '10px' } : { color: 'var(--muted-color)', borderLeft: '2px solid transparent' }}
+      className="group flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all duration-150 cursor-pointer"
+      style={item.active ? {
+        background: 'linear-gradient(135deg, rgba(212,175,55,0.25), rgba(212,175,55,0.08))',
+        border: '1px solid rgba(212,175,55,0.4)',
+        color: 'var(--accent)',
+        fontWeight: 600,
+      } : {
+        background: 'transparent',
+        border: '1px solid transparent',
+        color: 'var(--muted-color)',
+        fontWeight: 500,
+      }}
       onMouseEnter={(e) => {
         if (!item.active) {
-          e.currentTarget.style.background = 'var(--accent-bg)'
+          e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
           e.currentTarget.style.color = 'var(--text2)'
         }
       }}
