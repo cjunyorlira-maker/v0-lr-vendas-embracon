@@ -137,7 +137,7 @@ export default function PlanosPage() {
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {lista.map((p) => (
-                      <div key={p.id} className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.12)', backdropFilter: 'blur(4px)', border: '1px solid var(--border)', opacity: p.ativo ? 1 : 0.55 }}>
+                      <div key={p.id} className="rounded-xl p-4" style={{ background: 'rgba(17,18,22,0.92)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', border: '1px solid var(--border)', opacity: p.ativo ? 1 : 0.55 }}>
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex items-center gap-2">
                             <span className="font-mono font-bold text-sm px-2 py-0.5 rounded" style={{ background: `${bemColors[p.bem]}20`, color: bemColors[p.bem] }}>{p.sigla}</span>

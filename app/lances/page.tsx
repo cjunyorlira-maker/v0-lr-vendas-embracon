@@ -314,33 +314,33 @@ export default function LancesPage() {
           ) : (
             <>
             <div className="flex items-center gap-2 mb-5 flex-wrap">
-              <div className="flex gap-1 rounded-lg p-0.5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
+              <div className="flex gap-1 rounded-lg p-0.5" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)' }}>
                 <button onClick={() => setFiltroMes('atual')} className="rounded-md px-3 py-1.5 text-xs font-medium transition-colors" style={{ background: filtroMes === 'atual' ? 'var(--accent)' : 'transparent', color: filtroMes === 'atual' ? '#0a0a0a' : 'var(--muted-color)' }}>Mês Atual</button>
                 <button onClick={() => setFiltroMes('todos')} className="rounded-md px-3 py-1.5 text-xs font-medium transition-colors" style={{ background: filtroMes === 'todos' ? 'var(--accent)' : 'transparent', color: filtroMes === 'todos' ? '#0a0a0a' : 'var(--muted-color)' }}>Todos</button>
               </div>
               <div className="relative">
                 <Search size={15} style={{ color: 'var(--muted-color)', position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
-                <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar cliente, grupo, proposta..." className="rounded-lg pl-8 pr-3 py-2 text-sm outline-none w-64" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+                <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar cliente, grupo, proposta..." className="rounded-lg pl-8 pr-3 py-2 text-sm outline-none w-64" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }} />
               </div>
               {filtrosOpc.empresas.length > 0 && (
-                <select value={fEmpresa} onChange={(e) => { setFEmpresa(e.target.value); setFEquipe(''); setFVendedor('') }} className="rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                <select value={fEmpresa} onChange={(e) => { setFEmpresa(e.target.value); setFEquipe(''); setFVendedor('') }} className="rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }}>
                   <option value="" style={{ background: '#131313' }}>Todas empresas</option>
                   {filtrosOpc.empresas.map(e => <option key={e.id} value={e.id} style={{ background: '#131313' }}>{e.nome}</option>)}
                 </select>
               )}
               {['master', 'representante', 'adm'].includes(role) && (
-                <select value={fEquipe} onChange={(e) => { setFEquipe(e.target.value); setFVendedor('') }} className="rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                <select value={fEquipe} onChange={(e) => { setFEquipe(e.target.value); setFVendedor('') }} className="rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }}>
                   <option value="" style={{ background: '#131313' }}>Todas equipes</option>
                   {filtrosOpc.equipes.filter(eq => !fEmpresa || eq.empresa_id === fEmpresa).map(eq => <option key={eq.id} value={eq.id} style={{ background: '#131313' }}>{eq.nome}</option>)}
                 </select>
               )}
               {['master', 'representante', 'adm', 'supervisor'].includes(role) && (
-                <select value={fVendedor} onChange={(e) => setFVendedor(e.target.value)} className="rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                <select value={fVendedor} onChange={(e) => setFVendedor(e.target.value)} className="rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }}>
                   <option value="" style={{ background: '#131313' }}>Todos vendedores</option>
                   {filtrosOpc.vendedores.filter(vd => (!fEmpresa || vd.empresa_id === fEmpresa) && (!fEquipe || vd.equipe_id === fEquipe)).map(vd => <option key={vd.id} value={vd.id} style={{ background: '#131313' }}>{vd.nome}</option>)}
                 </select>
               )}
-              <select value={fGrupo} onChange={(e) => setFGrupo(e.target.value)} className="rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+              <select value={fGrupo} onChange={(e) => setFGrupo(e.target.value)} className="rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }}>
                 <option value="" style={{ background: '#131313' }}>Todos os grupos</option>
                 {gruposOrdenados.map(([g, qt]) => <option key={g} value={g} style={{ background: '#131313' }}>Grupo {g} ({qt})</option>)}
               </select>
@@ -403,12 +403,12 @@ export default function LancesPage() {
               {defTipo !== 'fixo25' && (
                 <div>
                   <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>{defTipo === 'valor' ? 'Valor (R$)' : 'Percentual (%)'}</label>
-                  <input value={defValor} onChange={(e) => setDefValor(defTipo === 'valor' ? formatarMoedaInput(e.target.value) : e.target.value)} placeholder={defTipo === 'valor' ? '50.000,00' : '30'} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+                  <input value={defValor} onChange={(e) => setDefValor(defTipo === 'valor' ? formatarMoedaInput(e.target.value) : e.target.value)} placeholder={defTipo === 'valor' ? '50.000,00' : '30'} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }} />
                 </div>
               )}
               <div>
                 <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Observação (opcional)</label>
-                <input value={defObs} onChange={(e) => setDefObs(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+                <input value={defObs} onChange={(e) => setDefObs(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }} />
               </div>
               <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: 'var(--text2)' }}>
                 <input type="checkbox" checked={defRecorrente} onChange={(e) => setDefRecorrente(e.target.checked)} className="accent-yellow-500" />
@@ -439,7 +439,7 @@ export default function LancesPage() {
                   const stLabel = of.contemplado ? 'Contemplado' : of.ciclo_encerrado ? 'Participou (não contemplado)' : of.status === 'ofertado' ? 'Ofertado' : of.status === 'solicitado' ? 'Solicitado' : 'Pendente'
                   const stCor = of.contemplado ? '#22c55e' : of.ciclo_encerrado ? 'var(--muted-color)' : of.status === 'ofertado' ? '#f59e0b' : 'var(--accent)'
                   return (
-                    <div key={i} className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)' }}>
+                    <div key={i} className="rounded-lg p-3" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)' }}>
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-medium" style={{ color: stCor }}>{stLabel}</span>
                         {of.data_assembleia && <span className="text-[10px]" style={{ color: 'var(--muted-color)' }}>Assemb: {fmtData(of.data_assembleia)}</span>}
@@ -464,13 +464,13 @@ export default function LancesPage() {
             <h3 className="text-base font-semibold mb-1" style={{ color: 'var(--text)' }}>Ofertar lance</h3>
             <p className="text-xs mb-4" style={{ color: 'var(--muted-color)' }}>{ofertarModal.clientes?.nome} · {descTipo(ofertarModal.lances_config)}. Anexe o comprovante do lance ofertado.</p>
             <input ref={fileRef} type="file" accept="application/pdf,image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePdf(f) }} />
-            <div onClick={() => fileRef.current?.click()} className="flex flex-col items-center justify-center gap-2 py-6 rounded-lg cursor-pointer mb-3" style={{ border: '2px dashed var(--border)', background: 'rgba(255,255,255,0.02)' }}>
+            <div onClick={() => fileRef.current?.click()} className="flex flex-col items-center justify-center gap-2 py-6 rounded-lg cursor-pointer mb-3" style={{ border: '2px dashed var(--border)', background: 'rgba(22,23,28,0.9)' }}>
               {pdfAnexo ? <><Paperclip size={20} style={{ color: '#22c55e' }} /><span className="text-xs" style={{ color: '#22c55e' }}>{pdfAnexo.nome}</span></> : <><Upload size={20} style={{ color: 'var(--accent)' }} /><span className="text-xs" style={{ color: 'var(--muted-color)' }}>Clique para anexar comprovante (PDF ou imagem)</span></>}
             </div>
             {!pdfAnexo && (
               <div className="mb-4">
                 <label className="block text-xs mb-1" style={{ color: '#f59e0b' }}>Sem comprovante? Justifique:</label>
-                <textarea value={justificativa} onChange={(e) => setJustificativa(e.target.value)} rows={2} placeholder="Ex: ofertado no sistema mas o comprovante ainda não foi gerado pela Embracon" className="w-full rounded-lg px-3 py-2 text-xs outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(245,158,11,0.3)', color: 'var(--text)' }} />
+                <textarea value={justificativa} onChange={(e) => setJustificativa(e.target.value)} rows={2} placeholder="Ex: ofertado no sistema mas o comprovante ainda não foi gerado pela Embracon" className="w-full rounded-lg px-3 py-2 text-xs outline-none" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid rgba(245,158,11,0.3)', color: 'var(--text)' }} />
               </div>
             )}
             <div className="flex gap-2">

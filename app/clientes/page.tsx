@@ -200,7 +200,7 @@ export default function ClientesPage() {
           </div>
 
           {mostraFiltros && (
-            <div className="flex gap-2 mb-4 flex-wrap rounded-xl p-3" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+            <div className="flex gap-2 mb-4 flex-wrap rounded-xl p-3" style={{ background: 'rgba(17,18,22,0.92)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)', border: '1px solid var(--border)' }}>
               <select value={fBem} onChange={(e) => setFBem(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={inputStyle}>
                 <option value="" style={{ background: '#131313' }}>Todos os bens</option>
                 <option value="Imóvel" style={{ background: '#131313' }}>Imóvel</option>
@@ -327,7 +327,7 @@ export default function ClientesPage() {
                           const sb = STATUS_BOLETO[c.status_boleto]
                           const sl = c.status_lance ? STATUS_LANCE[c.status_lance] : null
                           return (
-                            <div key={c.venda_id} className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)' }}>
+                            <div key={c.venda_id} className="rounded-lg p-3" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)' }}>
                               <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <span className="font-mono text-xs font-bold px-2 py-0.5 rounded" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)' }}>{c.plano}</span>

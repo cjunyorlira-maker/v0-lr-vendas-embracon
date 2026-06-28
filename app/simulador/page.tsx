@@ -98,7 +98,7 @@ export default function SimuladorPage() {
   const prazoRestante = Math.max(0, 240 - (1 + qtd))
   const creditoLiquido = faixa ? faixa.credito - lanceNum : 0
 
-  const inputStyle = { background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }
+  const inputStyle = { background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }
 
   const formatarMoeda = (valor: string) => {
     const num = valor.replace(/\D/g, '')
@@ -263,7 +263,7 @@ export default function SimuladorPage() {
             <div className="flex items-center justify-center py-12"><Loader2 size={20} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
           ) : (
             <div className="space-y-5">
-              <div className="rounded-xl p-5" style={{ background: 'rgba(0,0,0,0.12)', backdropFilter: 'blur(4px)', border: '1px solid var(--border)' }}>
+              <div className="rounded-xl p-5" style={{ background: 'rgba(17,18,22,0.92)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', border: '1px solid var(--border)' }}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Tipo de tabela</label>
@@ -336,7 +336,7 @@ export default function SimuladorPage() {
                     </button>
                   )}
                   {verCheia && faixa && (
-                    <div className="mt-3 rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
+                    <div className="mt-3 rounded-lg p-3" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)' }}>
                       <p className="text-xs mb-2" style={{ color: 'var(--muted-color)' }}>Parcela cheia (sem redução de 50%){comSeguro ? ' · com seguro' : ''}:</p>
                       <div className="flex justify-between text-sm"><span style={{ color: 'var(--muted-color)' }}>1ª parcela cheia</span><span style={{ color: 'var(--text)' }}>R$ {primeiraCheia.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
                       <div className="flex justify-between text-sm mt-1"><span style={{ color: 'var(--muted-color)' }}>Demais cheias</span><span style={{ color: 'var(--text)' }}>R$ {demaisCheia.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>

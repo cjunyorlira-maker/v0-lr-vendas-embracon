@@ -73,7 +73,7 @@ export default function TabelasPage() {
                         const aberto = expandido === p.id
                         const faixas = faixasPorSigla[p.sigla] || []
                         return (
-                          <div key={p.id} className="rounded-xl overflow-hidden" style={{ background: 'rgba(0,0,0,0.12)', backdropFilter: 'blur(4px)', border: '1px solid var(--border)' }}>
+                          <div key={p.id} className="rounded-xl overflow-hidden" style={{ background: 'rgba(17,18,22,0.92)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', border: '1px solid var(--border)' }}>
                             <div className="flex items-center justify-between p-4 cursor-pointer" onClick={() => abrir(p)}>
                               <div className="flex items-center gap-3 flex-wrap">
                                 <span className="font-mono text-xs font-bold px-2 py-1 rounded" style={{ background: `${cor}20`, color: cor }}>{p.sigla}</span>

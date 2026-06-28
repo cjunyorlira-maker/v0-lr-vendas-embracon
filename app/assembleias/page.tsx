@@ -140,7 +140,7 @@ export default function AssembleiasPage() {
     return (a.proxima_assembleia || '').localeCompare(b.proxima_assembleia || '')
   })
 
-  const inputStyle = { background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }
+  const inputStyle = { background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)' }
 
   return (
     <div className="relative min-h-screen font-sans">
@@ -231,27 +231,27 @@ export default function AssembleiasPage() {
               onChange={(e) => setBuscaGrupo(e.target.value)}
               placeholder="Buscar por número do grupo..."
               className="w-full rounded-lg px-3 py-2 text-sm outline-none"
-              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}
+              style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }}
             />
             <div className="flex flex-wrap gap-2">
-              <select value={ordenacao} onChange={(e) => setOrdenacao(e.target.value as 'proxima' | 'contemplam')} className="rounded-lg px-3 py-2 text-sm outline-none flex-1 min-w-[140px]" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+              <select value={ordenacao} onChange={(e) => setOrdenacao(e.target.value as 'proxima' | 'contemplam')} className="rounded-lg px-3 py-2 text-sm outline-none flex-1 min-w-[140px]" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }}>
                 <option value="proxima" style={{ background: '#131313' }}>Ordenar: Próxima assembleia</option>
                 <option value="contemplam" style={{ background: '#131313' }}>Ordenar: Mais contemplam</option>
               </select>
               {filtros.empresas.length > 0 && (
-                <select value={fEmpresa} onChange={(e) => { setFEmpresa(e.target.value); setFEquipe(''); setFVendedor('') }} className="rounded-lg px-3 py-2 text-sm outline-none flex-1 min-w-[140px]" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                <select value={fEmpresa} onChange={(e) => { setFEmpresa(e.target.value); setFEquipe(''); setFVendedor('') }} className="rounded-lg px-3 py-2 text-sm outline-none flex-1 min-w-[140px]" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }}>
                   <option value="" style={{ background: '#131313' }}>Todas as empresas</option>
                   {filtros.empresas.map(e => <option key={e.id} value={e.id} style={{ background: '#131313' }}>{e.nome}</option>)}
                 </select>
               )}
               {filtros.equipes.length > 0 && (
-                <select value={fEquipe} onChange={(e) => { setFEquipe(e.target.value); setFVendedor('') }} className="rounded-lg px-3 py-2 text-sm outline-none flex-1 min-w-[140px]" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                <select value={fEquipe} onChange={(e) => { setFEquipe(e.target.value); setFVendedor('') }} className="rounded-lg px-3 py-2 text-sm outline-none flex-1 min-w-[140px]" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }}>
                   <option value="" style={{ background: '#131313' }}>Todas as equipes</option>
                   {filtros.equipes.filter(eq => !fEmpresa || eq.empresa_id === fEmpresa).map(eq => <option key={eq.id} value={eq.id} style={{ background: '#131313' }}>{eq.nome}</option>)}
                 </select>
               )}
               {filtros.vendedores.length > 0 && (
-                <select value={fVendedor} onChange={(e) => setFVendedor(e.target.value)} className="rounded-lg px-3 py-2 text-sm outline-none flex-1 min-w-[140px]" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                <select value={fVendedor} onChange={(e) => setFVendedor(e.target.value)} className="rounded-lg px-3 py-2 text-sm outline-none flex-1 min-w-[140px]" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }}>
                   <option value="" style={{ background: '#131313' }}>Todos os vendedores</option>
                   {filtros.vendedores.filter(v => (!fEmpresa || v.empresa_id === fEmpresa) && (!fEquipe || v.equipe_id === fEquipe)).map(v => <option key={v.id} value={v.id} style={{ background: '#131313' }}>{v.nome}</option>)}
                 </select>
@@ -281,7 +281,7 @@ export default function AssembleiasPage() {
                     {extratos
                       .filter(e => e.bem === catAtiva && (!buscaGrupo || e.grupo.includes(buscaGrupo.trim())))
                       .map(e => (
-                        <div key={e.grupo} className="flex items-center justify-between rounded-xl p-3" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+                        <div key={e.grupo} className="flex items-center justify-between rounded-xl p-3" style={{ background: 'rgba(17,18,22,0.92)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)', border: '1px solid var(--border)' }}>
                           <div className="flex items-center gap-2">
                             <FileText size={15} style={{ color: 'var(--accent)' }} />
                             <div>
@@ -331,7 +331,7 @@ export default function AssembleiasPage() {
                   {aberto === g.grupo && g.tem_historico && (
                     <div className="px-4 pb-4 flex flex-col gap-3" style={{ borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
                       {g.historico.map(h => (
-                        <div key={h.mes_referencia} className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)' }}>
+                        <div key={h.mes_referencia} className="rounded-lg p-3" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)' }}>
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{h.mes_label} {h.numero_assembleia ? `· ${h.numero_assembleia}ª assembleia` : ''}</span>
                             <div className="flex items-center gap-2">
