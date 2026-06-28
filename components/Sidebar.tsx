@@ -17,21 +17,21 @@ interface NavItem {
 }
 
 const mainNav: NavItem[] = [
-  { icon: <Home size={16} />, label: '🏠 Dashboard', href: '/', active: true },
-  { icon: <Upload size={16} />, label: '📤 Nova Venda', href: '/nova-venda' },
-  { icon: <Users size={16} />, label: '👥 Clientes', href: '/clientes' },
-  { icon: <FileText size={16} />, label: '🧾 Boletos', href: '/boletos' },
-  { icon: <Target size={16} />, label: '🎯 Lances', href: '/lances' },
-  { icon: <Trophy size={16} />, label: '🏆 Ranking', href: '/ranking' },
-  { icon: <Calculator size={16} />, label: '🧮 Simulador', href: '/simulador' },
-  { icon: <BookOpen size={16} />, label: '📖 Tabelas', href: '/tabelas' },
-  { icon: <CalendarCheck size={16} />, label: '📅 Assembleias', href: '/assembleias' },
-  { icon: <Users2 size={16} />, label: '🤝 Equipe', href: '/equipe' },
+  { icon: <Home size={16} />, label: 'Dashboard', href: '/', active: true },
+  { icon: <Upload size={16} />, label: 'Nova Venda', href: '/nova-venda' },
+  { icon: <Users size={16} />, label: 'Clientes', href: '/clientes' },
+  { icon: <FileText size={16} />, label: 'Boletos', href: '/boletos' },
+  { icon: <Target size={16} />, label: 'Lances', href: '/lances' },
+  { icon: <Trophy size={16} />, label: 'Ranking', href: '/ranking' },
+  { icon: <Calculator size={16} />, label: 'Simulador', href: '/simulador' },
+  { icon: <BookOpen size={16} />, label: 'Tabelas', href: '/tabelas' },
+  { icon: <CalendarCheck size={16} />, label: 'Assembleias', href: '/assembleias' },
+  { icon: <Users2 size={16} />, label: 'Equipe', href: '/equipe' },
 ]
 
 const adminNav: NavItem[] = [
-  { icon: <DollarSign size={16} />, label: '💰 Comissões', href: '/comissoes' },
-  { icon: <Settings size={16} />, label: '⚙️ Planos', href: '/planos' },
+  { icon: <DollarSign size={16} />, label: 'Comissões', href: '/comissoes' },
+  { icon: <Settings size={16} />, label: 'Planos', href: '/planos' },
 ]
 
 function NavLink({ item }: { item: NavItem }) {
@@ -52,18 +52,20 @@ function NavLink({ item }: { item: NavItem }) {
       }}
       onMouseEnter={(e) => {
         if (!item.active) {
-          e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
-          e.currentTarget.style.color = 'var(--text2)'
+          e.currentTarget.style.background = 'rgba(212,175,55,0.08)'
+          e.currentTarget.style.color = 'var(--accent)'
+          e.currentTarget.style.transform = 'translateX(2px)'
         }
       }}
       onMouseLeave={(e) => {
         if (!item.active) {
           e.currentTarget.style.background = 'transparent'
           e.currentTarget.style.color = 'var(--muted-color)'
+          e.currentTarget.style.transform = 'translateX(0)'
         }
       }}
     >
-      <span className="shrink-0">{item.icon}</span>
+      <span className="shrink-0" style={{ color: item.active ? 'var(--accent)' : 'inherit' }}>{item.icon}</span>
       <span>{item.label}</span>
     </a>
   )
