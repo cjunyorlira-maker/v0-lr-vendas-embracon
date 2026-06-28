@@ -35,7 +35,7 @@ export function AnimatedBackground() {
     }
 
     const particles: Particle[] = []
-    const particleCount = 50
+    const particleCount = 80
 
     const createParticles = () => {
       particles.length = 0
@@ -43,8 +43,8 @@ export function AnimatedBackground() {
         particles.push({
           x: Math.random() * window.innerWidth,
           y: Math.random() * window.innerHeight,
-          size: Math.random() * 16 + 6,
-          baseOpacity: Math.random() * 0.15 + 0.05,
+          size: Math.random() * 20 + 8,
+          baseOpacity: Math.random() * 0.28 + 0.12,
           speed: Math.random() * 0.8 + 0.3,
           color: Math.random() > 0.4 ? GOLD : BLUE,
           pulse: Math.random() * Math.PI * 2,
@@ -173,7 +173,7 @@ export function AnimatedBackground() {
       />
       <div
         className="fixed inset-0 pointer-events-none"
-        style={{ zIndex: 1, background: "radial-gradient(ellipse at 50% 0%, rgba(10,11,14,0.55) 0%, rgba(8,9,12,0.78) 55%, rgba(6,7,10,0.9) 100%)" }}
+        style={{ zIndex: 1, background: "radial-gradient(ellipse at 50% 0%, rgba(10,11,14,0.15) 0%, rgba(8,9,12,0.4) 60%, rgba(6,7,10,0.55) 100%)" }}
       />
     </>
   )
