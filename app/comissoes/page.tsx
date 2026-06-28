@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { DollarSign, Loader2, AlertTriangle, Settings, Check, TrendingUp, Lock, Upload, FileText, Calculator, ChevronRight, Download, ChevronUp, ChevronDown } from 'lucide-react'
+import { DollarSign, Loader2, AlertTriangle, Settings, Check, TrendingUp, Lock, Upload, FileText, Calculator, ChevronRight, Download, ChevronUp, ChevronDown, Shield } from 'lucide-react'
 
 interface VendaComissao {
   id: string; cliente: string; vendedor: string; plano: string; adesao: number | null; bem: string; credito: number
@@ -21,7 +21,9 @@ export default function ComissoesPage() {
   const [semAcesso, setSemAcesso] = useState(false)
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set())
   const [rankModo, setRankModo] = useState<'pessoa' | 'equipe' | 'empresa'>('pessoa')
-  const [aba, setAba] = useState<'vendas' | 'config' | 'mapa' | 'calculo' | 'ranking'>('vendas')
+  const [aba, setAba] = useState<'vendas' | 'config' | 'mapa' | 'calculo' | 'ranking' | 'seguro'>('vendas')
+  const [vendasSeguro, setVendasSeguro] = useState<any[]>([])
+  const [loadingSeguro, setLoadingSeguro] = useState(false)
   const [mapas, setMapas] = useState<any[]>([])
   const [mapaSel, setMapaSel] = useState<string | null>(null)
   const [mapaDetalhe, setMapaDetalhe] = useState<any>(null)
@@ -66,6 +68,12 @@ export default function ComissoesPage() {
   useEffect(() => { if (aba === 'calculo' && planosCalc.length === 0) {
     fetch('/api/planos').then(r => r.json()).then(d => { if (d.planos) setPlanosCalc(d.planos.filter((p: any) => p.ativo)) })
   } }, [aba])
+  useEffect(() => {
+    if (aba === 'seguro') {
+      setLoadingSeguro(true)
+      fetch('/api/comissoes/seguro').then(r => r.json()).then(d => { setVendasSeguro(d.vendas || []); setLoadingSeguro(false) }).catch(() => setLoadingSeguro(false))
+    }
+  }, [aba])
 
   async function loadData() {
     setLoading(true)
@@ -207,6 +215,11 @@ export default function ComissoesPage() {
       await loadData()
     } catch { setResultImport('Erro de conexão') }
     setImportando(false)
+  }
+
+  const toggleSeguroRecebido = async (vendaId: string, atual: boolean) => {
+    setVendasSeguro(prev => prev.map(v => v.id === vendaId ? { ...v, comissao_seguro_recebida: !atual } : v))
+    await fetch('/api/comissoes/seguro', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ venda_id: vendaId, recebida: !atual }) })
   }
 
   const [ordenarPor, setOrdenarPor] = useState<string>('recebido')
@@ -472,6 +485,7 @@ export default function ComissoesPage() {
             <button onClick={() => setAba('calculo')} className={`tab-btn ${aba === 'calculo' ? 'ativo' : ''}`}><Calculator size={14} />Cálculo de Comissão</button>
             <button onClick={() => setAba('config')} className={`tab-btn ${aba === 'config' ? 'ativo' : ''}`}><Settings size={14} />Configurar padrão</button>
             <button onClick={() => setAba('ranking')} className={`tab-btn ${aba === 'ranking' ? 'ativo' : ''}`}><TrendingUp size={14} />Ranking de Faturamento</button>
+            <button onClick={() => setAba('seguro')} className={`tab-btn ${aba === 'seguro' ? 'ativo' : ''}`}><Shield size={14} />Seguro</button>
             </>)}
           </div>
 
@@ -626,6 +640,41 @@ export default function ComissoesPage() {
                 ))}
                 {rankingFaturamento.length === 0 && <p className="text-sm text-center py-8" style={{ color: 'var(--muted-color)' }}>Nenhuma venda no período.</p>}
               </div>
+            </div>
+          ) : aba === 'seguro' ? (
+            <div className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Comissão de Seguro (0,30%)</h3>
+                <div className="text-xs" style={{ color: 'var(--muted-color)' }}>
+                  Recebido: {fmtMoeda(vendasSeguro.filter(v => v.comissao_seguro_recebida).reduce((s, v) => s + (v.valor_credito * 0.003), 0))} / Total: {fmtMoeda(vendasSeguro.reduce((s, v) => s + (v.valor_credito * 0.003), 0))}
+                </div>
+              </div>
+              {loadingSeguro ? <p className="text-sm" style={{ color: 'var(--muted-color)' }}>Carregando...</p> : vendasSeguro.length === 0 ? <p className="text-sm" style={{ color: 'var(--muted-color)' }}>Nenhuma venda com seguro.</p> : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead><tr style={{ borderBottom: '1px solid var(--border)' }}>
+                      <th className="p-2 text-left" style={{ color: 'var(--muted-color)' }}>Cliente</th>
+                      <th className="p-2 text-left" style={{ color: 'var(--muted-color)' }}>Grupo/Cota</th>
+                      <th className="p-2 text-right" style={{ color: 'var(--muted-color)' }}>Crédito</th>
+                      <th className="p-2 text-right" style={{ color: 'var(--muted-color)' }}>Comissão (0,30%)</th>
+                      <th className="p-2 text-center" style={{ color: 'var(--muted-color)' }}>Recebido</th>
+                    </tr></thead>
+                    <tbody>
+                      {vendasSeguro.map(v => (
+                        <tr key={v.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                          <td className="p-2" style={{ color: 'var(--text)' }}>{v.cliente_nome || '-'}</td>
+                          <td className="p-2" style={{ color: 'var(--text2)' }}>{v.grupo}/{v.cota}</td>
+                          <td className="p-2 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda(v.valor_credito)}</td>
+                          <td className="p-2 text-right font-semibold" style={{ color: 'var(--accent)' }}>{fmtMoeda(v.valor_credito * 0.003)}</td>
+                          <td className="p-2 text-center">
+                            <button onClick={() => toggleSeguroRecebido(v.id, v.comissao_seguro_recebida)} className="rounded-md px-3 py-1 text-xs font-medium transition-colors" style={{ background: v.comissao_seguro_recebida ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.05)', border: `1px solid ${v.comissao_seguro_recebida ? '#22c55e' : 'var(--border)'}`, color: v.comissao_seguro_recebida ? '#22c55e' : 'var(--muted-color)' }}>{v.comissao_seguro_recebida ? `${'\u2713'} Recebido` : 'Pendente'}</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           ) : aba === 'config' ? (
             <>
