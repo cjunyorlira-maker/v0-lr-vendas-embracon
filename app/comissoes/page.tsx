@@ -263,10 +263,10 @@ export default function ComissoesPage() {
   const totalLR = vendasFiltradas.reduce((s, v) => s + v.comissao_lr, 0)
   const totalRecebido = vendasFiltradas.reduce((s, v) => s + (v.comissao_recebida_rs || 0), 0)
   const totalFalta = totalLR - totalRecebido
-  const totalProximaSemana = vendasFiltradas.reduce((s, v) => s + (v.comissao_a_receber_rs || 0), 0)
-  const fmtData = (iso: string | null) => iso ? new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''
+  const totalProximoPagamento = vendasFiltradas.reduce((s, v) => s + (v.comissao_a_receber_rs || 0), 0)
   const fmtDataPag = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
-  const diasAte = (iso: string) => { const d = Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000); return d }
+  const diasAtePag = (iso: string) => Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000))
+  const proximaDataPag = filaPagamentos.length > 0 ? filaPagamentos[0].data : null
   const emRisco = vendasFiltradas.filter(v => v.em_risco).length
   const totalVendedores = vendasFiltradas.reduce((s, v: any) => s + (v.venda_propria_supervisor ? 0 : (v.comissao_vendedor || 0)), 0)
   const totalSupervisores = vendasFiltradas.reduce((s, v) => s + (v.comissao_supervisor || 0), 0)
@@ -384,23 +384,15 @@ export default function ComissoesPage() {
             </div>
           )}
 
-          {ehGestao && (
-            <div className="rounded-xl p-4 mb-6" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.12), rgba(59,130,246,0.04))', border: '1px solid rgba(59,130,246,0.3)' }}>
-              <div className="flex items-center gap-2 mb-1"><Clock size={14} style={{ color: '#3b82f6' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Receber Próxima Semana</p></div>
-              <p className="text-xl font-bold" style={{ color: '#3b82f6' }}>{fmtMoeda(totalProximaSemana)}</p>
-              {proximaSextaPag ? <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>Embracon paga {fmtData(proximaSextaPag)} (sexta) — último mapa importado</p> : <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>nenhum mapa aguardando pagamento</p>}
-            </div>
-          )}
-
-          {ehGestao && filaPagamentos.length > 0 && (
+          {ehGestao && totalProximoPagamento > 0 && (
             <div className="rounded-xl p-4 mb-6" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.12), rgba(59,130,246,0.04))', border: '1px solid rgba(59,130,246,0.3)' }}>
               <div className="flex items-center gap-2 mb-1"><Clock size={14} style={{ color: '#3b82f6' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Próximo Pagamento</p></div>
-              <p className="text-xl font-bold" style={{ color: '#3b82f6' }}>{fmtMoeda(filaPagamentos[0].total)}</p>
-              <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>Embracon paga {fmtDataPag(filaPagamentos[0].data)} (sexta){diasAte(filaPagamentos[0].data) >= 0 ? ` · faltam ${diasAte(filaPagamentos[0].data)} dia(s)` : ''}</p>
+              <p className="text-xl font-bold" style={{ color: '#3b82f6' }}>{fmtMoeda(totalProximoPagamento)}</p>
+              {proximaDataPag && <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>Embracon paga {fmtDataPag(proximaDataPag)} (sexta) · faltam {diasAtePag(proximaDataPag)} dia(s)</p>}
               {filaPagamentos.length > 1 && (
                 <div className="mt-2 pt-2" style={{ borderTop: '1px solid rgba(59,130,246,0.2)' }}>
                   {filaPagamentos.slice(1).map((f, i) => (
-                    <p key={i} className="text-[10px]" style={{ color: 'var(--muted-color)' }}>+ {fmtMoeda(f.total)} aguardando ({fmtDataPag(f.data)})</p>
+                    <p key={i} className="text-[10px]" style={{ color: 'var(--muted-color)' }}>+ aguardando ({fmtDataPag(f.data)})</p>
                   ))}
                 </div>
               )}
