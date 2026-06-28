@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { DollarSign, Loader2, AlertTriangle, Settings, Check, TrendingUp, Lock, Upload, FileText, Calculator, ChevronRight, Download, ChevronUp, ChevronDown, Shield } from 'lucide-react'
+import { DollarSign, Loader2, AlertTriangle, Settings, Check, TrendingUp, Lock, Upload, FileText, Calculator, ChevronRight, Download, ChevronUp, ChevronDown, Shield, Clock } from 'lucide-react'
 
 interface VendaComissao {
   id: string; cliente: string; vendedor: string; plano: string; adesao: number | null; bem: string; credito: number
@@ -22,6 +22,7 @@ export default function ComissoesPage() {
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set())
   const [rankModo, setRankModo] = useState<'pessoa' | 'equipe' | 'empresa'>('pessoa')
   const [aba, setAba] = useState<'vendas' | 'config' | 'mapa' | 'calculo' | 'ranking' | 'seguro'>('vendas')
+  const [proximaSextaPag, setProximaSextaPag] = useState<string | null>(null)
   const [vendasSeguro, setVendasSeguro] = useState<any[]>([])
   const [loadingSeguro, setLoadingSeguro] = useState(false)
   const [mapas, setMapas] = useState<any[]>([])
@@ -82,6 +83,7 @@ export default function ComissoesPage() {
     if (res.status === 403) { setSemAcesso(true); setLoading(false); return }
     const data = await res.json()
     if (data.vendas) setVendas(data.vendas)
+    if (typeof data.proxima_sexta_pagamento !== 'undefined') setProximaSextaPag(data.proxima_sexta_pagamento)
     if (data.filtros) setFiltros(data.filtros)
     if (data.meu_role) setMeuRole(data.meu_role)
     if (data.config_categorias) {
@@ -259,6 +261,8 @@ export default function ComissoesPage() {
   const totalLR = vendasFiltradas.reduce((s, v) => s + v.comissao_lr, 0)
   const totalRecebido = vendasFiltradas.reduce((s, v) => s + (v.comissao_recebida_rs || 0), 0)
   const totalFalta = totalLR - totalRecebido
+  const totalProximaSemana = vendasFiltradas.reduce((s, v) => s + (v.comissao_a_receber_rs || 0), 0)
+  const fmtData = (iso: string | null) => iso ? new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''
   const emRisco = vendasFiltradas.filter(v => v.em_risco).length
   const totalVendedores = vendasFiltradas.reduce((s, v: any) => s + (v.venda_propria_supervisor ? 0 : (v.comissao_vendedor || 0)), 0)
   const totalSupervisores = vendasFiltradas.reduce((s, v) => s + (v.comissao_supervisor || 0), 0)
@@ -348,7 +352,7 @@ export default function ComissoesPage() {
         <main className="mx-auto max-w-[1400px] px-6 py-8 lg:px-8">
           {/* Resumo: LR total, Recebido, A receber, Risco */}
           {ehGestao && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
             <div className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
               <div className="flex items-center gap-2 mb-1"><TrendingUp size={14} style={{ color: 'var(--accent)' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Comissão Rep. (total)</p></div>
               <p className="text-xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(totalLR)}</p>
@@ -360,6 +364,11 @@ export default function ComissoesPage() {
             <div className="rounded-xl p-4" style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)' }}>
               <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>A receber</p>
               <p className="text-xl font-bold" style={{ color: '#f59e0b' }}>{fmtMoeda(totalFalta)}</p>
+            </div>
+            <div className="rounded-2xl p-5 relative overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.22), rgba(59,130,246,0.05))', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(59,130,246,0.4)', boxShadow: '0 8px 28px rgba(59,130,246,0.15)' }}>
+              <div className="flex items-center gap-2 mb-1"><Clock size={16} style={{ color: '#3b82f6' }} /><p className="text-xs font-medium" style={{ color: 'var(--muted-color)' }}>Receber Próxima Semana</p></div>
+              <p className="text-2xl font-bold" style={{ color: '#3b82f6' }}>{fmtMoeda(totalProximaSemana)}</p>
+              {proximaSextaPag ? <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>Embracon paga {fmtData(proximaSextaPag)} (sexta)</p> : <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>nenhum mapa pendente</p>}
             </div>
             <div className="rounded-xl p-4" style={{ background: emRisco > 0 ? 'rgba(239,68,68,0.08)' : 'rgba(0,0,0,0.12)', border: `1px solid ${emRisco > 0 ? 'rgba(239,68,68,0.3)' : 'var(--border)'}` }}>
               <div className="flex items-center gap-2 mb-1"><AlertTriangle size={14} style={{ color: emRisco > 0 ? '#ef4444' : 'var(--muted-color)' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Em risco de estorno</p></div>
