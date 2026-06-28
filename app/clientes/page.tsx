@@ -8,7 +8,7 @@ import { Users, Loader2, ChevronDown, ChevronUp, Search, SlidersHorizontal, Home
 
 interface Cota {
   venda_id: string; cliente_id: string; nome: string; cpf: string; telefone: string
-  grupo: string; cota: string; numero_proposta: string | null; numero_contrato: string | null; credito: number; bem: string; adesao: number | null; plano: string
+  grupo: string; cota: string; numero_proposta: string | null; numero_contrato: string | null; credito: number; bem: string; adesao: number | null; plano: string; com_seguro?: boolean
   data_assembleia: string | null; data_venda: string | null
   vendedor: string | null; equipe_nome: string | null; vendedor_id: string; equipe_id: string; empresa_id: string
   status_boleto: string; qtd_parcelas: number; proxima_cobranca: string | null; status_cliente: string
@@ -43,6 +43,7 @@ export default function ClientesPage() {
   const [mostraFiltros, setMostraFiltros] = useState(true)
   const [fBem, setFBem] = useState('')
   const [fAdesao, setFAdesao] = useState('')
+  const [fSeguro, setFSeguro] = useState('')
   const [fLance, setFLance] = useState('')
   const [filtrosOpc, setFiltrosOpc] = useState<{ empresas: any[]; equipes: any[]; vendedores: any[] }>({ empresas: [], equipes: [], vendedores: [] })
   const [fEmpresa, setFEmpresa] = useState('')
@@ -152,6 +153,8 @@ export default function ClientesPage() {
     return cl.cotas.some(c => {
       if (fBem && c.bem !== fBem) return false
       if (fAdesao && String(c.adesao) !== fAdesao) return false
+      if (fSeguro === 'com' && !c.com_seguro) return false
+      if (fSeguro === 'sem' && c.com_seguro) return false
       if (fLance && c.status_lance !== fLance) return false
       if (fStatusBoleto && c.status_boleto !== fStatusBoleto) return false
       if (fEmpresa && c.empresa_id !== fEmpresa) return false
@@ -209,6 +212,11 @@ export default function ClientesPage() {
                 <option value="1" style={{ background: '#131313' }}>1%</option>
                 <option value="2" style={{ background: '#131313' }}>2%</option>
               </select>
+              <select value={fSeguro} onChange={(e) => setFSeguro(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={inputStyle}>
+                <option value="" style={{ background: '#131313' }}>Seguro (todos)</option>
+                <option value="com" style={{ background: '#131313' }}>Com seguro</option>
+                <option value="sem" style={{ background: '#131313' }}>Sem seguro</option>
+              </select>
               <select value={fLance} onChange={(e) => setFLance(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={inputStyle}>
                 <option value="" style={{ background: '#131313' }}>Todos os lances</option>
                 <option value="pendente" style={{ background: '#131313' }}>Lance pendente</option>
@@ -245,7 +253,7 @@ export default function ClientesPage() {
               <button onClick={aplicarProducao} className="rounded-lg px-3 py-1.5 text-xs" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)', border: '1px solid rgba(212,175,55,0.3)' }}>Produção</button>
               <input type="date" value={dataDe} onChange={(e) => setDataDe(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={inputStyle} />
               <input type="date" value={dataAte} onChange={(e) => setDataAte(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={inputStyle} />
-              {(fBem || fAdesao || fLance || fStatusBoleto || fEmpresa || fEquipe || fVendedor || dataDe || dataAte) && <button onClick={() => { setFBem(''); setFAdesao(''); setFLance(''); setFStatusBoleto(''); setFEmpresa(''); setFEquipe(''); setFVendedor(''); setDataDe(''); setDataAte('') }} className="rounded-lg px-3 py-1.5 text-xs" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>Limpar</button>}
+              {(fBem || fAdesao || fSeguro || fLance || fStatusBoleto || fEmpresa || fEquipe || fVendedor || dataDe || dataAte) && <button onClick={() => { setFBem(''); setFAdesao(''); setFSeguro(''); setFLance(''); setFStatusBoleto(''); setFEmpresa(''); setFEquipe(''); setFVendedor(''); setDataDe(''); setDataAte('') }} className="rounded-lg px-3 py-1.5 text-xs" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>Limpar</button>}
             </div>
           )}
 
@@ -293,7 +301,12 @@ export default function ClientesPage() {
                       <div className="flex items-center gap-2 mt-2 flex-wrap">
                         {cl.cotas.map((c, i) => {
                           const Icon = bemIcon[c.bem] || Home
-                          return <span key={i} className="text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text2)' }}><Icon size={10} />{c.bem} {c.adesao}%</span>
+                          return (
+                            <span key={i} className="flex items-center gap-1">
+                              <span className="text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text2)' }}><Icon size={10} />{c.bem} {c.adesao}%</span>
+                              {c.com_seguro && <span className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}>com seguro</span>}
+                            </span>
+                          )
                         })}
                         {temLancePendente && <span className="text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1" style={{ background: 'rgba(234,179,8,0.15)', color: '#eab308' }}><Target size={10} />Lance pendente</span>}
                         {cl.cotas.some(c => c.status_lance === 'solicitado') && <span className="text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1" style={{ background: 'rgba(249,115,22,0.15)', color: '#f97316' }}><Target size={10} />Lance solicitado</span>}
