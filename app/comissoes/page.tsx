@@ -9,7 +9,7 @@ interface VendaComissao {
   id: string; cliente: string; vendedor: string; plano: string; adesao: number | null; bem: string; credito: number
   comissao_lr: number; comissao_lr_total: number; parcelas_pagas: number; total_parcelas_comissao: number; percentual_vendedor: number; comissao_vendedor: number
   percentual_supervisor: number; comissao_supervisor: number
-  comissao_recebida_rs: number; comissao_recebida_percent: number
+  comissao_recebida_rs: number; comissao_a_receber_rs?: number; comissao_mapeada_rs?: number; comissao_recebida_percent: number
   em_risco: boolean; valor_estorno: number; faltam: number; pgto_seguranca: number
 }
 
@@ -23,6 +23,7 @@ export default function ComissoesPage() {
   const [rankModo, setRankModo] = useState<'pessoa' | 'equipe' | 'empresa'>('pessoa')
   const [aba, setAba] = useState<'vendas' | 'config' | 'mapa' | 'calculo' | 'ranking' | 'seguro'>('vendas')
   const [proximaSextaPag, setProximaSextaPag] = useState<string | null>(null)
+  const [filaPagamentos, setFilaPagamentos] = useState<{ data: string; total: number }[]>([])
   const [vendasSeguro, setVendasSeguro] = useState<any[]>([])
   const [loadingSeguro, setLoadingSeguro] = useState(false)
   const [mapas, setMapas] = useState<any[]>([])
@@ -84,6 +85,7 @@ export default function ComissoesPage() {
     const data = await res.json()
     if (data.vendas) setVendas(data.vendas)
     if (typeof data.proxima_sexta_pagamento !== 'undefined') setProximaSextaPag(data.proxima_sexta_pagamento)
+    if (data.fila_pagamentos) setFilaPagamentos(data.fila_pagamentos)
     if (data.filtros) setFiltros(data.filtros)
     if (data.meu_role) setMeuRole(data.meu_role)
     if (data.config_categorias) {
@@ -263,6 +265,8 @@ export default function ComissoesPage() {
   const totalFalta = totalLR - totalRecebido
   const totalProximaSemana = vendasFiltradas.reduce((s, v) => s + (v.comissao_a_receber_rs || 0), 0)
   const fmtData = (iso: string | null) => iso ? new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''
+  const fmtDataPag = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  const diasAte = (iso: string) => { const d = Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000); return d }
   const emRisco = vendasFiltradas.filter(v => v.em_risco).length
   const totalVendedores = vendasFiltradas.reduce((s, v: any) => s + (v.venda_propria_supervisor ? 0 : (v.comissao_vendedor || 0)), 0)
   const totalSupervisores = vendasFiltradas.reduce((s, v) => s + (v.comissao_supervisor || 0), 0)
@@ -316,7 +320,7 @@ export default function ComissoesPage() {
     return vendasFiltradas.reduce((soma: number, v: any) => {
       if (v.boleto_status !== 'efetivado' || !v.boleto_data_efetivado) return soma
       if (new Date(v.boleto_data_efetivado) > limite) return soma
-      const falta = (v.comissao_lr_total || 0) - (v.comissao_recebida_rs || 0)
+      const falta = (v.comissao_lr_total || 0) - (v.comissao_mapeada_rs ?? v.comissao_recebida_rs ?? 0)
       return soma + (falta > 0 ? falta : 0)
     }, 0)
   })()
@@ -385,6 +389,21 @@ export default function ComissoesPage() {
               <div className="flex items-center gap-2 mb-1"><Clock size={14} style={{ color: '#3b82f6' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Receber Próxima Semana</p></div>
               <p className="text-xl font-bold" style={{ color: '#3b82f6' }}>{fmtMoeda(totalProximaSemana)}</p>
               {proximaSextaPag ? <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>Embracon paga {fmtData(proximaSextaPag)} (sexta) — último mapa importado</p> : <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>nenhum mapa aguardando pagamento</p>}
+            </div>
+          )}
+
+          {ehGestao && filaPagamentos.length > 0 && (
+            <div className="rounded-xl p-4 mb-6" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.12), rgba(59,130,246,0.04))', border: '1px solid rgba(59,130,246,0.3)' }}>
+              <div className="flex items-center gap-2 mb-1"><Clock size={14} style={{ color: '#3b82f6' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Próximo Pagamento</p></div>
+              <p className="text-xl font-bold" style={{ color: '#3b82f6' }}>{fmtMoeda(filaPagamentos[0].total)}</p>
+              <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>Embracon paga {fmtDataPag(filaPagamentos[0].data)} (sexta){diasAte(filaPagamentos[0].data) >= 0 ? ` · faltam ${diasAte(filaPagamentos[0].data)} dia(s)` : ''}</p>
+              {filaPagamentos.length > 1 && (
+                <div className="mt-2 pt-2" style={{ borderTop: '1px solid rgba(59,130,246,0.2)' }}>
+                  {filaPagamentos.slice(1).map((f, i) => (
+                    <p key={i} className="text-[10px]" style={{ color: 'var(--muted-color)' }}>+ {fmtMoeda(f.total)} aguardando ({fmtDataPag(f.data)})</p>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
