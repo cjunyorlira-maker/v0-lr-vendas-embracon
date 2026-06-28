@@ -76,17 +76,30 @@ export async function GET() {
       mapaDataPag.set(mp.id, dp)
       mapaPago.set(mp.id, agora >= dp)
     }
+    // por contrato: recebido pago, mapeado total, e a receber separado por data
     const recebidoPagoPorContrato = new Map<string, number>()
+    const mapeadoTotalPorContrato = new Map<string, number>()
     const aReceberPorContrato = new Map<string, number>()
     for (const l of (linhasAll || []) as any[]) {
       const c = String(l.contrato).trim()
-      if (mapaPago.get(l.mapa_id)) recebidoPagoPorContrato.set(c, (recebidoPagoPorContrato.get(c) || 0) + (l.valor_comissao || 0))
-      else aReceberPorContrato.set(c, (aReceberPorContrato.get(c) || 0) + (l.valor_comissao || 0))
+      const val = l.valor_comissao || 0
+      mapeadoTotalPorContrato.set(c, (mapeadoTotalPorContrato.get(c) || 0) + val)
+      if (mapaPago.get(l.mapa_id)) recebidoPagoPorContrato.set(c, (recebidoPagoPorContrato.get(c) || 0) + val)
+      else aReceberPorContrato.set(c, (aReceberPorContrato.get(c) || 0) + val)
     }
     let proximaSextaPagamento: Date | null = null
     for (const [id, dp] of mapaDataPag) {
       if (!mapaPago.get(id) && (!proximaSextaPagamento || dp < proximaSextaPagamento)) proximaSextaPagamento = dp
     }
+    // fila de pagamentos pendentes agrupada por data (para o card Próximo Pagamento)
+    const filaPorData = new Map<string, number>() // 'ISO' -> total do mapa
+    for (const mp of (mapasAll || []) as any[]) {
+      if (mapaPago.get(mp.id)) continue
+      const dp = mapaDataPag.get(mp.id); if (!dp) continue
+      const totalMapa = (linhasAll || []).filter((l: any) => l.mapa_id === mp.id).reduce((s: number, l: any) => s + (l.valor_comissao || 0), 0)
+      filaPorData.set(dp.toISOString(), (filaPorData.get(dp.toISOString()) || 0) + totalMapa)
+    }
+    const filaPagamentos = Array.from(filaPorData.entries()).map(([data, total]) => ({ data, total })).sort((a, b) => a.data.localeCompare(b.data))
 
     const lista = (vendas || []).map((v: any) => {
       const plano = Array.isArray(v.planos) ? v.planos[0] : v.planos
@@ -136,6 +149,7 @@ export async function GET() {
         comissao_supervisor_propria: vendaPropriaSupervisor ? comVend : 0,
         comissao_recebida_rs: (recebidoPagoPorContrato.get(String(v.numero_contrato || '').trim()) || recebidoPagoPorContrato.get(String(v.numero_proposta || '').trim()) || 0),
         comissao_a_receber_rs: (aReceberPorContrato.get(String(v.numero_contrato || '').trim()) || aReceberPorContrato.get(String(v.numero_proposta || '').trim()) || 0),
+        comissao_mapeada_rs: (mapeadoTotalPorContrato.get(String(v.numero_contrato || '').trim()) || mapeadoTotalPorContrato.get(String(v.numero_proposta || '').trim()) || 0),
         comissao_recebida_percent: v.comissao_recebida_percent || 0,
         boleto_status: boleto?.status || null,
         boleto_data_efetivado: boleto?.data_efetivacao || null,
@@ -166,6 +180,7 @@ export async function GET() {
       vendas: lista, config, config_categorias: configCategorias || [], meu_role: me.role,
       filtros: { empresas: empresasOpc, equipes: equipesOpc, vendedores: vendedoresOpc },
       proxima_sexta_pagamento: proximaSextaPagamento ? proximaSextaPagamento.toISOString() : null,
+      fila_pagamentos: filaPagamentos,
     })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
