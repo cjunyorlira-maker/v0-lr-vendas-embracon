@@ -356,38 +356,38 @@ export default function ComissoesPage() {
         <main className="mx-auto max-w-[1400px] px-6 py-8 lg:px-8">
           {/* Resumo: LR total, Recebido, A receber, Risco */}
           {ehGestao && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-            <div className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
-              <div className="flex items-center gap-2 mb-1"><TrendingUp size={14} style={{ color: 'var(--accent)' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Comissão Rep. (total)</p></div>
-              <p className="text-xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(totalLR)}</p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div className="rounded-2xl p-5" style={{ background: 'rgba(17,18,22,0.92)', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
+              <div className="flex items-center gap-2 mb-1.5"><TrendingUp size={14} style={{ color: 'var(--accent)' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Comissão Rep. (total)</p></div>
+              <p className="text-2xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(totalLR)}</p>
             </div>
-            <div className="rounded-xl p-4" style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.12) 0%, rgba(34,197,94,0.04) 100%)', border: '1px solid rgba(34,197,94,0.25)' }}>
-              <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Já recebido</p>
-              <p className="text-xl font-bold" style={{ color: '#22c55e' }}>{fmtMoeda(totalRecebido)}</p>
+            <div className="rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.14), rgba(17,18,22,0.94))', border: '1px solid rgba(34,197,94,0.3)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
+              <p className="text-xs mb-1.5" style={{ color: 'var(--muted-color)' }}>Já recebido</p>
+              <p className="text-2xl font-bold" style={{ color: '#22c55e' }}>{fmtMoeda(totalRecebido)}</p>
             </div>
-            <div className="rounded-xl p-4" style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.2)' }}>
-              <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>A receber</p>
-              <p className="text-xl font-bold" style={{ color: '#f59e0b' }}>{fmtMoeda(totalFalta)}</p>
+            <div className="rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.14), rgba(17,18,22,0.94))', border: '1px solid rgba(245,158,11,0.3)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
+              <p className="text-xs mb-1.5" style={{ color: 'var(--muted-color)' }}>A receber</p>
+              <p className="text-2xl font-bold" style={{ color: '#f59e0b' }}>{fmtMoeda(totalFalta)}</p>
             </div>
-            <div className="rounded-xl p-4" style={{ background: emRisco > 0 ? 'rgba(239,68,68,0.08)' : 'rgba(0,0,0,0.12)', border: `1px solid ${emRisco > 0 ? 'rgba(239,68,68,0.3)' : 'var(--border)'}` }}>
-              <div className="flex items-center gap-2 mb-1"><AlertTriangle size={14} style={{ color: emRisco > 0 ? '#ef4444' : 'var(--muted-color)' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Em risco de estorno</p></div>
-              <p className="text-xl font-bold" style={{ color: emRisco > 0 ? '#ef4444' : 'var(--text)' }}>{emRisco}</p>
+            <div className="rounded-2xl p-5" style={{ background: emRisco > 0 ? 'linear-gradient(135deg, rgba(239,68,68,0.14), rgba(17,18,22,0.94))' : 'rgba(17,18,22,0.92)', border: `1px solid ${emRisco > 0 ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.08)'}`, boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
+              <div className="flex items-center gap-2 mb-1.5"><AlertTriangle size={14} style={{ color: emRisco > 0 ? '#ef4444' : 'var(--muted-color)' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Em risco de estorno</p></div>
+              <p className="text-2xl font-bold" style={{ color: emRisco > 0 ? '#ef4444' : 'var(--text)' }}>{emRisco}</p>
             </div>
           </div>
           )}
 
           {ehGestao && previaProximaSemana > 0 && (
-            <div className="rounded-xl p-4 mb-6" style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.25)' }}>
-              <div className="flex items-center gap-2 mb-1"><TrendingUp size={14} style={{ color: '#22c55e' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Prévia Próxima Semana</p></div>
-              <p className="text-xl font-bold" style={{ color: '#22c55e' }}>{fmtMoeda(previaProximaSemana)}</p>
+            <div className="rounded-2xl p-5 mb-6" style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.1), rgba(17,18,22,0.94))', border: '1px solid rgba(34,197,94,0.25)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
+              <div className="flex items-center gap-2 mb-1.5"><TrendingUp size={14} style={{ color: '#22c55e' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Prévia Próxima Semana</p></div>
+              <p className="text-2xl font-bold" style={{ color: '#22c55e' }}>{fmtMoeda(previaProximaSemana)}</p>
               <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>Vendas efetivadas até quinta que ainda não foram 100% recebidas</p>
             </div>
           )}
 
           {ehGestao && totalProximoPagamento > 0 && (
-            <div className="rounded-xl p-4 mb-6" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.12), rgba(59,130,246,0.04))', border: '1px solid rgba(59,130,246,0.3)' }}>
-              <div className="flex items-center gap-2 mb-1"><Clock size={14} style={{ color: '#3b82f6' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Próximo Pagamento</p></div>
-              <p className="text-xl font-bold" style={{ color: '#3b82f6' }}>{fmtMoeda(totalProximoPagamento)}</p>
+            <div className="rounded-2xl p-5 mb-6" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.14), rgba(17,18,22,0.94))', border: '1px solid rgba(59,130,246,0.3)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
+              <div className="flex items-center gap-2 mb-1.5"><Clock size={14} style={{ color: '#3b82f6' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Próximo Pagamento</p></div>
+              <p className="text-2xl font-bold" style={{ color: '#3b82f6' }}>{fmtMoeda(totalProximoPagamento)}</p>
               {proximaDataPag && <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>Embracon paga {fmtDataPag(proximaDataPag)} (sexta) · faltam {diasAtePag(proximaDataPag)} dia(s)</p>}
               {filaPagamentos.length > 1 && (
                 <div className="mt-2 pt-2" style={{ borderTop: '1px solid rgba(59,130,246,0.2)' }}>
@@ -400,43 +400,43 @@ export default function ComissoesPage() {
           )}
 
           {/* Cards de comissão de equipe */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
             {(ehGestao || ehAdm) && (
-            <div className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
-              <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Comissão Vendedores</p>
-              <p className="text-xl font-bold" style={{ color: '#3b82f6' }}>{fmtMoeda(totalVendedores)}</p>
+            <div className="rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.12), rgba(17,18,22,0.94))', border: '1px solid rgba(59,130,246,0.28)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
+              <p className="text-xs mb-1.5" style={{ color: 'var(--muted-color)' }}>Comissão Vendedores</p>
+              <p className="text-2xl font-bold" style={{ color: '#3b82f6' }}>{fmtMoeda(totalVendedores)}</p>
             </div>
             )}
             {(ehGestao || ehAdm) && (
-            <div className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
-              <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Comissão Supervisores</p>
-              <p className="text-xl font-bold" style={{ color: '#a855f7' }}>{fmtMoeda(totalSupervisores)}</p>
+            <div className="rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.12), rgba(17,18,22,0.94))', border: '1px solid rgba(168,85,247,0.28)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
+              <p className="text-xs mb-1.5" style={{ color: 'var(--muted-color)' }}>Comissão Supervisores</p>
+              <p className="text-2xl font-bold" style={{ color: '#a855f7' }}>{fmtMoeda(totalSupervisores)}</p>
             </div>
             )}
             {(ehGestao || ehAdm) && totalSupervisorPropria > 0 && (
-            <div className="rounded-xl p-4" style={{ background: 'rgba(236,72,153,0.06)', border: '1px solid rgba(236,72,153,0.25)' }}>
-              <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Superv. Venda Própria</p>
-              <p className="text-xl font-bold" style={{ color: '#ec4899' }}>{fmtMoeda(totalSupervisorPropria)}</p>
-              <p className="text-[10px] mt-0.5" style={{ color: 'var(--muted-color)' }}>vendas do próprio supervisor</p>
+            <div className="rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, rgba(236,72,153,0.12), rgba(17,18,22,0.94))', border: '1px solid rgba(236,72,153,0.28)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
+              <p className="text-xs mb-1.5" style={{ color: 'var(--muted-color)' }}>Superv. Venda Própria</p>
+              <p className="text-2xl font-bold" style={{ color: '#ec4899' }}>{fmtMoeda(totalSupervisorPropria)}</p>
+              <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>vendas do próprio supervisor</p>
             </div>
             )}
             {meuRole === 'master' && (
-              <div className="rounded-xl p-4" style={{ background: 'linear-gradient(135deg, rgba(212,175,55,0.15) 0%, rgba(212,175,55,0.04) 100%)', border: '1px solid rgba(212,175,55,0.3)' }}>
-                <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Comissão Master — Garantido</p>
-                <p className="text-xl font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(comissaoMasterGarantido)}</p>
+              <div className="rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, rgba(212,175,55,0.16), rgba(17,18,22,0.94))', border: '1px solid rgba(212,175,55,0.35)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
+                <p className="text-xs mb-1.5" style={{ color: 'var(--muted-color)' }}>Comissão Master — Garantido</p>
+                <p className="text-2xl font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(comissaoMasterGarantido)}</p>
                 <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>Potencial total: {fmtMoeda(comissaoMaster)} (0,25% se todos pagarem até o estorno)</p>
-                <p className="text-[10px] mt-0.5" style={{ color: 'var(--muted-color)' }}>sobre {fmtMoeda(producaoTotal)} de produção</p>
+                <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>sobre {fmtMoeda(producaoTotal)} de produção</p>
               </div>
             )}
-            {ehGestao && (<div className="rounded-xl p-4" style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.12) 0%, rgba(34,197,94,0.04) 100%)', border: '1px solid rgba(34,197,94,0.25)' }}>
-              <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Líquido Representante</p>
-              <p className="text-xl font-bold" style={{ color: '#22c55e' }}>{fmtMoeda(liquidoRep)}</p>
-              <p className="text-[10px] mt-0.5" style={{ color: 'var(--muted-color)' }}>após vendedor e supervisor</p>
+            {ehGestao && (<div className="rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.12), rgba(17,18,22,0.94))', border: '1px solid rgba(34,197,94,0.28)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
+              <p className="text-xs mb-1.5" style={{ color: 'var(--muted-color)' }}>Líquido Representante</p>
+              <p className="text-2xl font-bold" style={{ color: '#22c55e' }}>{fmtMoeda(liquidoRep)}</p>
+              <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>após vendedor e supervisor</p>
             </div>)}
-            {ehGestao && (<div className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
-              <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Total em Vendas</p>
-              <p className="text-xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(producaoTotal)}</p>
-              <p className="text-[10px] mt-0.5" style={{ color: 'var(--muted-color)' }}>{vendasFiltradas.length} venda(s)</p>
+            {ehGestao && (<div className="rounded-2xl p-5" style={{ background: 'rgba(17,18,22,0.92)', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
+              <p className="text-xs mb-1.5" style={{ color: 'var(--muted-color)' }}>Total em Vendas</p>
+              <p className="text-2xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(producaoTotal)}</p>
+              <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>{vendasFiltradas.length} venda(s)</p>
             </div>)}
           </div>
 
