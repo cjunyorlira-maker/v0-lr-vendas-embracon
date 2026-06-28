@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
       empresa_id_alvo, equipe_id_alvo, vendedor_id_alvo,
       observacoes,
       data_assembleia_entrada,
+      com_seguro,
       proxima_cobranca,
     } = body
 
@@ -126,6 +127,7 @@ export async function POST(req: NextRequest) {
         pdf_proposta_nome: pdf_nome || null,
         observacoes: observacoes || null,
         data_assembleia_entrada: data_assembleia_entrada || null,
+        com_seguro: com_seguro || false,
         data_venda: data_venda || null,
       })
       .select('id')
