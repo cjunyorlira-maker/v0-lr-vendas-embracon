@@ -35,7 +35,7 @@ export function AnimatedBackground() {
     }
 
     const particles: Particle[] = []
-    const particleCount = 120
+    const particleCount = 50
 
     const createParticles = () => {
       particles.length = 0
@@ -43,8 +43,8 @@ export function AnimatedBackground() {
         particles.push({
           x: Math.random() * window.innerWidth,
           y: Math.random() * window.innerHeight,
-          size: Math.random() * 25 + 10,
-          baseOpacity: Math.random() * 0.4 + 0.2,
+          size: Math.random() * 16 + 6,
+          baseOpacity: Math.random() * 0.15 + 0.05,
           speed: Math.random() * 0.8 + 0.3,
           color: Math.random() > 0.4 ? GOLD : BLUE,
           pulse: Math.random() * Math.PI * 2,
@@ -104,8 +104,8 @@ export function AnimatedBackground() {
           orb.x + wobbleX, orb.y + wobbleY, orb.radius
         )
         
-        gradient.addColorStop(0, `rgba(${orb.color.r}, ${orb.color.g}, ${orb.color.b}, 0.12)`)
-        gradient.addColorStop(0.4, `rgba(${orb.color.r}, ${orb.color.g}, ${orb.color.b}, 0.05)`)
+        gradient.addColorStop(0, `rgba(${orb.color.r}, ${orb.color.g}, ${orb.color.b}, 0.06)`)
+        gradient.addColorStop(0.4, `rgba(${orb.color.r}, ${orb.color.g}, ${orb.color.b}, 0.025)`)
         gradient.addColorStop(1, `rgba(${orb.color.r}, ${orb.color.g}, ${orb.color.b}, 0)`)
 
         ctx.fillStyle = gradient
@@ -165,10 +165,16 @@ export function AnimatedBackground() {
   }, [])
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="fixed inset-0 pointer-events-none"
-      style={{ background: "#080808", zIndex: 0 }}
-    />
+    <>
+      <canvas
+        ref={canvasRef}
+        className="fixed inset-0 pointer-events-none"
+        style={{ background: "#080808", zIndex: 0 }}
+      />
+      <div
+        className="fixed inset-0 pointer-events-none"
+        style={{ zIndex: 1, background: "radial-gradient(ellipse at 50% 0%, rgba(10,11,14,0.55) 0%, rgba(8,9,12,0.78) 55%, rgba(6,7,10,0.9) 100%)" }}
+      />
+    </>
   )
 }
