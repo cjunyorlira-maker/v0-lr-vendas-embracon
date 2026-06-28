@@ -26,10 +26,18 @@ async function autenticar() {
   if (!authUser) return { erro: NextResponse.json({ error: "Não autenticado" }, { status: 401 }) }
   const me = await getMe(authUser.id)
   if (!me) return { erro: NextResponse.json({ error: "Usuário não encontrado" }, { status: 403 }) }
-  if (!['master', 'representante'].includes(me.role)) {
-    return { erro: NextResponse.json({ error: "Sem permissão" }, { status: 403 }) }
-  }
   return { me }
+}
+
+// aplica a hierarquia: master/adm-matriz vê tudo; supervisor a equipe; vendedor as próprias; demais a empresa
+async function aplicarEscopo(q: any, me: any) {
+  const { escopoGlobal } = await getEscopo(me)
+  if (!escopoGlobal) {
+    if (me.role === 'supervisor') q = q.eq('equipe_id', me.equipe_id)
+    else if (me.role === 'vendedor') q = q.eq('vendedor_id', me.id)
+    else q = q.eq('empresa_id', me.empresa_id)
+  }
+  return q
 }
 
 // GET: lista vendas COM seguro + status de recebimento da comissão de seguro
@@ -40,12 +48,11 @@ export async function GET() {
 
     let q = supabaseAdmin
       .from('vendas')
-      .select('id, valor_credito, grupo, cota, empresa_id, com_seguro, comissao_seguro_recebida, clientes(nome)')
+      .select('id, valor_credito, grupo, cota, empresa_id, equipe_id, vendedor_id, com_seguro, comissao_seguro_recebida, clientes(nome)')
       .eq('com_seguro', true)
       .order('criado_em', { ascending: false })
 
-    const { escopoGlobal } = await getEscopo(me)
-    if (!escopoGlobal) q = q.eq('empresa_id', me!.empresa_id)
+    q = await aplicarEscopo(q, me)
     const { data: vendas } = await q
 
     const lista = (vendas || []).map((v: any) => {
@@ -75,10 +82,9 @@ export async function POST(req: NextRequest) {
     const { venda_id, recebida } = await req.json()
     if (!venda_id) return NextResponse.json({ error: "venda_id obrigatório" }, { status: 400 })
 
-    // garante que a venda está no escopo do usuário
-    const { escopoGlobal } = await getEscopo(me)
-    let check = supabaseAdmin.from('vendas').select('id, empresa_id').eq('id', venda_id)
-    if (!escopoGlobal) check = check.eq('empresa_id', me!.empresa_id)
+    // garante que a venda está no escopo do usuário antes de atualizar
+    let check = supabaseAdmin.from('vendas').select('id').eq('id', venda_id)
+    check = await aplicarEscopo(check, me)
     const { data: venda } = await check.single()
     if (!venda) return NextResponse.json({ error: "Venda não encontrada" }, { status: 404 })
 
