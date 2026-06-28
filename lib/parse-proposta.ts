@@ -105,19 +105,33 @@ export function parseProposta(textoPdf: string): DadosProposta {
   const emailMatch = texto.match(/([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/i)
   const email = emailMatch ? emailMatch[1] : null
 
-  // ─── Nº PROPOSTA ─── 7 dígitos na linha "Grupo Cota...9881377"
+  // ─── Nº PROPOSTA ─── (6 a 8 dígitos)
   let numero_proposta: string | null = null
+  // Caso 1 (layout antigo): número na MESMA linha que "Grupo Cota"
   for (const linha of linhas) {
-    // linha que contém "Grupo Cota" e um número de 6-8 dígitos
     if (/Grupo\s*Cota/i.test(linha)) {
       const numMatch = linha.match(/(\d{6,8})/)
       if (numMatch) { numero_proposta = numMatch[1]; break }
     }
   }
-  // fallback: 7 dígitos isolados nas primeiras linhas
+  // Caso 2 (layout novo): "Grupo" e "Cota" em linhas separadas; o número
+  // da proposta vem numa linha sozinha (6-8 dígitos) logo depois, ANTES da
+  // linha de grupo/cota ("7269 1536 - 0").
   if (!numero_proposta) {
-    for (const linha of linhas.slice(0, 15)) {
-      const mm = linha.match(/^(\d{7})$/)
+    const idxGrupo = linhas.findIndex(l => /^Grupo$/i.test(l.trim()))
+    if (idxGrupo !== -1) {
+      for (let i = idxGrupo + 1; i < Math.min(idxGrupo + 6, linhas.length); i++) {
+        // para na linha de grupo+cota (ex: "7269 1536 - 0")
+        if (/^\d{4}\s+\d{3,5}\s*-\s*\d$/.test(linhas[i].trim())) break
+        const mm = linhas[i].trim().match(/^(\d{6,8})$/)
+        if (mm) { numero_proposta = mm[1]; break }
+      }
+    }
+  }
+  // fallback: número isolado (6-8 dígitos) nas primeiras linhas
+  if (!numero_proposta) {
+    for (const linha of linhas.slice(0, 20)) {
+      const mm = linha.trim().match(/^(\d{6,8})$/)
       if (mm) { numero_proposta = mm[1]; break }
     }
   }

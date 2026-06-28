@@ -44,6 +44,7 @@ export default function NovaVendaPage() {
   const [planoId, setPlanoId] = useState('')
   const [qtdParcelas, setQtdParcelas] = useState('0')
   const [observacoes, setObservacoes] = useState('')
+  const [comSeguro, setComSeguro] = useState(false)
   const [dataAssembleia, setDataAssembleia] = useState('')
   const [dataVenda, setDataVenda] = useState('')
   const [dataVencimento, setDataVencimento] = useState('')
@@ -150,7 +151,7 @@ export default function NovaVendaPage() {
 
   function limparForm() {
     setNomeCliente(''); setCpfCnpj(''); setTelefone(''); setEmail(''); setNumeroProposta(''); setNumeroContrato(''); setGrupo(''); setCota('')
-    setValorCredito(''); setValorPrimeiraParcela(''); setValorDemaisParcelas(''); setAdesaoPercent(''); setPlanoId(''); setQtdParcelas('0'); setObservacoes('')
+    setValorCredito(''); setValorPrimeiraParcela(''); setValorDemaisParcelas(''); setAdesaoPercent(''); setPlanoId(''); setQtdParcelas('0'); setObservacoes(''); setComSeguro(false)
     setDataAssembleia(''); setDataVencimento(''); setCalendarioGrupo([]); setProximaCobranca(''); setGrupoEncontrado(null); setPdfBase64(null); setPdfNome(''); setErro(''); setAvisoParser('')
     setEmpresaSel(''); setEquipeSel(''); setVendedorSel('')
   }
@@ -168,6 +169,7 @@ export default function NovaVendaPage() {
         adesao_percent: adesaoPercent ? parseFloat(adesaoPercent) : null, plano_id: planoId || null,
         qtd_parcelas: parseInt(qtdParcelas) || 0, valor_boleto: valorBoletoCalc, pdf_base64: pdfBase64, pdf_nome: pdfNome,
         observacoes: observacoes || null, data_assembleia_entrada: dataAssembleia || null, proxima_cobranca: proximaCobranca || null,
+        com_seguro: comSeguro,
         empresa_id_alvo: empresaSel || null, equipe_id_alvo: equipeSel || null, vendedor_id_alvo: vendedorSel || null,
       }
       if (grupoEncontrado === false && grupo && dataAssembleia) {
@@ -267,6 +269,13 @@ export default function NovaVendaPage() {
                 <p className="text-xs mt-2" style={{ color: 'var(--muted-color)' }}>Opcional. Quantas parcelas o cliente quer adiantar (0 = sem adiantamento). Adesão/1ª parcela é paga só uma vez na proposta.</p>
               </div>
               <div className="rounded-xl p-5" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+                <div className="mb-4">
+                  <label className="block text-xs mb-2" style={{ color: 'var(--muted-color)' }}>Venda fechada com seguro?</label>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setComSeguro(false)} className="flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors" style={{ background: !comSeguro ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${!comSeguro ? 'var(--accent)' : 'var(--border)'}`, color: !comSeguro ? 'var(--accent)' : 'var(--muted-color)' }}>Sem seguro</button>
+                    <button type="button" onClick={() => setComSeguro(true)} className="flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors" style={{ background: comSeguro ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${comSeguro ? 'var(--accent)' : 'var(--border)'}`, color: comSeguro ? 'var(--accent)' : 'var(--muted-color)' }}>Com seguro</button>
+                  </div>
+                </div>
                 <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Observações</label>
                 <textarea value={observacoes} onChange={(e) => setObservacoes(e.target.value)} rows={2} className="w-full rounded-lg px-3 py-2 text-sm outline-none resize-none" style={inputStyle} />
               </div>
