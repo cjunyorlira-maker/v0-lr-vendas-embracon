@@ -7,7 +7,7 @@ import Header from '@/components/Header'
 import { Calculator, CreditCard, Loader2, AlertTriangle } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 
-interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number; estorno_ate_pgto: number | null; categoria_comissao: string | null; seguro_pct?: number | null; tx_adm_topo?: number | null; cheia_incremento_pct?: number | null; prazo_meses?: number | null; reduzida_25_pct?: number | null }
+interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number; estorno_ate_pgto: number | null; categoria_comissao: string | null; seguro_pct?: number | null; tx_adm_topo?: number | null; cheia_incremento_pct?: number | null; prazo_meses?: number | null; reduzida_25_pct?: number | null; pl_demais_50_pct?: number | null; pl_demais_25_pct?: number | null; pl_demais_int_pct?: number | null; pl_p12_50_pct?: number | null; pl_p12_25_pct?: number | null; pl_p12_int_pct?: number | null }
 interface FaixaCredito { credito: number; primeira_parcela: number; demais_parcela: number; total_nao_estornar: number }
 
 const fmtMoeda = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -42,7 +42,7 @@ export default function SimuladorPage() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.from('planos').select('id, sigla, nome_completo, bem, adesao_percent, estorno_ate_pgto, categoria_comissao, seguro_pct, tx_adm_topo, cheia_incremento_pct, prazo_meses, reduzida_25_pct').eq('ativo', true).order('bem').then(({ data }) => {
+    supabase.from('planos').select('id, sigla, nome_completo, bem, adesao_percent, estorno_ate_pgto, categoria_comissao, seguro_pct, tx_adm_topo, cheia_incremento_pct, prazo_meses, reduzida_25_pct, pl_demais_50_pct, pl_demais_25_pct, pl_demais_int_pct, pl_p12_50_pct, pl_p12_25_pct, pl_p12_int_pct').eq('ativo', true).order('bem').then(({ data }) => {
       if (data) setPlanos(data as Plano[]); setLoading(false)
     })
   }, [])
@@ -107,6 +107,17 @@ export default function SimuladorPage() {
   const pdPropostaSemSeg = pdProposta - seguroMensal
   // Parcelinha: as parcelas 1 a 12 são iguais (valor maior). Antecipar = antecipar as parcelas 1-12.
   const ehParcelinha = planoAtual?.categoria_comissao === 'imovel_parcelinha'
+  // PARCELINHA: usa percentuais próprios (1ª-12ª = p1, demais = pd; sem adesão)
+  let pdParc25 = demais25, p1Parc25 = primeira25, pdParcCheia = demaisCheia, p1ParcCheia = primeiraCheia
+  if (ehParcelinha && faixa) {
+    const C = faixa.credito
+    // demais (cada) por nível
+    pdParc25    = Math.round(C * (planoAtual?.pl_demais_25_pct || 0) * 100) / 100 + seguroMensal
+    pdParcCheia = Math.round(C * (planoAtual?.pl_demais_int_pct || 0) * 100) / 100 + seguroMensal
+    // 1ª-12ª por nível
+    p1Parc25    = Math.round(C * (planoAtual?.pl_p12_25_pct || 0) * 100) / 100 + seguroMensal
+    p1ParcCheia = Math.round(C * (planoAtual?.pl_p12_int_pct || 0) * 100) / 100 + seguroMensal
+  }
   // valor da entrada = 1ª (base antecip) + (qtd) demais (base antecip); na Parcelinha são qtd parcelas iguais
   const entradaProposta = ehParcelinha ? p1Antecip * qtd : p1Antecip + pdAntecip * qtd
   const nParcelasEntrada = ehParcelinha ? qtd : 1 + qtd
@@ -333,22 +344,22 @@ export default function SimuladorPage() {
                       <input value={lanceEmbutido} onChange={e => setLanceEmbutido(formatarMoeda(e.target.value))} placeholder="Lance embutido (opcional)" inputMode="numeric" className="w-full rounded-lg pl-9 pr-3 py-2 text-sm outline-none" style={inputStyle} />
                     </div>
                     <p className="text-[11px]" style={{ color: 'var(--muted-color)' }}>Prazo da proposta: {prazoRestante} meses</p>
-                    {(red25Pct > 0 || cheiaInc > 0) && (
+                    {(red25Pct > 0 || cheiaInc > 0 || ehParcelinha) && (
                       <>
                         <div>
                           <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Parcela mostrada na proposta</label>
                           <div className="flex gap-2">
                             <button onClick={() => setTipoParcela('red50')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoParcela === 'red50' ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoParcela === 'red50' ? 'var(--accent)' : 'var(--border)'}`, color: tipoParcela === 'red50' ? 'var(--accent)' : 'var(--muted-color)' }}>50%</button>
-                            {red25Pct > 0 && <button onClick={() => setTipoParcela('red25')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoParcela === 'red25' ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoParcela === 'red25' ? 'var(--accent)' : 'var(--border)'}`, color: tipoParcela === 'red25' ? 'var(--accent)' : 'var(--muted-color)' }}>25%</button>}
-                            {cheiaInc > 0 && <button onClick={() => setTipoParcela('cheia')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoParcela === 'cheia' ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoParcela === 'cheia' ? 'var(--accent)' : 'var(--border)'}`, color: tipoParcela === 'cheia' ? 'var(--accent)' : 'var(--muted-color)' }}>Cheia</button>}
+                            {(red25Pct > 0 || ehParcelinha) && <button onClick={() => setTipoParcela('red25')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoParcela === 'red25' ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoParcela === 'red25' ? 'var(--accent)' : 'var(--border)'}`, color: tipoParcela === 'red25' ? 'var(--accent)' : 'var(--muted-color)' }}>25%</button>}
+                            {(cheiaInc > 0 || ehParcelinha) && <button onClick={() => setTipoParcela('cheia')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoParcela === 'cheia' ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoParcela === 'cheia' ? 'var(--accent)' : 'var(--border)'}`, color: tipoParcela === 'cheia' ? 'var(--accent)' : 'var(--muted-color)' }}>Cheia</button>}
                           </div>
                         </div>
                         <div>
                           <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Base da antecipação (entrada)</label>
                           <div className="flex gap-2">
                             <button onClick={() => setTipoAntecipacao('red50')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoAntecipacao === 'red50' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoAntecipacao === 'red50' ? '#3b82f6' : 'var(--border)'}`, color: tipoAntecipacao === 'red50' ? '#3b82f6' : 'var(--muted-color)' }}>50%</button>
-                            {red25Pct > 0 && <button onClick={() => setTipoAntecipacao('red25')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoAntecipacao === 'red25' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoAntecipacao === 'red25' ? '#3b82f6' : 'var(--border)'}`, color: tipoAntecipacao === 'red25' ? '#3b82f6' : 'var(--muted-color)' }}>25%</button>}
-                            {cheiaInc > 0 && <button onClick={() => setTipoAntecipacao('cheia')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoAntecipacao === 'cheia' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoAntecipacao === 'cheia' ? '#3b82f6' : 'var(--border)'}`, color: tipoAntecipacao === 'cheia' ? '#3b82f6' : 'var(--muted-color)' }}>Cheia</button>}
+                            {(red25Pct > 0 || ehParcelinha) && <button onClick={() => setTipoAntecipacao('red25')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoAntecipacao === 'red25' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoAntecipacao === 'red25' ? '#3b82f6' : 'var(--border)'}`, color: tipoAntecipacao === 'red25' ? '#3b82f6' : 'var(--muted-color)' }}>25%</button>}
+                            {(cheiaInc > 0 || ehParcelinha) && <button onClick={() => setTipoAntecipacao('cheia')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoAntecipacao === 'cheia' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoAntecipacao === 'cheia' ? '#3b82f6' : 'var(--border)'}`, color: tipoAntecipacao === 'cheia' ? '#3b82f6' : 'var(--muted-color)' }}>Cheia</button>}
                           </div>
                         </div>
                       </>
@@ -373,25 +384,25 @@ export default function SimuladorPage() {
                   </div>
 
                   <p className="text-xs mt-3" style={{ color: 'var(--muted-color)' }}>Prazo: {prazoPlano} meses {planoAtual?.tx_adm_topo ? `· Taxa adm. total: ${planoAtual.tx_adm_topo}%` : ''}</p>
-                  {(red25Pct > 0 || cheiaInc > 0) && faixa && (
+                  {(red25Pct > 0 || cheiaInc > 0 || ehParcelinha) && faixa && (
                     <button onClick={() => setVerCheia(v => !v)} className="mt-3 rounded-lg px-3 py-2 text-xs font-medium transition-colors w-full" style={{ background: verCheia ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', border: `1px solid ${verCheia ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.12)'}`, color: verCheia ? 'var(--accent)' : 'var(--muted-color)' }}>
                       {verCheia ? 'Ocultar outras reduções' : 'Ver 25% e parcela cheia'}
                     </button>
                   )}
                   {verCheia && faixa && (
                     <div className="mt-3 space-y-2">
-                      {red25Pct > 0 && (
+                      {(red25Pct > 0 || ehParcelinha) && (
                         <div className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
                           <p className="text-xs mb-2" style={{ color: 'var(--muted-color)' }}>Redução de 25%{comSeguro ? ' · com seguro' : ''}:</p>
-                          <div className="flex justify-between text-sm"><span style={{ color: 'var(--muted-color)' }}>1ª parcela</span><span style={{ color: 'var(--text)' }}>R$ {primeira25.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
-                          <div className="flex justify-between text-sm mt-1"><span style={{ color: 'var(--muted-color)' }}>Demais</span><span style={{ color: 'var(--text)' }}>R$ {demais25.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                          <div className="flex justify-between text-sm"><span style={{ color: 'var(--muted-color)' }}>{ehParcelinha ? '1ª a 12ª' : '1ª parcela'}</span><span style={{ color: 'var(--text)' }}>R$ {(ehParcelinha ? p1Parc25 : primeira25).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                          <div className="flex justify-between text-sm mt-1"><span style={{ color: 'var(--muted-color)' }}>Demais</span><span style={{ color: 'var(--text)' }}>R$ {(ehParcelinha ? pdParc25 : demais25).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
                         </div>
                       )}
-                      {cheiaInc > 0 && (
+                      {(cheiaInc > 0 || ehParcelinha) && (
                         <div className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
                           <p className="text-xs mb-2" style={{ color: 'var(--muted-color)' }}>Parcela cheia (sem redução){comSeguro ? ' · com seguro' : ''}:</p>
-                          <div className="flex justify-between text-sm"><span style={{ color: 'var(--muted-color)' }}>1ª parcela cheia</span><span style={{ color: 'var(--text)' }}>R$ {primeiraCheia.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
-                          <div className="flex justify-between text-sm mt-1"><span style={{ color: 'var(--muted-color)' }}>Demais cheias</span><span style={{ color: 'var(--text)' }}>R$ {demaisCheia.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                          <div className="flex justify-between text-sm"><span style={{ color: 'var(--muted-color)' }}>{ehParcelinha ? '1ª a 12ª cheia' : '1ª parcela cheia'}</span><span style={{ color: 'var(--text)' }}>R$ {(ehParcelinha ? p1ParcCheia : primeiraCheia).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                          <div className="flex justify-between text-sm mt-1"><span style={{ color: 'var(--muted-color)' }}>Demais cheias</span><span style={{ color: 'var(--text)' }}>R$ {(ehParcelinha ? pdParcCheia : demaisCheia).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
                           <p className="text-[10px] mt-2" style={{ color: 'var(--muted-color)' }}>Cobrada após a contemplação (devolução integral do crédito).</p>
                         </div>
                       )}
