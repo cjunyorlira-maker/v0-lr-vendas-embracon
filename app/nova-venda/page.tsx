@@ -183,7 +183,7 @@ export default function NovaVendaPage() {
     setSalvando(false)
   }
 
-  const inputStyle = { background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }
+  const inputStyle = { background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }
   const mostraAtribuicao = ['master', 'representante', 'adm', 'supervisor'].includes(meuRole)
   const equipesFiltradas = isMatriz && empresaSel ? equipes.filter(e => e.empresa_id === empresaSel) : equipes
   const vendedoresFiltrados = vendedores.filter(v => { if (isMatriz && empresaSel && v.empresa_id !== empresaSel) return false; if (equipeSel && v.equipe_id !== equipeSel) return false; return true })
@@ -195,9 +195,9 @@ export default function NovaVendaPage() {
         <Header title="Nova Venda" />
         <main className="mx-auto max-w-3xl px-6 py-8 lg:px-8">
           {etapa === 'upload' && (
-            <div className="rounded-xl p-8" style={{ background: 'rgba(0,0,0,0.12)', backdropFilter: 'blur(4px)', border: '1px solid var(--border)' }}>
+            <div className="rounded-xl p-8" style={{ background: 'rgba(17,18,22,0.92)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', border: '1px solid var(--border)' }}>
               <input ref={fileInputRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
-              <div onClick={() => fileInputRef.current?.click()} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) handleFile(f) }} className="flex flex-col items-center justify-center gap-3 py-12 rounded-xl cursor-pointer" style={{ border: '2px dashed var(--border)', background: 'rgba(255,255,255,0.02)' }}>
+              <div onClick={() => fileInputRef.current?.click()} onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) handleFile(f) }} className="flex flex-col items-center justify-center gap-3 py-12 rounded-xl cursor-pointer" style={{ border: '2px dashed var(--border)', background: 'rgba(22,23,28,0.9)' }}>
                 {parsing ? (<><Loader2 size={40} className="animate-spin" style={{ color: 'var(--accent)' }} /><p className="text-sm" style={{ color: 'var(--text2)' }}>Lendo a proposta...</p></>) : (<><div className="flex h-14 w-14 items-center justify-center rounded-full" style={{ background: 'rgba(212,175,55,0.15)' }}><Upload size={24} style={{ color: 'var(--accent)' }} /></div><p className="text-base font-medium" style={{ color: 'var(--text)' }}>Solte a proposta em PDF aqui</p><p className="text-xs" style={{ color: 'var(--muted-color)' }}>ou clique para selecionar · leitura automática</p></>)}
               </div>
               {erro && <div className="mt-4 rounded-lg p-3 text-sm" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>{erro}</div>}
@@ -229,7 +229,7 @@ export default function NovaVendaPage() {
                   </div>
                 </div>
               )}
-              <div className="rounded-xl p-5" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+              <div className="rounded-xl p-5" style={{ background: 'rgba(17,18,22,0.92)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)', border: '1px solid var(--border)' }}>
                 <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--accent)' }}>Dados do Cliente</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="md:col-span-2"><label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Nome completo *</label><input value={nomeCliente} onChange={(e) => setNomeCliente(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} /></div>
@@ -238,7 +238,7 @@ export default function NovaVendaPage() {
                   <div className="md:col-span-2"><label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Email</label><input value={email} onChange={(e) => setEmail(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} /></div>
                 </div>
               </div>
-              <div className="rounded-xl p-5" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+              <div className="rounded-xl p-5" style={{ background: 'rgba(17,18,22,0.92)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)', border: '1px solid var(--border)' }}>
                 <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--accent)' }}>Dados da Venda</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div><label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Plano {!planoId && <span style={{ color: '#ef4444' }}>* obrigatório</span>}</label><select value={planoId} onChange={(e) => setPlanoId(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={{ ...inputStyle, border: !planoId ? '1px solid #ef4444' : (inputStyle as any).border }}><option value="" style={{ background: '#131313' }}>Selecione o plano</option>{planos.map((p) => (<option key={p.id} value={p.id} style={{ background: '#131313' }}>{p.sigla} — {p.nome_completo} ({p.adesao_percent}%)</option>))}</select>{!planoId && <p className="text-[10px] mt-1" style={{ color: '#ef4444' }}>Sem plano, a comissão não é calculada.</p>}</div>
@@ -268,7 +268,7 @@ export default function NovaVendaPage() {
                 </div>
                 <p className="text-xs mt-2" style={{ color: 'var(--muted-color)' }}>Opcional. Quantas parcelas o cliente quer adiantar (0 = sem adiantamento). Adesão/1ª parcela é paga só uma vez na proposta.</p>
               </div>
-              <div className="rounded-xl p-5" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+              <div className="rounded-xl p-5" style={{ background: 'rgba(17,18,22,0.92)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)', border: '1px solid var(--border)' }}>
                 <div className="mb-4">
                   <label className="block text-xs mb-2" style={{ color: 'var(--muted-color)' }}>Venda fechada com seguro?</label>
                   <div className="flex gap-2">

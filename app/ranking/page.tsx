@@ -84,8 +84,8 @@ export default function RankingPage() {
               </div>
             </div>
             <div className="flex items-end gap-2">
-              <div><label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>De</label><input type="date" value={inicio} onChange={(e) => setInicio(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }} /></div>
-              <div><label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>Até</label><input type="date" value={fim} onChange={(e) => setFim(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }} /></div>
+              <div><label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>De</label><input type="date" value={inicio} onChange={(e) => setInicio(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }} /></div>
+              <div><label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>Até</label><input type="date" value={fim} onChange={(e) => setFim(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }} /></div>
               <button onClick={() => loadData(inicio, fim)} className="rounded-lg px-3 py-1.5 text-xs font-semibold" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)', border: '1px solid rgba(212,175,55,0.3)' }}>Aplicar</button>
             </div>
           </div>
@@ -96,7 +96,7 @@ export default function RankingPage() {
             <button onClick={() => aplicarPeriodo('semana')} className="rounded-lg px-3 py-1.5 text-xs font-medium" style={{ background: periodoAtivo === 'semana' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${periodoAtivo === 'semana' ? 'var(--accent)' : 'var(--border)'}`, color: periodoAtivo === 'semana' ? 'var(--accent)' : 'var(--muted-color)' }}>Semana</button>
             <button onClick={() => aplicarPeriodo('ano')} className="rounded-lg px-3 py-1.5 text-xs font-medium" style={{ background: periodoAtivo === 'ano' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${periodoAtivo === 'ano' ? 'var(--accent)' : 'var(--border)'}`, color: periodoAtivo === 'ano' ? 'var(--accent)' : 'var(--muted-color)' }}>Ano (acumulado)</button>
             {empresas.length > 0 && (
-              <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} className="rounded-lg px-3 py-1.5 text-xs outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+              <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} className="rounded-lg px-3 py-1.5 text-xs outline-none" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }}>
                 <option value="" style={{ background: '#131313' }}>Todas as empresas</option>
                 {empresas.map(e => <option key={e.id} value={e.id} style={{ background: '#131313' }}>{e.nome}</option>)}
               </select>
@@ -140,7 +140,7 @@ export default function RankingPage() {
               {resto.length > 0 && (
                 <div className="space-y-1">
                   {resto.map((r) => (
-                    <div key={r.posicao} className="flex items-center gap-3 rounded-lg px-4 py-2.5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)' }}>
+                    <div key={r.posicao} className="flex items-center gap-3 rounded-lg px-4 py-2.5" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)' }}>
                       <span className="text-xs font-bold w-6" style={{ color: 'var(--muted-color)' }}>{r.posicao}º</span>
                       <span className="flex-1 text-sm truncate" style={{ color: 'var(--text2)' }}>{r.nome}</span>
                       <span className="text-xs" style={{ color: 'var(--muted-color)' }}>{r.qtd} vd</span>

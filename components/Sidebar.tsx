@@ -38,22 +38,34 @@ function NavLink({ item }: { item: NavItem }) {
   return (
     <a
       href={item.href}
-      className="group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-all duration-150 cursor-pointer"
-      style={item.active ? { background: 'var(--accent-bg)', color: 'var(--accent)', borderLeft: '2px solid var(--accent)', paddingLeft: '10px' } : { color: 'var(--muted-color)', borderLeft: '2px solid transparent' }}
+      className="group flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all duration-150 cursor-pointer"
+      style={item.active ? {
+        background: 'linear-gradient(135deg, rgba(212,175,55,0.25), rgba(212,175,55,0.08))',
+        border: '1px solid rgba(212,175,55,0.4)',
+        color: 'var(--accent)',
+        fontWeight: 600,
+      } : {
+        background: 'transparent',
+        border: '1px solid transparent',
+        color: 'var(--muted-color)',
+        fontWeight: 500,
+      }}
       onMouseEnter={(e) => {
         if (!item.active) {
-          e.currentTarget.style.background = 'var(--accent-bg)'
-          e.currentTarget.style.color = 'var(--text2)'
+          e.currentTarget.style.background = 'rgba(212,175,55,0.08)'
+          e.currentTarget.style.color = 'var(--accent)'
+          e.currentTarget.style.transform = 'translateX(2px)'
         }
       }}
       onMouseLeave={(e) => {
         if (!item.active) {
           e.currentTarget.style.background = 'transparent'
           e.currentTarget.style.color = 'var(--muted-color)'
+          e.currentTarget.style.transform = 'translateX(0)'
         }
       }}
     >
-      <span className="shrink-0">{item.icon}</span>
+      <span className="shrink-0" style={{ color: item.active ? 'var(--accent)' : 'inherit' }}>{item.icon}</span>
       <span>{item.label}</span>
     </a>
   )

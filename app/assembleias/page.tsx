@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { CalendarCheck, ChevronDown, ChevronUp, Users, Dices, Target, Gavel, Sparkles, Loader2, Share2, Upload, CheckCircle2, PartyPopper, BarChart3, AlertTriangle, FileText, Download } from 'lucide-react'
+import { CalendarCheck, ChevronDown, ChevronUp, Users, Dices, Target, Gavel, Sparkles, Loader2, Share2, Upload, CheckCircle2, PartyPopper, BarChart3, AlertTriangle, FileText, Download, MessageCircle } from 'lucide-react'
 import PassarResultado from '@/components/PassarResultado'
 
 interface HistMes {
@@ -20,9 +20,9 @@ interface Grupo {
 }
 
 const CATEGORIAS = [
-  { key: 'Imóvel', label: 'Imóvel' },
-  { key: 'Veículo', label: 'Auto' },
-  { key: 'Pesados', label: 'Pesados' },
+    { key: 'Imóvel', label: '🏠 Imóvel' },
+    { key: 'Veículo', label: '🚗 Auto' },
+    { key: 'Pesados', label: '🚛 Pesados' },
 ]
 
 const fmtPct = (v: number | null) => v == null || v === 0 ? '-' : (v * 100).toFixed(2).replace('.', ',') + '%'
@@ -52,6 +52,9 @@ export default function AssembleiasPage() {
   const [extratos, setExtratos] = useState<{ grupo: string; bem: string; arquivo_nome: string; atualizado_em: string }[]>([])
   const [subindoExtrato, setSubindoExtrato] = useState<string | null>(null)
   const [ordenacao, setOrdenacao] = useState<'proxima' | 'contemplam'>('proxima')
+  const [clientesGrupo, setClientesGrupo] = useState<any[]>([])
+  const [grupoAberto, setGrupoAberto] = useState<string | null>(null)
+  const [carregandoClientes, setCarregandoClientes] = useState(false)
 
   const carregarPendentes = () => {
     fetch('/api/assembleias/pendentes').then(r => r.json()).then(d => { if (d.pendentes) setPendentes(d.pendentes) }).catch(() => {})
@@ -140,7 +143,25 @@ export default function AssembleiasPage() {
     return (a.proxima_assembleia || '').localeCompare(b.proxima_assembleia || '')
   })
 
-  const inputStyle = { background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }
+  const verClientesGrupo = async (grupo: string) => {
+    if (grupoAberto === grupo) { setGrupoAberto(null); setClientesGrupo([]); return }
+    setCarregandoClientes(true); setGrupoAberto(grupo)
+    try {
+      const res = await fetch(`/api/assembleias/clientes-grupo?grupo=${grupo}`)
+      const data = await res.json()
+      setClientesGrupo(data.clientes || [])
+    } catch { setClientesGrupo([]) }
+    setCarregandoClientes(false)
+  }
+  const abrirWhatsApp = (telefone: string, nome: string, grupo: string) => {
+    const num = (telefone || '').replace(/\D/g, '')
+    const numFull = num.length <= 11 ? '55' + num : num
+    const primeiroNome = (nome || '').trim().split(/\s+/)[0]
+    const msg = encodeURIComponent(`Olá ${primeiroNome}, tudo bem? 🎉 Saiu o resultado da assembleia do nosso grupo ${grupo}!`)
+    window.open(`https://wa.me/${numFull}?text=${msg}`, '_blank')
+  }
+
+  const inputStyle = { background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)' }
 
   return (
     <div className="relative min-h-screen font-sans">
@@ -216,7 +237,7 @@ export default function AssembleiasPage() {
             {CATEGORIAS.map(c => {
               const qtd = grupos.filter(g => g.bem === c.key).length
               return (
-                <button key={c.key} onClick={() => { setCatAtiva(c.key); setAberto(null) }} className="rounded-lg px-4 py-2 text-sm font-medium transition-colors" style={{ background: catAtiva === c.key ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${catAtiva === c.key ? 'var(--accent)' : 'var(--border)'}`, color: catAtiva === c.key ? 'var(--accent)' : 'var(--muted-color)' }}>
+                <button key={c.key} onClick={() => { setCatAtiva(c.key); setAberto(null) }} className="rounded-lg px-4 py-2 text-sm font-medium transition-colors" style={{ background: catAtiva === c.key ? 'linear-gradient(135deg, #d4af37, #b8941f)' : 'rgba(255,255,255,0.06)', border: `1px solid ${catAtiva === c.key ? '#d4af37' : 'rgba(255,255,255,0.1)'}`, color: catAtiva === c.key ? '#131313' : 'var(--text)', fontWeight: catAtiva === c.key ? 700 : 500, boxShadow: catAtiva === c.key ? '0 4px 14px rgba(212,175,55,0.3)' : 'none' }}>
                   {c.label} <span className="text-xs opacity-70">({qtd})</span>
                 </button>
               )
@@ -231,27 +252,27 @@ export default function AssembleiasPage() {
               onChange={(e) => setBuscaGrupo(e.target.value)}
               placeholder="Buscar por número do grupo..."
               className="w-full rounded-lg px-3 py-2 text-sm outline-none"
-              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}
+              style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }}
             />
             <div className="flex flex-wrap gap-2">
-              <select value={ordenacao} onChange={(e) => setOrdenacao(e.target.value as 'proxima' | 'contemplam')} className="rounded-lg px-3 py-2 text-sm outline-none flex-1 min-w-[140px]" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+              <select value={ordenacao} onChange={(e) => setOrdenacao(e.target.value as 'proxima' | 'contemplam')} className="rounded-lg px-3 py-2 text-sm outline-none flex-1 min-w-[140px]" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }}>
                 <option value="proxima" style={{ background: '#131313' }}>Ordenar: Próxima assembleia</option>
                 <option value="contemplam" style={{ background: '#131313' }}>Ordenar: Mais contemplam</option>
               </select>
               {filtros.empresas.length > 0 && (
-                <select value={fEmpresa} onChange={(e) => { setFEmpresa(e.target.value); setFEquipe(''); setFVendedor('') }} className="rounded-lg px-3 py-2 text-sm outline-none flex-1 min-w-[140px]" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                <select value={fEmpresa} onChange={(e) => { setFEmpresa(e.target.value); setFEquipe(''); setFVendedor('') }} className="rounded-lg px-3 py-2 text-sm outline-none flex-1 min-w-[140px]" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }}>
                   <option value="" style={{ background: '#131313' }}>Todas as empresas</option>
                   {filtros.empresas.map(e => <option key={e.id} value={e.id} style={{ background: '#131313' }}>{e.nome}</option>)}
                 </select>
               )}
               {filtros.equipes.length > 0 && (
-                <select value={fEquipe} onChange={(e) => { setFEquipe(e.target.value); setFVendedor('') }} className="rounded-lg px-3 py-2 text-sm outline-none flex-1 min-w-[140px]" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                <select value={fEquipe} onChange={(e) => { setFEquipe(e.target.value); setFVendedor('') }} className="rounded-lg px-3 py-2 text-sm outline-none flex-1 min-w-[140px]" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }}>
                   <option value="" style={{ background: '#131313' }}>Todas as equipes</option>
                   {filtros.equipes.filter(eq => !fEmpresa || eq.empresa_id === fEmpresa).map(eq => <option key={eq.id} value={eq.id} style={{ background: '#131313' }}>{eq.nome}</option>)}
                 </select>
               )}
               {filtros.vendedores.length > 0 && (
-                <select value={fVendedor} onChange={(e) => setFVendedor(e.target.value)} className="rounded-lg px-3 py-2 text-sm outline-none flex-1 min-w-[140px]" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                <select value={fVendedor} onChange={(e) => setFVendedor(e.target.value)} className="rounded-lg px-3 py-2 text-sm outline-none flex-1 min-w-[140px]" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }}>
                   <option value="" style={{ background: '#131313' }}>Todos os vendedores</option>
                   {filtros.vendedores.filter(v => (!fEmpresa || v.empresa_id === fEmpresa) && (!fEquipe || v.equipe_id === fEquipe)).map(v => <option key={v.id} value={v.id} style={{ background: '#131313' }}>{v.nome}</option>)}
                 </select>
@@ -281,7 +302,7 @@ export default function AssembleiasPage() {
                     {extratos
                       .filter(e => e.bem === catAtiva && (!buscaGrupo || e.grupo.includes(buscaGrupo.trim())))
                       .map(e => (
-                        <div key={e.grupo} className="flex items-center justify-between rounded-xl p-3" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+                        <div key={e.grupo} className="flex items-center justify-between rounded-xl p-3" style={{ background: 'rgba(17,18,22,0.92)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)', border: '1px solid var(--border)' }}>
                           <div className="flex items-center gap-2">
                             <FileText size={15} style={{ color: 'var(--accent)' }} />
                             <div>
@@ -327,11 +348,39 @@ export default function AssembleiasPage() {
                     {g.tem_historico && (aberto === g.grupo ? <ChevronUp size={18} style={{ color: 'var(--muted-color)' }} /> : <ChevronDown size={18} style={{ color: 'var(--muted-color)' }} />)}
                   </button>
 
+                  {/* ver meus clientes do grupo */}
+                  <div className="px-4 pb-4">
+                    <button onClick={(e) => { e.stopPropagation(); verClientesGrupo(g.grupo) }} className="rounded-lg px-4 py-2 text-xs font-semibold transition-all" style={{ background: grupoAberto === g.grupo ? 'linear-gradient(135deg, #25D366, #128C7E)' : 'linear-gradient(135deg, rgba(212,175,55,0.2), rgba(212,175,55,0.08))', border: `1px solid ${grupoAberto === g.grupo ? '#25D366' : 'rgba(212,175,55,0.4)'}`, color: grupoAberto === g.grupo ? '#fff' : 'var(--accent)' }}>
+                      {grupoAberto === g.grupo ? 'Ocultar clientes' : '👥 Ver Meus Clientes'}
+                    </button>
+                    {grupoAberto === g.grupo && (
+                      <div className="mt-3 rounded-lg p-3" style={{ background: 'rgba(17,18,22,0.6)', border: '1px solid var(--border)' }}>
+                        {carregandoClientes ? <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Carregando...</p> : clientesGrupo.length === 0 ? <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Nenhum cliente seu neste grupo.</p> : (
+                          <div className="space-y-2">
+                            {clientesGrupo.map((c, i) => (
+                              <div key={i} className="flex items-center justify-between gap-2 py-1.5" style={{ borderBottom: i < clientesGrupo.length - 1 ? '1px solid rgba(255,255,255,0.05)' : 'none' }}>
+                                <div>
+                                  <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>{c.nome}</p>
+                                  <p className="text-[10px]" style={{ color: 'var(--muted-color)' }}>Cota {c.cota}{c.vendedor && c.vendedor !== '-' ? ` · ${c.vendedor}` : ''}</p>
+                                </div>
+                                {c.telefone && (
+                                  <button onClick={(e) => { e.stopPropagation(); abrirWhatsApp(c.telefone, c.nome, g.grupo) }} className="shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold flex items-center gap-1.5" style={{ background: 'linear-gradient(135deg, #25D366, #128C7E)', color: '#fff' }}>
+                                    <MessageCircle size={13} /> WhatsApp
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
                   {/* histórico expandido */}
                   {aberto === g.grupo && g.tem_historico && (
                     <div className="px-4 pb-4 flex flex-col gap-3" style={{ borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
                       {g.historico.map(h => (
-                        <div key={h.mes_referencia} className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)' }}>
+                        <div key={h.mes_referencia} className="rounded-lg p-3" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)' }}>
                           <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{h.mes_label} {h.numero_assembleia ? `· ${h.numero_assembleia}ª assembleia` : ''}</span>
                             <div className="flex items-center gap-2">

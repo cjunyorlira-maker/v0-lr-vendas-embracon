@@ -23,33 +23,52 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ grup
 
     const hoje = new Date()
 
-    let linhaCal = grupoData.linha_calendario
-    // se o grupo não tem linha mas tem data de assembleia, deduz a linha cruzando com o calendário
-    if (!linhaCal && grupoData.data_assembleia_manual) {
-      const { data: match } = await supabaseAdmin
-        .from('calendario_embracon')
-        .select('linha_calendario')
-        .eq('data_assembleia', grupoData.data_assembleia_manual)
-        .limit(1)
-        .single()
-      if (match?.linha_calendario) linhaCal = match.linha_calendario
-    }
+    // Busca o calendário EXATO do grupo (datas reais do PDF oficial Embracon)
+    const { data: calExato } = await supabaseAdmin
+      .from('calendario_grupo')
+      .select('data_assembleia, data_vencimento, dia_semana')
+      .eq('grupo', grupo)
+      .order('data_assembleia')
+
     let calendario: { mes: number; data_assembleia: string; data_vencimento: string }[] = []
-    if (linhaCal) {
-      const { data: cal } = await supabaseAdmin
-        .from('calendario_embracon')
-        .select('mes, data_assembleia, data_vencimento')
-        .eq('linha_calendario', linhaCal)
-        .order('mes')
-      if (cal) calendario = cal
+    if (calExato && calExato.length > 0) {
+      calendario = calExato.map((c: any) => ({
+        mes: new Date(c.data_assembleia + 'T00:00:00').getMonth() + 1,
+        data_assembleia: c.data_assembleia,
+        data_vencimento: c.data_vencimento,
+      }))
     }
 
-    // Próxima assembleia (Regra B): escolhe a primeira cujo VENCIMENTO ainda não passou.
-    // Se o vencimento do mês já passou, o cliente não paga a 1ª parcela a tempo → vai pro mês seguinte.
+    // FALLBACK: se o grupo NÃO está no calendário exato, usa o padrão 
+    // histórico do vencimento do grupo (linha 10/15/20/25) — para vendas 
+    // que passem da data do PDF (calendário vai até jul/2027) ou grupos 
+    // ainda não mapeados.
+    if (calendario.length === 0) {
+      let linhaCal = grupoData.linha_calendario
+      if (!linhaCal && grupoData.data_assembleia_manual) {
+        const { data: match } = await supabaseAdmin
+          .from('calendario_embracon')
+          .select('linha_calendario')
+          .eq('data_assembleia', grupoData.data_assembleia_manual)
+          .limit(1).single()
+        if (match?.linha_calendario) linhaCal = match.linha_calendario
+      }
+      if (linhaCal) {
+        const { data: cal } = await supabaseAdmin
+          .from('calendario_embracon')
+          .select('mes, data_assembleia, data_vencimento')
+          .eq('linha_calendario', linhaCal)
+          .order('mes')
+        if (cal) calendario = cal
+      }
+    }
+
+    // Próxima assembleia (MESMA REGRA): a primeira cujo VENCIMENTO ainda 
+    // não passou. Venda até o dia do vencimento → assembleia desse mês; 
+    // venda após → próxima.
     const hojeStr = hoje.toISOString().slice(0, 10)
     let proxima: any = null
     for (const a of calendario) {
-      // usa o vencimento como corte; se não tiver vencimento, usa a própria assembleia
       const corte = a.data_vencimento || a.data_assembleia
       if (corte >= hojeStr) { proxima = a; break }
     }

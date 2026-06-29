@@ -27,6 +27,23 @@ export async function GET() {
 
     // info dos grupos (próxima assembleia, faixa)
     const { data: gruposInfo } = await supabaseAdmin.from('assembleias_grupos_info').select('*')
+
+    // calendário oficial exato por grupo (datas reais do PDF Embracon)
+    const { data: calTodos } = await supabaseAdmin
+      .from('calendario_grupo')
+      .select('grupo, data_assembleia, data_vencimento')
+      .order('data_assembleia')
+    const hojeStr = new Date().toISOString().slice(0, 10)
+    // pra cada grupo, a próxima assembleia = a primeira cujo VENCIMENTO ainda não passou
+    const proxAssembleiaPorGrupo: Record<string, { data_assembleia: string; data_vencimento: string }> = {}
+    for (const c of (calTodos || [])) {
+      const g = String(c.grupo).trim()
+      if (proxAssembleiaPorGrupo[g]) continue // já achou a próxima (a lista vem ordenada por data)
+      const corte = c.data_vencimento || c.data_assembleia
+      if (corte >= hojeStr) {
+        proxAssembleiaPorGrupo[g] = { data_assembleia: c.data_assembleia, data_vencimento: c.data_vencimento }
+      }
+    }
     // histórico completo (todos os meses)
     const { data: historico } = await supabaseAdmin.from('assembleias_historico').select('*').order('mes_referencia', { ascending: false })
 
@@ -43,6 +60,19 @@ export async function GET() {
       q = q.eq('vendedor_id', me.id)
     }
     const { data: vendas } = await q
+
+    // grupos onde a LR tem cliente no GERAL (toda a operação) — define quais
+    // grupos aparecem na tela. A contagem de clientes abaixo continua por escopo.
+    const { data: vendasGlobais } = await supabaseAdmin
+      .from('vendas')
+      .select('grupo')
+      .not('grupo', 'is', null)
+      .not('cliente_id', 'is', null)
+    const gruposComCliente = new Set<string>()
+    for (const v of (vendasGlobais || [])) {
+      const g = String(v.grupo).trim()
+      if (g) gruposComCliente.add(g)
+    }
 
     // empresas (pra nomes)
     const { data: empresas } = await supabaseAdmin.from('empresas').select('id, nome')
@@ -68,11 +98,10 @@ export async function GET() {
     // monta a lista: TODOS os grupos mapeados (todos veem todos), contagem respeita visibilidade
     const infoMap: Record<string, any> = {}
     for (const gi of (gruposInfo || [])) infoMap[String(gi.grupo).trim()] = gi
-    // grupos = todos os mapeados em assembleias_grupos_info + qualquer grupo que tenha histórico ou cliente
-    const todosGrupos = new Set<string>()
-    for (const gi of (gruposInfo || [])) todosGrupos.add(String(gi.grupo).trim())
-    for (const h of (historico || [])) todosGrupos.add(String(h.grupo).trim())
-    for (const g of Object.keys(clientesPorGrupo)) todosGrupos.add(g)
+    // a lista é SÓ os grupos onde a LR tem cliente (global). O catálogo
+    // (assembleias_grupos_info) e o histórico só ENRIQUECEM esses grupos,
+    // não criam linhas novas na tela.
+    const todosGrupos = gruposComCliente
 
     const grupos = Array.from(todosGrupos).map(g => {
       const info = infoMap[g] || {}
@@ -91,7 +120,8 @@ export async function GET() {
         grupo: g,
         bem: info.bem || hist[0]?.bem || '-',
         faixa_credito: info.faixa_credito || null,
-        proxima_assembleia: info.proxima_assembleia || null,
+        proxima_assembleia: proxAssembleiaPorGrupo[g]?.data_assembleia || info.proxima_assembleia || null,
+        proximo_vencimento: proxAssembleiaPorGrupo[g]?.data_vencimento || null,
         proxima_num_assembleia: proxNum,
         total_clientes: cpg.total.size,
         clientes_por_empresa: porEmpresa,

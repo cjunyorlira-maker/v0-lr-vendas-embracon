@@ -228,7 +228,7 @@ O boleto está em anexo.`
             {filtrosOpc.empresas.length > 0 && (
               <div>
                 <label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>Empresa</label>
-                <select value={fEmpresa} onChange={(e) => { setFEmpresa(e.target.value); setFEquipe(''); setFVendedor('') }} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                <select value={fEmpresa} onChange={(e) => { setFEmpresa(e.target.value); setFEquipe(''); setFVendedor('') }} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }}>
                   <option value="" style={{ background: '#131313' }}>Todas</option>
                   {filtrosOpc.empresas.map(e => <option key={e.id} value={e.id} style={{ background: '#131313' }}>{e.nome}</option>)}
                 </select>
@@ -237,7 +237,7 @@ O boleto está em anexo.`
             {['master', 'representante', 'adm'].includes(role) && (
               <div>
                 <label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>Equipe</label>
-                <select value={fEquipe} onChange={(e) => { setFEquipe(e.target.value); setFVendedor('') }} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                <select value={fEquipe} onChange={(e) => { setFEquipe(e.target.value); setFVendedor('') }} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }}>
                   <option value="" style={{ background: '#131313' }}>Todas</option>
                   {filtrosOpc.equipes.filter(eq => !fEmpresa || eq.empresa_id === fEmpresa).map(eq => <option key={eq.id} value={eq.id} style={{ background: '#131313' }}>{eq.nome}</option>)}
                 </select>
@@ -246,7 +246,7 @@ O boleto está em anexo.`
             {['master', 'representante', 'adm', 'supervisor'].includes(role) && (
               <div>
                 <label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>Vendedor</label>
-                <select value={fVendedor} onChange={(e) => setFVendedor(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+                <select value={fVendedor} onChange={(e) => setFVendedor(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }}>
                   <option value="" style={{ background: '#131313' }}>Todos</option>
                   {filtrosOpc.vendedores.filter(vd => (!fEmpresa || vd.empresa_id === fEmpresa) && (!fEquipe || vd.equipe_id === fEquipe)).map(vd => <option key={vd.id} value={vd.id} style={{ background: '#131313' }}>{vd.nome}</option>)}
                 </select>
@@ -256,11 +256,11 @@ O boleto está em anexo.`
             <button onClick={aplicarProducao} className="rounded-lg px-3 py-1.5 text-xs self-end" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)', border: '1px solid rgba(212,175,55,0.3)' }}>Produção</button>
             <div>
               <label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>De</label>
-              <input type="date" value={dataDe} onChange={(e) => setDataDe(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+              <input type="date" value={dataDe} onChange={(e) => setDataDe(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }} />
             </div>
             <div>
               <label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>Até</label>
-              <input type="date" value={dataAte} onChange={(e) => setDataAte(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+              <input type="date" value={dataAte} onChange={(e) => setDataAte(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }} />
             </div>
             {(fEmpresa || fEquipe || fVendedor || dataDe || dataAte) && <button onClick={() => { setFEmpresa(''); setFEquipe(''); setFVendedor(''); setDataDe(''); setDataAte('') }} className="rounded-lg px-3 py-1.5 text-xs self-end" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>Limpar</button>}
           </div>
@@ -352,7 +352,7 @@ O boleto está em anexo.`
             <h3 className="text-base font-semibold mb-1" style={{ color: 'var(--text)' }}>Anexar boleto</h3>
             <p className="text-xs mb-4" style={{ color: 'var(--muted-color)' }}>Anexe o PDF do boleto que a Embracon mandou. Ao confirmar, vai pra "Aguardando pagamento".</p>
             <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePdfFile(f) }} />
-            <div onClick={() => fileRef.current?.click()} className="flex flex-col items-center justify-center gap-2 py-6 rounded-lg cursor-pointer mb-4" style={{ border: '2px dashed var(--border)', background: 'rgba(255,255,255,0.02)' }}>
+            <div onClick={() => fileRef.current?.click()} className="flex flex-col items-center justify-center gap-2 py-6 rounded-lg cursor-pointer mb-4" style={{ border: '2px dashed var(--border)', background: 'rgba(22,23,28,0.9)' }}>
               {pdfAnexo ? (<><Paperclip size={20} style={{ color: '#22c55e' }} /><span className="text-xs" style={{ color: '#22c55e' }}>{pdfAnexo.nome}</span><span className="text-[10px]" style={{ color: 'var(--muted-color)' }}>clique para trocar</span></>) : (<><Upload size={20} style={{ color: 'var(--accent)' }} /><span className="text-xs" style={{ color: 'var(--muted-color)' }}>Clique para selecionar o PDF do boleto</span></>)}
             </div>
             <div className="rounded-lg p-3 mb-4 text-xs" style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', color: '#3b82f6' }}>Em breve: envio automático via WhatsApp (Evolution). Por enquanto, anexe e mande manual.</div>
