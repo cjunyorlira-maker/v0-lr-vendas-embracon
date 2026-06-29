@@ -50,7 +50,7 @@ export default function AssembleiasPage() {
   const [visao, setVisao] = useState<'atual' | 'historico' | 'extrato' | 'calendario'>('historico')
   const [calGrupos, setCalGrupos] = useState<any[]>([])
   const [meuRole, setMeuRole] = useState<string>('')
-  const [extratos, setExtratos] = useState<{ grupo: string; bem: string; arquivo_nome: string; atualizado_em: string }[]>([])
+  const [extratos, setExtratos] = useState<{ grupo: string; bem: string; arquivo_nome: string; atualizado_em: string; faixa_credito: string | null }[]>([])
   const [subindoExtrato, setSubindoExtrato] = useState<string | null>(null)
   const [ordenacao, setOrdenacao] = useState<'proxima' | 'contemplam'>('proxima')
   const [clientesGrupo, setClientesGrupo] = useState<any[]>([])
@@ -338,8 +338,9 @@ export default function AssembleiasPage() {
                           <div className="flex items-center gap-2">
                             <FileText size={15} style={{ color: 'var(--accent)' }} />
                             <div>
-                              <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>Grupo {e.grupo}</span>
-                              <span className="text-[10px] block" style={{ color: 'var(--muted-color)' }}>Atualizado em {new Date(e.atualizado_em).toLocaleDateString('pt-BR')}</span>
+                <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>Grupo {e.grupo}</span>
+                {e.faixa_credito && <span className="text-[11px] block" style={{ color: 'var(--accent)' }}>R$ {e.faixa_credito}</span>}
+                <span className="text-[10px] block" style={{ color: 'var(--muted-color)' }}>Atualizado em {new Date(e.atualizado_em).toLocaleDateString('pt-BR')}</span>
                             </div>
                           </div>
                           <button onClick={() => baixarExtrato(e.grupo)} className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg font-medium" style={{ background: 'rgba(212,175,55,0.15)', color: 'var(--accent)', border: '1px solid rgba(212,175,55,0.3)' }}>
