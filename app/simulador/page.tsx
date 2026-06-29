@@ -7,7 +7,7 @@ import Header from '@/components/Header'
 import { Calculator, CreditCard, Loader2, AlertTriangle } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 
-interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number; estorno_ate_pgto: number | null; categoria_comissao: string | null; seguro_pct?: number | null; tx_adm_topo?: number | null; cheia_incremento_pct?: number | null; prazo_meses?: number | null }
+interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number; estorno_ate_pgto: number | null; categoria_comissao: string | null; seguro_pct?: number | null; tx_adm_topo?: number | null; cheia_incremento_pct?: number | null; prazo_meses?: number | null; reduzida_25_pct?: number | null }
 interface FaixaCredito { credito: number; primeira_parcela: number; demais_parcela: number; total_nao_estornar: number }
 
 const fmtMoeda = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
@@ -40,7 +40,7 @@ export default function SimuladorPage() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.from('planos').select('id, sigla, nome_completo, bem, adesao_percent, estorno_ate_pgto, categoria_comissao, seguro_pct, tx_adm_topo, cheia_incremento_pct, prazo_meses').eq('ativo', true).order('bem').then(({ data }) => {
+    supabase.from('planos').select('id, sigla, nome_completo, bem, adesao_percent, estorno_ate_pgto, categoria_comissao, seguro_pct, tx_adm_topo, cheia_incremento_pct, prazo_meses, reduzida_25_pct').eq('ativo', true).order('bem').then(({ data }) => {
       if (data) setPlanos(data as Plano[]); setLoading(false)
     })
   }, [])
@@ -85,6 +85,9 @@ export default function SimuladorPage() {
   const cheiaInc = planoAtual?.cheia_incremento_pct || 0
   const demaisCheia = faixa ? Math.round((faixa.demais_parcela + faixa.credito * cheiaInc) * 100) / 100 + seguroMensal : 0
   const primeiraCheia = faixa ? demaisCheia + Math.round(faixa.credito * (planoAtual?.adesao_percent || 0) / 100 * 100) / 100 : 0
+  const red25Pct = planoAtual?.reduzida_25_pct || 0
+  const demais25 = faixa && red25Pct > 0 ? Math.round(faixa.credito * red25Pct * 100) / 100 + seguroMensal : 0
+  const primeira25 = faixa && red25Pct > 0 ? demais25 + Math.round(faixa.credito * (planoAtual?.adesao_percent || 0) / 100 * 100) / 100 : 0
   const p1 = (faixa?.primeira_parcela || 0) + seguroMensal
   const pd = (faixa?.demais_parcela || 0) + seguroMensal
   // Parcelinha: as parcelas 1 a 12 são iguais (valor maior). Antecipar = antecipar as parcelas 1-12.
@@ -331,17 +334,28 @@ export default function SimuladorPage() {
                   </div>
 
                   <p className="text-xs mt-3" style={{ color: 'var(--muted-color)' }}>Prazo: {prazoPlano} meses {planoAtual?.tx_adm_topo ? `· Taxa adm. total: ${planoAtual.tx_adm_topo}%` : ''}</p>
-                  {cheiaInc > 0 && faixa && (
+                  {(red25Pct > 0 || cheiaInc > 0) && faixa && (
                     <button onClick={() => setVerCheia(v => !v)} className="mt-3 rounded-lg px-3 py-2 text-xs font-medium transition-colors w-full" style={{ background: verCheia ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', border: `1px solid ${verCheia ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.12)'}`, color: verCheia ? 'var(--accent)' : 'var(--muted-color)' }}>
-                      {verCheia ? 'Ocultar parcela cheia' : 'Ver parcela cheia (sem redução)'}
+                      {verCheia ? 'Ocultar outras reduções' : 'Ver 25% e parcela cheia'}
                     </button>
                   )}
                   {verCheia && faixa && (
-                    <div className="mt-3 rounded-lg p-3" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)' }}>
-                      <p className="text-xs mb-2" style={{ color: 'var(--muted-color)' }}>Parcela cheia (sem redução de 50%){comSeguro ? ' · com seguro' : ''}:</p>
-                      <div className="flex justify-between text-sm"><span style={{ color: 'var(--muted-color)' }}>1ª parcela cheia</span><span style={{ color: 'var(--text)' }}>R$ {primeiraCheia.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
-                      <div className="flex justify-between text-sm mt-1"><span style={{ color: 'var(--muted-color)' }}>Demais cheias</span><span style={{ color: 'var(--text)' }}>R$ {demaisCheia.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
-                      <p className="text-[10px] mt-2" style={{ color: 'var(--muted-color)' }}>A parcela cheia é cobrada após a contemplação (devolução integral do crédito).</p>
+                    <div className="mt-3 space-y-2">
+                      {red25Pct > 0 && (
+                        <div className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
+                          <p className="text-xs mb-2" style={{ color: 'var(--muted-color)' }}>Redução de 25%{comSeguro ? ' · com seguro' : ''}:</p>
+                          <div className="flex justify-between text-sm"><span style={{ color: 'var(--muted-color)' }}>1ª parcela</span><span style={{ color: 'var(--text)' }}>R$ {primeira25.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                          <div className="flex justify-between text-sm mt-1"><span style={{ color: 'var(--muted-color)' }}>Demais</span><span style={{ color: 'var(--text)' }}>R$ {demais25.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                        </div>
+                      )}
+                      {cheiaInc > 0 && (
+                        <div className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
+                          <p className="text-xs mb-2" style={{ color: 'var(--muted-color)' }}>Parcela cheia (sem redução){comSeguro ? ' · com seguro' : ''}:</p>
+                          <div className="flex justify-between text-sm"><span style={{ color: 'var(--muted-color)' }}>1ª parcela cheia</span><span style={{ color: 'var(--text)' }}>R$ {primeiraCheia.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                          <div className="flex justify-between text-sm mt-1"><span style={{ color: 'var(--muted-color)' }}>Demais cheias</span><span style={{ color: 'var(--text)' }}>R$ {demaisCheia.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                          <p className="text-[10px] mt-2" style={{ color: 'var(--muted-color)' }}>Cobrada após a contemplação (devolução integral do crédito).</p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
