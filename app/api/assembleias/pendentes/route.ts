@@ -11,57 +11,53 @@ const supabaseAdmin = createClient(
 
 export async function GET() {
   try {
-    // grupos mapeados (com info), exceto os que vão INAUGURAR
+    // grupos onde a LR tem cliente (no geral)
+    const { data: vendasCli } = await supabaseAdmin
+      .from('vendas').select('grupo').not('grupo', 'is', null).not('cliente_id', 'is', null)
+    const gruposComCliente = new Set<string>()
+    for (const v of (vendasCli || [])) {
+      const g = String(v.grupo).trim(); if (g) gruposComCliente.add(g)
+    }
+
+    // calendário oficial exato por grupo
+    const { data: calTodos } = await supabaseAdmin
+      .from('calendario_grupo').select('grupo, data_assembleia')
+      .order('data_assembleia')
+
+    // bem de cada grupo (pro label)
     const { data: gruposInfo } = await supabaseAdmin
-      .from('assembleias_grupos_info').select('grupo, bem, proxima_assembleia')
-    // linha de calendário de cada grupo
-    const { data: gruposEmb } = await supabaseAdmin
-      .from('grupos_embracon').select('grupo, linha_calendario')
-    // calendário completo
-    const { data: calendario } = await supabaseAdmin
-      .from('calendario_embracon').select('linha_calendario, data_assembleia')
+      .from('assembleias_grupos_info').select('grupo, bem')
+    const bemDe: Record<string, string> = {}
+    for (const gi of (gruposInfo || [])) bemDe[String(gi.grupo).trim()] = gi.bem
+
     // histórico já subido
     const { data: historico } = await supabaseAdmin
       .from('assembleias_historico').select('grupo, mes_referencia')
-    // primeira assembleia que cada grupo realmente participou (entrada das vendas)
-    const { data: vendasAssemb } = await supabaseAdmin
-      .from('vendas').select('grupo, data_assembleia_entrada').not('grupo', 'is', null).not('data_assembleia_entrada', 'is', null)
-    const primeiraAssembGrupo: Record<string, string> = {}
-    for (const v of (vendasAssemb || [])) {
-      const g = String(v.grupo).trim()
-      if (!primeiraAssembGrupo[g] || v.data_assembleia_entrada < primeiraAssembGrupo[g]) {
-        primeiraAssembGrupo[g] = v.data_assembleia_entrada
-      }
-    }
-
-    const hoje = new Date().toISOString().slice(0, 10)
-    const linhaDe: Record<string, string> = {}
-    for (const g of (gruposEmb || [])) linhaDe[String(g.grupo).trim()] = g.linha_calendario
     const jaSubiu = new Set((historico || []).map(h => `${String(h.grupo).trim()}|${h.mes_referencia}`))
 
-    const pendentes: { grupo: string; bem: string; data_assembleia: string; mes: string }[] = []
-    for (const gi of (gruposInfo || [])) {
-      const grupo = String(gi.grupo).trim()
-      if (gi.proxima_assembleia === 'INAUGURAR') continue
-      const linha = linhaDe[grupo]
-      if (!linha) continue
-      // a partir de quando o grupo participou (não pega assembleias de antes da entrada)
-      const inicioGrupo = primeiraAssembGrupo[grupo]
-      if (!inicioGrupo) continue // grupo sem venda com assembleia ainda → não cobra resultado
-      // última assembleia que já aconteceu (data real do calendário), a partir da entrada do grupo
-      const assembsPassadas = (calendario || [])
-        .filter(c => c.linha_calendario === linha && c.data_assembleia <= hoje && c.data_assembleia >= inicioGrupo)
-        .map(c => c.data_assembleia)
-        .sort()
-      if (assembsPassadas.length === 0) continue
-      const ultima = assembsPassadas[assembsPassadas.length - 1]
-      const mes = ultima.slice(0, 7)
-      // se ainda não subiu o resultado desse mês → pendente
-      if (!jaSubiu.has(`${grupo}|${mes}`)) {
-        pendentes.push({ grupo, bem: gi.bem, data_assembleia: ultima, mes })
+    const hoje = new Date().toISOString().slice(0, 10)
+
+    // pra cada grupo com cliente, acha a ÚLTIMA assembleia que já passou (data exata)
+    const ultimaPassada: Record<string, string> = {}
+    for (const c of (calTodos || [])) {
+      const g = String(c.grupo).trim()
+      if (!gruposComCliente.has(g)) continue
+      if (c.data_assembleia <= hoje) {
+        if (!ultimaPassada[g] || c.data_assembleia > ultimaPassada[g]) {
+          ultimaPassada[g] = c.data_assembleia
+        }
       }
     }
-    // ordena por data de assembleia (mais antiga primeiro)
+
+    // pendente = última assembleia passada cujo resultado do mês ainda não foi subido
+    const pendentes: { grupo: string; bem: string; data_assembleia: string; mes: string }[] = []
+    for (const g of Object.keys(ultimaPassada)) {
+      const ultima = ultimaPassada[g]
+      const mes = ultima.slice(0, 7)
+      if (!jaSubiu.has(`${g}|${mes}`)) {
+        pendentes.push({ grupo: g, bem: bemDe[g] || '-', data_assembleia: ultima, mes })
+      }
+    }
     pendentes.sort((a, b) => a.data_assembleia.localeCompare(b.data_assembleia))
 
     return NextResponse.json({ pendentes, total: pendentes.length })
