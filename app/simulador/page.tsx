@@ -7,19 +7,19 @@ import Header from '@/components/Header'
 import { Calculator, CreditCard, Loader2, AlertTriangle } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 
-interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number; estorno_ate_pgto: number | null; categoria_comissao: string | null; seguro_pct?: number | null; tx_adm_topo?: number | null; cheia_incremento_pct?: number | null }
+interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number; estorno_ate_pgto: number | null; categoria_comissao: string | null; seguro_pct?: number | null; tx_adm_topo?: number | null; cheia_incremento_pct?: number | null; prazo_meses?: number | null; reduzida_25_pct?: number | null }
 interface FaixaCredito { credito: number; primeira_parcela: number; demais_parcela: number; total_nao_estornar: number }
 
 const fmtMoeda = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
 // categorias agrupadas
 const CATEGORIAS: Record<string, { label: string; siglas: string[] }> = {
-  imovel_1: { label: 'Imóvel 1%', siglas: ['EI1', 'SUE'] },
-  imovel_2: { label: 'Imóvel 2%', siglas: ['PSE', 'SEP'] },
-  imovel_parcelinha: { label: 'Imóvel Parcelinha', siglas: ['TP', 'TEP'] },
-  auto_1: { label: 'Auto 1%', siglas: ['ETA'] },
-  auto_2: { label: 'Auto 2%', siglas: ['PE2'] },
-  pesados_2: { label: 'Pesados 2%', siglas: ['SP'] },
+  imovel_1: { label: '🏠 Imóvel Adesão 1%', siglas: ['EI1', 'SUE'] },
+  imovel_2: { label: '🏠 Imóvel Adesão 2%', siglas: ['PSE', 'SEP'] },
+  imovel_parcelinha: { label: '🏠 Imóvel Parcelinha', siglas: ['TP', 'TEP'] },
+  auto_1: { label: '🚗 Auto Adesão 1%', siglas: ['ETA'] },
+  auto_2: { label: '🚗 Auto Adesão 2%', siglas: ['PE2'] },
+  pesados_2: { label: '🚛 Pesados Adesão 2%', siglas: ['SP'] },
 }
 
 export default function SimuladorPage() {
@@ -31,6 +31,8 @@ export default function SimuladorPage() {
   const [creditoSel, setCreditoSel] = useState('')
   const [comSeguro, setComSeguro] = useState(false)
   const [verCheia, setVerCheia] = useState(false)
+  const [tipoParcela, setTipoParcela] = useState<'red50' | 'red25' | 'cheia'>('red50')
+  const [tipoAntecipacao, setTipoAntecipacao] = useState<'red50' | 'red25' | 'cheia'>('red50')
   const [qtdAntecipar, setQtdAntecipar] = useState('2')
   const [nomeCliente, setNomeCliente] = useState('')
   const [lanceEmbutido, setLanceEmbutido] = useState('')
@@ -40,7 +42,7 @@ export default function SimuladorPage() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.from('planos').select('id, sigla, nome_completo, bem, adesao_percent, estorno_ate_pgto, categoria_comissao, seguro_pct, tx_adm_topo, cheia_incremento_pct').eq('ativo', true).order('bem').then(({ data }) => {
+    supabase.from('planos').select('id, sigla, nome_completo, bem, adesao_percent, estorno_ate_pgto, categoria_comissao, seguro_pct, tx_adm_topo, cheia_incremento_pct, prazo_meses, reduzida_25_pct').eq('ativo', true).order('bem').then(({ data }) => {
       if (data) setPlanos(data as Plano[]); setLoading(false)
     })
   }, [])
@@ -79,15 +81,36 @@ export default function SimuladorPage() {
   const faixa = faixas.find(f => String(f.credito) === creditoSel)
   const qtd = parseInt(qtdAntecipar) || 0
   const planoAtual = planos.find(p => p.sigla === planoSigla)
+  const prazoPlano = planoAtual?.prazo_meses || 240
   const seguroPct = planoAtual?.seguro_pct || 0
   const seguroMensal = (comSeguro && faixa) ? Math.round(faixa.credito * seguroPct * 100) / 100 : 0
   const cheiaInc = planoAtual?.cheia_incremento_pct || 0
   const demaisCheia = faixa ? Math.round((faixa.demais_parcela + faixa.credito * cheiaInc) * 100) / 100 + seguroMensal : 0
   const primeiraCheia = faixa ? demaisCheia + Math.round(faixa.credito * (planoAtual?.adesao_percent || 0) / 100 * 100) / 100 : 0
+  const red25Pct = planoAtual?.reduzida_25_pct || 0
+  const demais25 = faixa && red25Pct > 0 ? Math.round(faixa.credito * red25Pct * 100) / 100 + seguroMensal : 0
+  const primeira25 = faixa && red25Pct > 0 ? demais25 + Math.round(faixa.credito * (planoAtual?.adesao_percent || 0) / 100 * 100) / 100 : 0
   const p1 = (faixa?.primeira_parcela || 0) + seguroMensal
   const pd = (faixa?.demais_parcela || 0) + seguroMensal
+  // funções pra pegar a parcela conforme o tipo escolhido
+  const pdPorTipo = (t: string) => t === 'cheia' ? demaisCheia : t === 'red25' ? demais25 : pd
+  const p1PorTipo = (t: string) => t === 'cheia' ? primeiraCheia : t === 'red25' ? primeira25 : p1
+  const labelPorTipo = (t: string) => t === 'cheia' ? 'cheia' : t === 'red25' ? '25%' : '50%'
+  // parcela mostrada na proposta (escolha 1)
+  const p1Proposta = p1PorTipo(tipoParcela)
+  const pdProposta = pdPorTipo(tipoParcela)
+  // base da antecipação/entrada (escolha 2, independente)
+  const pdAntecip = pdPorTipo(tipoAntecipacao)
+  const p1Antecip = p1PorTipo(tipoAntecipacao)
+  // versões SEM seguro (o seguro é somado separadamente nas caixas do PDF)
+  const p1PropostaSemSeg = p1Proposta - seguroMensal
+  const pdPropostaSemSeg = pdProposta - seguroMensal
   // Parcelinha: as parcelas 1 a 12 são iguais (valor maior). Antecipar = antecipar as parcelas 1-12.
   const ehParcelinha = planoAtual?.categoria_comissao === 'imovel_parcelinha'
+  // valor da entrada = 1ª (base antecip) + (qtd) demais (base antecip); na Parcelinha são qtd parcelas iguais
+  const entradaProposta = ehParcelinha ? p1Antecip * qtd : p1Antecip + pdAntecip * qtd
+  const nParcelasEntrada = ehParcelinha ? qtd : 1 + qtd
+  const entradaPropostaSemSeg = entradaProposta - seguroMensal * nParcelasEntrada
   // antecipadas: na Parcelinha o cliente antecipa as parcelas 1-12 (valor p1); nos outros antecipa as demais (pd)
   const valorAntecipadas = ehParcelinha ? p1 * qtd : pd * qtd
   const totalCliente = ehParcelinha ? p1 * qtd : p1 + pd * qtd
@@ -95,7 +118,7 @@ export default function SimuladorPage() {
   const limiteEstorno = planoAtual?.estorno_ate_pgto || 0
   const totalNaoEstornar = limiteEstorno > 0 ? p1 + pd * (limiteEstorno - 1) : (faixa?.total_nao_estornar || 0)
   const lanceNum = parseFloat((lanceEmbutido || '').replace(/\./g, '').replace(',', '.')) || 0
-  const prazoRestante = Math.max(0, 240 - (1 + qtd))
+  const prazoRestante = Math.max(0, prazoPlano - (1 + qtd))
   const creditoLiquido = faixa ? faixa.credito - lanceNum : 0
 
   const inputStyle = { background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }
@@ -195,15 +218,15 @@ export default function SimuladorPage() {
     // Investimento com seguro (fundo claro)
     const segMensal = Math.round(faixa.credito * (planoAtual.seguro_pct || 0) * 100) / 100
     // Primeiro pagamento = 1ª parcela + parcelas antecipadas (qtd)
-    const primeiroPagamentoSem = faixa.primeira_parcela + (faixa.demais_parcela * qtd)
-    const primeiroPagamentoCom = (faixa.primeira_parcela + segMensal) + ((faixa.demais_parcela + segMensal) * qtd)
+    const primeiroPagamentoSem = entradaPropostaSemSeg
+    const primeiroPagamentoCom = entradaPropostaSemSeg + segMensal * nParcelasEntrada
     let y2 = colY + 100
     caixaSombra(14, y2, 88, 44)
     doc.setTextColor(...RED); doc.setFont('helvetica','bold'); doc.setFontSize(10)
     doc.text('Investimento com seguro', 14 + 44, y2 + 8, { align: 'center' })
     let iy = y2 + 14
     badge(18, iy, 38, '1º pagamento'); valor(60, iy, fmt(primeiroPagamentoCom)); iy += 10
-    badge(18, iy, 38, 'Demais parcelas'); valor(60, iy, fmt(faixa.demais_parcela + segMensal)); iy += 10
+    badge(18, iy, 38, 'Demais parcelas'); valor(60, iy, fmt(pdPropostaSemSeg + segMensal)); iy += 10
     badge(18, iy, 36, 'Valor do seguro'); valor(58, iy, fmt(segMensal))
 
     // Investimento sem seguro (fundo claro)
@@ -213,7 +236,7 @@ export default function SimuladorPage() {
     doc.text('Investimento sem seguro', 14 + 44, y3 + 8, { align: 'center' })
     let sy = y3 + 14
     badge(18, sy, 38, '1º pagamento'); valor(60, sy, fmt(primeiroPagamentoSem)); sy += 10
-    badge(18, sy, 38, 'Demais parcelas'); valor(60, sy, fmt(faixa.demais_parcela))
+    badge(18, sy, 38, 'Demais parcelas'); valor(60, sy, fmt(pdPropostaSemSeg))
 
     // ===== COLUNA DIREITA =====
     let ry2 = colY
@@ -221,7 +244,7 @@ export default function SimuladorPage() {
     doc.text('Demonstrativo de taxa', 108 + 44, ry2 + 8, { align: 'center' })
     ry2 += 16
     const admTopo = planoAtual.tx_adm_topo || 0
-    const taxaMes = admTopo / 240
+    const taxaMes = admTopo / prazoPlano
     const taxaAno = taxaMes * 12
     const fmtPct = (n: number) => n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%'
     const barMes = 18
@@ -240,7 +263,7 @@ export default function SimuladorPage() {
     avisos.forEach(a => { doc.text(a, 108, ry2, { maxWidth: 90 }); ry2 += 11 })
     doc.setTextColor(90,90,90); doc.setFontSize(8)
     doc.text('TABELA ' + planoAtual.nome_completo, 108, ry2, { maxWidth: 90 }); ry2 += 5
-    doc.text('Tipo: Mais por menos', 108, ry2)
+    doc.text('Tipo: Mais por menos · parcela ' + labelPorTipo(tipoParcela) + ' · antecip. ' + labelPorTipo(tipoAntecipacao), 108, ry2)
 
     doc.save('Proposta_' + (nomeCliente || 'cliente').replace(/\s+/g, '_') + '.pdf')
   }
@@ -310,6 +333,26 @@ export default function SimuladorPage() {
                       <input value={lanceEmbutido} onChange={e => setLanceEmbutido(formatarMoeda(e.target.value))} placeholder="Lance embutido (opcional)" inputMode="numeric" className="w-full rounded-lg pl-9 pr-3 py-2 text-sm outline-none" style={inputStyle} />
                     </div>
                     <p className="text-[11px]" style={{ color: 'var(--muted-color)' }}>Prazo da proposta: {prazoRestante} meses</p>
+                    {(red25Pct > 0 || cheiaInc > 0) && (
+                      <>
+                        <div>
+                          <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Parcela mostrada na proposta</label>
+                          <div className="flex gap-2">
+                            <button onClick={() => setTipoParcela('red50')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoParcela === 'red50' ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoParcela === 'red50' ? 'var(--accent)' : 'var(--border)'}`, color: tipoParcela === 'red50' ? 'var(--accent)' : 'var(--muted-color)' }}>50%</button>
+                            {red25Pct > 0 && <button onClick={() => setTipoParcela('red25')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoParcela === 'red25' ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoParcela === 'red25' ? 'var(--accent)' : 'var(--border)'}`, color: tipoParcela === 'red25' ? 'var(--accent)' : 'var(--muted-color)' }}>25%</button>}
+                            {cheiaInc > 0 && <button onClick={() => setTipoParcela('cheia')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoParcela === 'cheia' ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoParcela === 'cheia' ? 'var(--accent)' : 'var(--border)'}`, color: tipoParcela === 'cheia' ? 'var(--accent)' : 'var(--muted-color)' }}>Cheia</button>}
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Base da antecipação (entrada)</label>
+                          <div className="flex gap-2">
+                            <button onClick={() => setTipoAntecipacao('red50')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoAntecipacao === 'red50' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoAntecipacao === 'red50' ? '#3b82f6' : 'var(--border)'}`, color: tipoAntecipacao === 'red50' ? '#3b82f6' : 'var(--muted-color)' }}>50%</button>
+                            {red25Pct > 0 && <button onClick={() => setTipoAntecipacao('red25')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoAntecipacao === 'red25' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoAntecipacao === 'red25' ? '#3b82f6' : 'var(--border)'}`, color: tipoAntecipacao === 'red25' ? '#3b82f6' : 'var(--muted-color)' }}>25%</button>}
+                            {cheiaInc > 0 && <button onClick={() => setTipoAntecipacao('cheia')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoAntecipacao === 'cheia' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoAntecipacao === 'cheia' ? '#3b82f6' : 'var(--border)'}`, color: tipoAntecipacao === 'cheia' ? '#3b82f6' : 'var(--muted-color)' }}>Cheia</button>}
+                          </div>
+                        </div>
+                      </>
+                    )}
                     <button onClick={gerarPDF} className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors" style={{ background: 'linear-gradient(135deg, rgba(200,32,46,0.85), rgba(160,20,34,0.85))', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.18)', color: '#fff', boxShadow: '0 8px 24px rgba(200,32,46,0.25)' }}>Gerar PDF da proposta</button>
                   </div>
                 )}
@@ -329,18 +372,29 @@ export default function SimuladorPage() {
                     <p className="text-2xl font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(totalCliente)}</p>
                   </div>
 
-                  <p className="text-xs mt-3" style={{ color: 'var(--muted-color)' }}>Prazo: 240 meses {planoAtual?.tx_adm_topo ? `· Taxa adm. total: ${planoAtual.tx_adm_topo}%` : ''}</p>
-                  {cheiaInc > 0 && faixa && (
+                  <p className="text-xs mt-3" style={{ color: 'var(--muted-color)' }}>Prazo: {prazoPlano} meses {planoAtual?.tx_adm_topo ? `· Taxa adm. total: ${planoAtual.tx_adm_topo}%` : ''}</p>
+                  {(red25Pct > 0 || cheiaInc > 0) && faixa && (
                     <button onClick={() => setVerCheia(v => !v)} className="mt-3 rounded-lg px-3 py-2 text-xs font-medium transition-colors w-full" style={{ background: verCheia ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', border: `1px solid ${verCheia ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.12)'}`, color: verCheia ? 'var(--accent)' : 'var(--muted-color)' }}>
-                      {verCheia ? 'Ocultar parcela cheia' : 'Ver parcela cheia (sem redução)'}
+                      {verCheia ? 'Ocultar outras reduções' : 'Ver 25% e parcela cheia'}
                     </button>
                   )}
                   {verCheia && faixa && (
-                    <div className="mt-3 rounded-lg p-3" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)' }}>
-                      <p className="text-xs mb-2" style={{ color: 'var(--muted-color)' }}>Parcela cheia (sem redução de 50%){comSeguro ? ' · com seguro' : ''}:</p>
-                      <div className="flex justify-between text-sm"><span style={{ color: 'var(--muted-color)' }}>1ª parcela cheia</span><span style={{ color: 'var(--text)' }}>R$ {primeiraCheia.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
-                      <div className="flex justify-between text-sm mt-1"><span style={{ color: 'var(--muted-color)' }}>Demais cheias</span><span style={{ color: 'var(--text)' }}>R$ {demaisCheia.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
-                      <p className="text-[10px] mt-2" style={{ color: 'var(--muted-color)' }}>A parcela cheia é cobrada após a contemplação (devolução integral do crédito).</p>
+                    <div className="mt-3 space-y-2">
+                      {red25Pct > 0 && (
+                        <div className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
+                          <p className="text-xs mb-2" style={{ color: 'var(--muted-color)' }}>Redução de 25%{comSeguro ? ' · com seguro' : ''}:</p>
+                          <div className="flex justify-between text-sm"><span style={{ color: 'var(--muted-color)' }}>1ª parcela</span><span style={{ color: 'var(--text)' }}>R$ {primeira25.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                          <div className="flex justify-between text-sm mt-1"><span style={{ color: 'var(--muted-color)' }}>Demais</span><span style={{ color: 'var(--text)' }}>R$ {demais25.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                        </div>
+                      )}
+                      {cheiaInc > 0 && (
+                        <div className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
+                          <p className="text-xs mb-2" style={{ color: 'var(--muted-color)' }}>Parcela cheia (sem redução){comSeguro ? ' · com seguro' : ''}:</p>
+                          <div className="flex justify-between text-sm"><span style={{ color: 'var(--muted-color)' }}>1ª parcela cheia</span><span style={{ color: 'var(--text)' }}>R$ {primeiraCheia.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                          <div className="flex justify-between text-sm mt-1"><span style={{ color: 'var(--muted-color)' }}>Demais cheias</span><span style={{ color: 'var(--text)' }}>R$ {demaisCheia.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                          <p className="text-[10px] mt-2" style={{ color: 'var(--muted-color)' }}>Cobrada após a contemplação (devolução integral do crédito).</p>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>

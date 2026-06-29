@@ -290,12 +290,15 @@ export default function ClientesPage() {
                             </span>
                           ))}
                         </div>
-                        <div className="flex items-center gap-2">
-                          {cl.cotas.length === 1 && !cl.cotas[0].status_lance && (
-                            <button onClick={(e) => { e.stopPropagation(); setLanceModal(cl.cotas[0]) }} className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] font-medium" style={{ background: 'rgba(168,85,247,0.15)', color: '#a855f7', border: '1px solid rgba(168,85,247,0.3)' }}><Target size={11} />Criar lance</button>
-                          )}
-                          {aberto ? <ChevronUp size={16} style={{ color: 'var(--muted-color)' }} /> : <ChevronDown size={16} style={{ color: 'var(--muted-color)' }} />}
-                        </div>
+                  <div className="flex items-center gap-2">
+                    {cl.cotas.length === 1 && ['master','representante','adm','supervisor'].includes(meuRole) && (
+                      <button onClick={(e) => { e.stopPropagation(); const c = cl.cotas[0]; setEditarModal(c); setEdVendedor(c.vendedor_id || ''); setEdEquipe(c.equipe_id || ''); setEdEmpresa(c.empresa_id || ''); setEdParcelas(String(c.qtd_parcelas ?? '')) }} className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] font-medium" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text2)', border: '1px solid var(--border)' }}><Pencil size={11} />Editar</button>
+                    )}
+                    {cl.cotas.length === 1 && !cl.cotas[0].status_lance && (
+                      <button onClick={(e) => { e.stopPropagation(); setLanceModal(cl.cotas[0]) }} className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-[10px] font-medium" style={{ background: 'rgba(168,85,247,0.15)', color: '#a855f7', border: '1px solid rgba(168,85,247,0.3)' }}><Target size={11} />Criar lance</button>
+                    )}
+                    {aberto ? <ChevronUp size={16} style={{ color: 'var(--muted-color)' }} /> : <ChevronDown size={16} style={{ color: 'var(--muted-color)' }} />}
+                  </div>
                       </div>
                       {/* Alertas resumo (antes de expandir) */}
                       <div className="flex items-center gap-2 mt-2 flex-wrap">

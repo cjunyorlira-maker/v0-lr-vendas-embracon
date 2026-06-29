@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import {
   Home, Upload, Users, FileText, Target, Trophy, Users2,
@@ -13,11 +13,10 @@ interface NavItem {
   icon: React.ReactNode
   label: string
   href: string
-  active?: boolean
 }
 
 const mainNav: NavItem[] = [
-  { icon: <Home size={16} />, label: 'Dashboard', href: '/', active: true },
+  { icon: <Home size={16} />, label: 'Dashboard', href: '/' },
   { icon: <Upload size={16} />, label: 'Nova Venda', href: '/nova-venda' },
   { icon: <Users size={16} />, label: 'Clientes', href: '/clientes' },
   { icon: <FileText size={16} />, label: 'Boletos', href: '/boletos' },
@@ -34,12 +33,15 @@ const adminNav: NavItem[] = [
   { icon: <Settings size={16} />, label: 'Planos', href: '/planos' },
 ]
 
-function NavLink({ item }: { item: NavItem }) {
+function NavLink({ item, pathname }: { item: NavItem; pathname: string }) {
+  const isActive = item.href === '/'
+    ? pathname === '/'
+    : pathname === item.href || pathname.startsWith(item.href + '/')
   return (
     <a
       href={item.href}
       className="group flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all duration-150 cursor-pointer"
-      style={item.active ? {
+      style={isActive ? {
         background: 'linear-gradient(135deg, rgba(212,175,55,0.25), rgba(212,175,55,0.08))',
         border: '1px solid rgba(212,175,55,0.4)',
         color: 'var(--accent)',
@@ -51,21 +53,21 @@ function NavLink({ item }: { item: NavItem }) {
         fontWeight: 500,
       }}
       onMouseEnter={(e) => {
-        if (!item.active) {
+        if (!isActive) {
           e.currentTarget.style.background = 'rgba(212,175,55,0.08)'
           e.currentTarget.style.color = 'var(--accent)'
           e.currentTarget.style.transform = 'translateX(2px)'
         }
       }}
       onMouseLeave={(e) => {
-        if (!item.active) {
+        if (!isActive) {
           e.currentTarget.style.background = 'transparent'
           e.currentTarget.style.color = 'var(--muted-color)'
           e.currentTarget.style.transform = 'translateX(0)'
         }
       }}
     >
-      <span className="shrink-0" style={{ color: item.active ? 'var(--accent)' : 'inherit' }}>{item.icon}</span>
+      <span className="shrink-0" style={{ color: isActive ? 'var(--accent)' : 'inherit' }}>{item.icon}</span>
       <span>{item.label}</span>
     </a>
   )
@@ -205,6 +207,7 @@ interface SidebarContentProps {
 }
 
 function SidebarContent({ userNome, userEmail, userRole, empresaNome, empresaLogo, fotoUrl, onFotoChange, onSignOut }: SidebarContentProps) {
+  const pathname = usePathname()
   let displayName = userNome || 'Usuário'
   if (userRole === 'representante' && empresaNome) {
     displayName = empresaNome
@@ -240,7 +243,7 @@ function SidebarContent({ userNome, userEmail, userRole, empresaNome, empresaLog
             // Equipe: não aparece para vendedor (ele não gerencia ninguém)
             if (item.href === '/equipe') return userRole !== 'vendedor'
             return true
-          }).map((item) => (<NavLink key={item.label} item={item} />))}
+          }).map((item) => (<NavLink key={item.label} item={item} pathname={pathname} />))}
         </div>
         <div className="my-4 px-3" style={{ borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
           {adminNav.filter((item) => {
@@ -249,7 +252,7 @@ function SidebarContent({ userNome, userEmail, userRole, empresaNome, empresaLog
             // Planos: só master e representante
             if (item.href === '/planos') return ['master', 'representante'].includes(userRole)
             return true
-          }).map((item) => (<NavLink key={item.label} item={item} />))}
+          }).map((item) => (<NavLink key={item.label} item={item} pathname={pathname} />))}
         </div>
       </nav>
 
