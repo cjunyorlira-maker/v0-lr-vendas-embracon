@@ -228,25 +228,30 @@ export default function SimuladorPage() {
 
     // Investimento com seguro (fundo claro)
     const segMensal = Math.round(faixa.credito * (planoAtual.seguro_pct || 0) * 100) / 100
+    // valor de cada parcela 1ª-12ª (parcelinha) conforme o tipo escolhido na proposta
+    const p12PropostaSemSeg = p1PropostaSemSeg
+    const p12PropostaComSeg = p1PropostaSemSeg + segMensal
     // Primeiro pagamento = 1ª parcela + parcelas antecipadas (qtd)
     const primeiroPagamentoSem = entradaPropostaSemSeg
     const primeiroPagamentoCom = entradaPropostaSemSeg + segMensal * nParcelasEntrada
     let y2 = colY + 100
-    caixaSombra(14, y2, 88, 44)
+    caixaSombra(14, y2, 88, (ehParcelinha ? 54 : 44))
     doc.setTextColor(...RED); doc.setFont('helvetica','bold'); doc.setFontSize(10)
     doc.text('Investimento com seguro', 14 + 44, y2 + 8, { align: 'center' })
     let iy = y2 + 14
     badge(18, iy, 38, '1º pagamento'); valor(60, iy, fmt(primeiroPagamentoCom)); iy += 10
+    if (ehParcelinha) { badge(18, iy, 38, '1ª à 12ª'); valor(60, iy, fmt(p12PropostaComSeg)); iy += 10 }
     badge(18, iy, 38, 'Demais parcelas'); valor(60, iy, fmt(pdPropostaSemSeg + segMensal)); iy += 10
     badge(18, iy, 36, 'Valor do seguro'); valor(58, iy, fmt(segMensal))
 
     // Investimento sem seguro (fundo claro)
-    let y3 = y2 + 52
-    caixaSombra(14, y3, 88, 34)
+    let y3 = y2 + (ehParcelinha ? 62 : 52)
+    caixaSombra(14, y3, 88, (ehParcelinha ? 44 : 34))
     doc.setTextColor(...RED); doc.setFont('helvetica','bold'); doc.setFontSize(10)
     doc.text('Investimento sem seguro', 14 + 44, y3 + 8, { align: 'center' })
     let sy = y3 + 14
     badge(18, sy, 38, '1º pagamento'); valor(60, sy, fmt(primeiroPagamentoSem)); sy += 10
+    if (ehParcelinha) { badge(18, sy, 38, '1ª à 12ª'); valor(60, sy, fmt(p12PropostaSemSeg)); sy += 10 }
     badge(18, sy, 38, 'Demais parcelas'); valor(60, sy, fmt(pdPropostaSemSeg))
 
     // ===== COLUNA DIREITA =====
