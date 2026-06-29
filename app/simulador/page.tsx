@@ -14,12 +14,12 @@ const fmtMoeda = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'curre
 
 // categorias agrupadas
 const CATEGORIAS: Record<string, { label: string; siglas: string[] }> = {
-  imovel_1: { label: 'Imóvel Adesão 1%', siglas: ['EI1', 'SUE'] },
-  imovel_2: { label: 'Imóvel Adesão 2%', siglas: ['PSE', 'SEP'] },
-  imovel_parcelinha: { label: 'Imóvel Parcelinha', siglas: ['TP', 'TEP'] },
-  auto_1: { label: 'Auto Adesão 1%', siglas: ['ETA'] },
-  auto_2: { label: 'Auto Adesão 2%', siglas: ['PE2'] },
-  pesados_2: { label: 'Pesados Adesão 2%', siglas: ['SP'] },
+  imovel_1: { label: '🏠 Imóvel Adesão 1%', siglas: ['EI1', 'SUE'] },
+  imovel_2: { label: '🏠 Imóvel Adesão 2%', siglas: ['PSE', 'SEP'] },
+  imovel_parcelinha: { label: '🏠 Imóvel Parcelinha', siglas: ['TP', 'TEP'] },
+  auto_1: { label: '🚗 Auto Adesão 1%', siglas: ['ETA'] },
+  auto_2: { label: '🚗 Auto Adesão 2%', siglas: ['PE2'] },
+  pesados_2: { label: '🚛 Pesados Adesão 2%', siglas: ['SP'] },
 }
 
 export default function SimuladorPage() {
