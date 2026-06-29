@@ -47,9 +47,10 @@ export default function AssembleiasPage() {
   const [subindo, setSubindo] = useState(false)
   const [resultadoUpload, setResultadoUpload] = useState<any>(null)
   const [pendentes, setPendentes] = useState<{ grupo: string; bem: string; data_assembleia: string; mes: string }[]>([])
-  const [visao, setVisao] = useState<'atual' | 'historico' | 'extrato'>('historico')
+  const [visao, setVisao] = useState<'atual' | 'historico' | 'extrato' | 'calendario'>('historico')
+  const [calGrupos, setCalGrupos] = useState<any[]>([])
   const [meuRole, setMeuRole] = useState<string>('')
-  const [extratos, setExtratos] = useState<{ grupo: string; bem: string; arquivo_nome: string; atualizado_em: string }[]>([])
+  const [extratos, setExtratos] = useState<{ grupo: string; bem: string; arquivo_nome: string; atualizado_em: string; faixa_credito: string | null }[]>([])
   const [subindoExtrato, setSubindoExtrato] = useState<string | null>(null)
   const [ordenacao, setOrdenacao] = useState<'proxima' | 'contemplam'>('proxima')
   const [clientesGrupo, setClientesGrupo] = useState<any[]>([])
@@ -64,6 +65,11 @@ export default function AssembleiasPage() {
     fetch('/api/assembleias/extrato').then(r => r.json()).then(d => { if (d.extratos) setExtratos(d.extratos) }).catch(() => {})
   }
   useEffect(() => { carregarExtratos() }, [])
+  useEffect(() => {
+    if (visao === 'calendario') {
+      fetch('/api/assembleias/calendario').then(r => r.json()).then(d => { if (d.grupos) setCalGrupos(d.grupos) }).catch(() => {})
+    }
+  }, [visao])
   useEffect(() => {
     fetch('/api/assembleias').then(r => r.json()).then(d => {
       if (d.grupos) setGrupos(d.grupos)
@@ -230,6 +236,7 @@ export default function AssembleiasPage() {
             <button onClick={() => { setVisao('atual'); setAberto(null) }} className="rounded-lg px-4 py-2 text-sm font-medium transition-colors" style={{ background: visao === 'atual' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${visao === 'atual' ? 'var(--accent)' : 'var(--border)'}`, color: visao === 'atual' ? 'var(--accent)' : 'var(--muted-color)' }}>Mês Atual</button>
             <button onClick={() => { setVisao('historico'); setAberto(null) }} className="rounded-lg px-4 py-2 text-sm font-medium transition-colors" style={{ background: visao === 'historico' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${visao === 'historico' ? 'var(--accent)' : 'var(--border)'}`, color: visao === 'historico' ? 'var(--accent)' : 'var(--muted-color)' }}>Histórico</button>
             <button onClick={() => { setVisao('extrato'); setAberto(null) }} className="rounded-lg px-4 py-2 text-sm font-medium transition-colors" style={{ background: visao === 'extrato' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${visao === 'extrato' ? 'var(--accent)' : 'var(--border)'}`, color: visao === 'extrato' ? 'var(--accent)' : 'var(--muted-color)' }}>Extrato do Grupo</button>
+              <button onClick={() => { setVisao('calendario'); setAberto(null) }} className="rounded-lg px-4 py-2 text-sm font-medium transition-colors" style={{ background: visao === 'calendario' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${visao === 'calendario' ? 'var(--accent)' : 'var(--border)'}`, color: visao === 'calendario' ? 'var(--accent)' : 'var(--muted-color)' }}>Calendário</button>
           </div>
 
           {/* abas de categoria */}
@@ -280,7 +287,32 @@ export default function AssembleiasPage() {
             </div>
           </div>
 
-          {loading ? (
+          {visao === 'calendario' ? (
+            <div className="space-y-2">
+              {calGrupos.length === 0 ? (
+                <p className="text-sm text-center py-16" style={{ color: 'var(--muted-color)' }}>Nenhum grupo no calendário.</p>
+              ) : calGrupos.map(g => (
+                <div key={g.grupo} className="rounded-xl p-4" style={{ background: 'rgba(17,18,22,0.92)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div>
+                      <span className="font-bold" style={{ color: 'var(--text)' }}>Grupo {g.grupo}</span>
+                      <span className="text-xs ml-2" style={{ color: 'var(--muted-color)' }}>{g.bem}{g.faixa_credito ? ` · R$ ${g.faixa_credito}` : ''}</span>
+                    </div>
+                    <span className="text-xs px-2 py-1 rounded-md" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)' }}>{g.total_clientes} cliente(s)</span>
+                  </div>
+                  <div className="flex gap-3 mt-3 flex-wrap">
+                    {g.proximas.map((p: any, i: number) => (
+                      <div key={i} className="text-center px-3 py-2 rounded-lg" style={{ background: 'rgba(22,23,28,0.9)' }}>
+                        <div className="text-[10px]" style={{ color: 'var(--muted-color)' }}>{i === 0 ? 'Próxima' : `+${i} mês`}</div>
+                        <div className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{new Date(p.data_assembleia + 'T00:00:00').toLocaleDateString('pt-BR')}</div>
+                      </div>
+                    ))}
+                    {g.proximas.length === 0 && <span className="text-xs" style={{ color: 'var(--muted-color)' }}>Sem datas no calendário</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : loading ? (
             <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
           ) : gruposDaCat.length === 0 ? (
             <p className="text-sm text-center py-16" style={{ color: 'var(--muted-color)' }}>Nenhum grupo nesta categoria.</p>
@@ -306,8 +338,9 @@ export default function AssembleiasPage() {
                           <div className="flex items-center gap-2">
                             <FileText size={15} style={{ color: 'var(--accent)' }} />
                             <div>
-                              <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>Grupo {e.grupo}</span>
-                              <span className="text-[10px] block" style={{ color: 'var(--muted-color)' }}>Atualizado em {new Date(e.atualizado_em).toLocaleDateString('pt-BR')}</span>
+                <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>Grupo {e.grupo}</span>
+                {e.faixa_credito && <span className="text-[11px] block" style={{ color: 'var(--accent)' }}>R$ {e.faixa_credito}</span>}
+                <span className="text-[10px] block" style={{ color: 'var(--muted-color)' }}>Atualizado em {new Date(e.atualizado_em).toLocaleDateString('pt-BR')}</span>
                             </div>
                           </div>
                           <button onClick={() => baixarExtrato(e.grupo)} className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg font-medium" style={{ background: 'rgba(212,175,55,0.15)', color: 'var(--accent)', border: '1px solid rgba(212,175,55,0.3)' }}>

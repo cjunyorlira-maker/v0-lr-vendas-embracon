@@ -31,7 +31,16 @@ export async function GET() {
     if (!me) return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
     const { data: extratos } = await supabaseAdmin
       .from('extratos_grupo').select('grupo, bem, arquivo_nome, atualizado_em').order('grupo')
-    return NextResponse.json({ extratos: extratos || [] })
+    // faixa de crédito de cada grupo
+    const { data: info } = await supabaseAdmin
+      .from('assembleias_grupos_info').select('grupo, faixa_credito')
+    const faixaDe: Record<string, string> = {}
+    for (const i of (info || [])) faixaDe[String(i.grupo).trim()] = i.faixa_credito
+    const enriquecidos = (extratos || []).map(e => ({
+      ...e,
+      faixa_credito: faixaDe[String(e.grupo).trim()] || null,
+    }))
+    return NextResponse.json({ extratos: enriquecidos })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
