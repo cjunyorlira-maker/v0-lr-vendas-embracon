@@ -47,6 +47,7 @@ export default function AssembleiasPage() {
   const [subindo, setSubindo] = useState(false)
   const [resultadoUpload, setResultadoUpload] = useState<any>(null)
   const [pendentes, setPendentes] = useState<{ grupo: string; bem: string; data_assembleia: string; mes: string }[]>([])
+  const [naoMapeados, setNaoMapeados] = useState<string[]>([])
   const [visao, setVisao] = useState<'atual' | 'historico' | 'extrato' | 'calendario'>('historico')
   const [calGrupos, setCalGrupos] = useState<any[]>([])
   const [meuRole, setMeuRole] = useState<string>('')
@@ -58,7 +59,7 @@ export default function AssembleiasPage() {
   const [carregandoClientes, setCarregandoClientes] = useState(false)
 
   const carregarPendentes = () => {
-    fetch('/api/assembleias/pendentes').then(r => r.json()).then(d => { if (d.pendentes) setPendentes(d.pendentes) }).catch(() => {})
+    fetch('/api/assembleias/pendentes').then(r => r.json()).then(d => { if (d.pendentes) setPendentes(d.pendentes); if (d.nao_mapeados) setNaoMapeados(d.nao_mapeados) }).catch(() => {})
   }
   useEffect(() => { carregarPendentes() }, [])
   const carregarExtratos = () => {
@@ -204,6 +205,25 @@ export default function AssembleiasPage() {
                 {pendentes.map(p => (
                   <span key={p.grupo} className="text-xs px-2 py-1 rounded-md font-medium" style={{ background: 'rgba(234,179,8,0.15)', color: '#eab308', border: '1px solid rgba(234,179,8,0.3)' }}>
                     Grupo {p.grupo} · {new Date(p.data_assembleia + 'T00:00:00').toLocaleDateString('pt-BR')}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {naoMapeados.length > 0 && (
+            <div className="mb-6 rounded-xl p-4" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.35)' }}>
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle size={16} style={{ color: '#ef4444' }} />
+                <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Grupos sem calendário cadastrado</span>
+              </div>
+              <p className="text-xs mb-2" style={{ color: 'var(--muted-color)' }}>
+                {naoMapeados.length} grupo{naoMapeados.length !== 1 ? 's' : ''} com cliente mas sem datas de assembleia no calendário oficial. Atualize o calendário Embracon pra incluir:
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {naoMapeados.map(g => (
+                  <span key={g} className="text-xs px-2 py-1 rounded-md font-medium" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}>
+                    Grupo {g}
                   </span>
                 ))}
               </div>

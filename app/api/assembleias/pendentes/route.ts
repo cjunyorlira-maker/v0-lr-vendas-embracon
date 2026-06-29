@@ -60,7 +60,16 @@ export async function GET() {
     }
     pendentes.sort((a, b) => a.data_assembleia.localeCompare(b.data_assembleia))
 
-    return NextResponse.json({ pendentes, total: pendentes.length })
+    // grupos com cliente que NÃO estão no calendário oficial (precisam ser mapeados)
+    const { data: vendasCli2 } = await supabaseAdmin
+      .from('vendas').select('grupo').not('grupo', 'is', null).not('cliente_id', 'is', null)
+    const gruposComClienteSet = new Set<string>()
+    for (const v of (vendasCli2 || [])) { const g = String(v.grupo).trim(); if (g) gruposComClienteSet.add(g) }
+    const { data: calGrupos2 } = await supabaseAdmin.from('calendario_grupo').select('grupo')
+    const noCalendario = new Set((calGrupos2 || []).map(c => String(c.grupo).trim()))
+    const naoMapeados = Array.from(gruposComClienteSet).filter(g => !noCalendario.has(g)).sort()
+
+    return NextResponse.json({ pendentes, total: pendentes.length, nao_mapeados: naoMapeados })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
