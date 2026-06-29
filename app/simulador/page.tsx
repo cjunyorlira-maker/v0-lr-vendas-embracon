@@ -31,6 +31,7 @@ export default function SimuladorPage() {
   const [creditoSel, setCreditoSel] = useState('')
   const [comSeguro, setComSeguro] = useState(false)
   const [verCheia, setVerCheia] = useState(false)
+  const [tipoParcela, setTipoParcela] = useState<'red50' | 'red25' | 'cheia'>('red50')
   const [qtdAntecipar, setQtdAntecipar] = useState('2')
   const [nomeCliente, setNomeCliente] = useState('')
   const [lanceEmbutido, setLanceEmbutido] = useState('')
@@ -90,6 +91,13 @@ export default function SimuladorPage() {
   const primeira25 = faixa && red25Pct > 0 ? demais25 + Math.round(faixa.credito * (planoAtual?.adesao_percent || 0) / 100 * 100) / 100 : 0
   const p1 = (faixa?.primeira_parcela || 0) + seguroMensal
   const pd = (faixa?.demais_parcela || 0) + seguroMensal
+  // parcela que vai na proposta, conforme a escolha do vendedor
+  const p1Proposta = tipoParcela === 'cheia' ? primeiraCheia : tipoParcela === 'red25' ? primeira25 : p1
+  const pdProposta = tipoParcela === 'cheia' ? demaisCheia : tipoParcela === 'red25' ? demais25 : pd
+  const labelReducao = tipoParcela === 'cheia' ? 'Parcela cheia' : tipoParcela === 'red25' ? 'Redução de 25%' : 'Redução de 50%'
+  // versões SEM seguro (o seguro é somado separadamente nas caixas do PDF)
+  const p1PropostaSemSeg = p1Proposta - seguroMensal
+  const pdPropostaSemSeg = pdProposta - seguroMensal
   // Parcelinha: as parcelas 1 a 12 são iguais (valor maior). Antecipar = antecipar as parcelas 1-12.
   const ehParcelinha = planoAtual?.categoria_comissao === 'imovel_parcelinha'
   // antecipadas: na Parcelinha o cliente antecipa as parcelas 1-12 (valor p1); nos outros antecipa as demais (pd)
@@ -199,15 +207,15 @@ export default function SimuladorPage() {
     // Investimento com seguro (fundo claro)
     const segMensal = Math.round(faixa.credito * (planoAtual.seguro_pct || 0) * 100) / 100
     // Primeiro pagamento = 1ª parcela + parcelas antecipadas (qtd)
-    const primeiroPagamentoSem = faixa.primeira_parcela + (faixa.demais_parcela * qtd)
-    const primeiroPagamentoCom = (faixa.primeira_parcela + segMensal) + ((faixa.demais_parcela + segMensal) * qtd)
+    const primeiroPagamentoSem = p1PropostaSemSeg + (pdPropostaSemSeg * qtd)
+    const primeiroPagamentoCom = (p1PropostaSemSeg + segMensal) + ((pdPropostaSemSeg + segMensal) * qtd)
     let y2 = colY + 100
     caixaSombra(14, y2, 88, 44)
     doc.setTextColor(...RED); doc.setFont('helvetica','bold'); doc.setFontSize(10)
     doc.text('Investimento com seguro', 14 + 44, y2 + 8, { align: 'center' })
     let iy = y2 + 14
     badge(18, iy, 38, '1º pagamento'); valor(60, iy, fmt(primeiroPagamentoCom)); iy += 10
-    badge(18, iy, 38, 'Demais parcelas'); valor(60, iy, fmt(faixa.demais_parcela + segMensal)); iy += 10
+    badge(18, iy, 38, 'Demais parcelas'); valor(60, iy, fmt(pdPropostaSemSeg + segMensal)); iy += 10
     badge(18, iy, 36, 'Valor do seguro'); valor(58, iy, fmt(segMensal))
 
     // Investimento sem seguro (fundo claro)
@@ -217,7 +225,7 @@ export default function SimuladorPage() {
     doc.text('Investimento sem seguro', 14 + 44, y3 + 8, { align: 'center' })
     let sy = y3 + 14
     badge(18, sy, 38, '1º pagamento'); valor(60, sy, fmt(primeiroPagamentoSem)); sy += 10
-    badge(18, sy, 38, 'Demais parcelas'); valor(60, sy, fmt(faixa.demais_parcela))
+    badge(18, sy, 38, 'Demais parcelas'); valor(60, sy, fmt(pdPropostaSemSeg))
 
     // ===== COLUNA DIREITA =====
     let ry2 = colY
@@ -244,7 +252,7 @@ export default function SimuladorPage() {
     avisos.forEach(a => { doc.text(a, 108, ry2, { maxWidth: 90 }); ry2 += 11 })
     doc.setTextColor(90,90,90); doc.setFontSize(8)
     doc.text('TABELA ' + planoAtual.nome_completo, 108, ry2, { maxWidth: 90 }); ry2 += 5
-    doc.text('Tipo: Mais por menos', 108, ry2)
+    doc.text('Tipo: Mais por menos · ' + labelReducao, 108, ry2)
 
     doc.save('Proposta_' + (nomeCliente || 'cliente').replace(/\s+/g, '_') + '.pdf')
   }
@@ -314,6 +322,16 @@ export default function SimuladorPage() {
                       <input value={lanceEmbutido} onChange={e => setLanceEmbutido(formatarMoeda(e.target.value))} placeholder="Lance embutido (opcional)" inputMode="numeric" className="w-full rounded-lg pl-9 pr-3 py-2 text-sm outline-none" style={inputStyle} />
                     </div>
                     <p className="text-[11px]" style={{ color: 'var(--muted-color)' }}>Prazo da proposta: {prazoRestante} meses</p>
+                    {(red25Pct > 0 || cheiaInc > 0) && (
+                      <div>
+                        <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Parcela na proposta</label>
+                        <div className="flex gap-2">
+                          <button onClick={() => setTipoParcela('red50')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoParcela === 'red50' ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoParcela === 'red50' ? 'var(--accent)' : 'var(--border)'}`, color: tipoParcela === 'red50' ? 'var(--accent)' : 'var(--muted-color)' }}>Redução 50%</button>
+                          {red25Pct > 0 && <button onClick={() => setTipoParcela('red25')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoParcela === 'red25' ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoParcela === 'red25' ? 'var(--accent)' : 'var(--border)'}`, color: tipoParcela === 'red25' ? 'var(--accent)' : 'var(--muted-color)' }}>Redução 25%</button>}
+                          {cheiaInc > 0 && <button onClick={() => setTipoParcela('cheia')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoParcela === 'cheia' ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoParcela === 'cheia' ? 'var(--accent)' : 'var(--border)'}`, color: tipoParcela === 'cheia' ? 'var(--accent)' : 'var(--muted-color)' }}>Cheia</button>}
+                        </div>
+                      </div>
+                    )}
                     <button onClick={gerarPDF} className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors" style={{ background: 'linear-gradient(135deg, rgba(200,32,46,0.85), rgba(160,20,34,0.85))', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.18)', color: '#fff', boxShadow: '0 8px 24px rgba(200,32,46,0.25)' }}>Gerar PDF da proposta</button>
                   </div>
                 )}
