@@ -6,7 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import { BookOpen, Loader2, Home, Car, Truck, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react'
 
-interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number; estorno_ate_pgto: number | null; parcelas_nao_estornar: number | null; seguro_pct?: number | null; tx_adm_topo: number | null; cheia_incremento_pct: number | null }
+interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number; estorno_ate_pgto: number | null; parcelas_nao_estornar: number | null; seguro_pct?: number | null; tx_adm_topo: number | null; cheia_incremento_pct: number | null; prazo_meses?: number | null }
 interface Faixa { credito: number; primeira_parcela: number; demais_parcela: number; mais_7: number; total_nao_estornar: number; taxa_antecip: number }
 
 const fmtMoeda = (v: number | null) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
@@ -25,7 +25,7 @@ export default function TabelasPage() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.from('planos').select('id, sigla, nome_completo, bem, adesao_percent, estorno_ate_pgto, parcelas_nao_estornar, seguro_pct, tx_adm_topo, cheia_incremento_pct').eq('ativo', true).order('bem').then(({ data, error }) => {
+    supabase.from('planos').select('id, sigla, nome_completo, bem, adesao_percent, estorno_ate_pgto, parcelas_nao_estornar, seguro_pct, tx_adm_topo, cheia_incremento_pct, prazo_meses').eq('ativo', true).order('bem').then(({ data, error }) => {
       if (error) console.error('Erro ao buscar planos:', error)
       if (data) setPlanos(data as Plano[])
       setLoading(false)
@@ -80,7 +80,7 @@ export default function TabelasPage() {
                                 <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{p.nome_completo}</span>
                                 <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)' }}>Adesão {p.adesao_percent}%</span>
                                 {p.tx_adm_topo && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--muted-color)' }}>Taxa adm. {p.tx_adm_topo}%</span>}
-                                <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--muted-color)' }}>240 meses</span>
+                                <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--muted-color)' }}>{p.prazo_meses || 240} meses</span>
                               </div>
                               {aberto ? <ChevronUp size={16} style={{ color: 'var(--muted-color)' }} /> : <ChevronDown size={16} style={{ color: 'var(--muted-color)' }} />}
                             </div>
