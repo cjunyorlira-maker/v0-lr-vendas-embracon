@@ -279,7 +279,7 @@ export default function SimuladorPage() {
     avisos.forEach(a => { doc.text(a, 108, ry2, { maxWidth: 90 }); ry2 += 11 })
     doc.setTextColor(90,90,90); doc.setFontSize(8)
     doc.text('TABELA ' + planoAtual.nome_completo, 108, ry2, { maxWidth: 90 }); ry2 += 5
-    doc.text('Tipo: Mais por menos · parcela ' + labelPorTipo(tipoParcela) + ' · antecip. ' + labelPorTipo(tipoAntecipacao), 108, ry2)
+    doc.text('Tipo: Mais por menos · parcela ' + labelPorTipo(tipoParcela), 108, ry2)
 
     doc.save('Proposta_' + (nomeCliente || 'cliente').replace(/\s+/g, '_') + '.pdf')
   }
