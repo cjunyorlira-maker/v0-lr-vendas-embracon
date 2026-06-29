@@ -156,7 +156,8 @@ export default function AssembleiasPage() {
   const abrirWhatsApp = (telefone: string, nome: string, grupo: string) => {
     const num = (telefone || '').replace(/\D/g, '')
     const numFull = num.length <= 11 ? '55' + num : num
-    const msg = encodeURIComponent(`Olá ${nome}, tudo bem? Sou da LR Multimarcas e tenho novidades sobre a assembleia do seu grupo ${grupo}.`)
+    const primeiroNome = (nome || '').trim().split(/\s+/)[0]
+    const msg = encodeURIComponent(`Olá ${primeiroNome}, tudo bem? 🎉 Saiu o resultado da assembleia do nosso grupo ${grupo}!`)
     window.open(`https://wa.me/${numFull}?text=${msg}`, '_blank')
   }
 
