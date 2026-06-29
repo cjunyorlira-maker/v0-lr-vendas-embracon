@@ -291,7 +291,7 @@ export default function AssembleiasPage() {
             <div className="space-y-2">
               {calGrupos.length === 0 ? (
                 <p className="text-sm text-center py-16" style={{ color: 'var(--muted-color)' }}>Nenhum grupo no calendário.</p>
-              ) : calGrupos.map(g => (
+              ) : calGrupos.filter(g => g.bem === catAtiva && (!buscaGrupo || g.grupo.includes(buscaGrupo.trim()))).map(g => (
                 <div key={g.grupo} className="rounded-xl p-4" style={{ background: 'rgba(17,18,22,0.92)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div>
@@ -311,6 +311,9 @@ export default function AssembleiasPage() {
                   </div>
                 </div>
               ))}
+              {calGrupos.filter(g => g.bem === catAtiva && (!buscaGrupo || g.grupo.includes(buscaGrupo.trim()))).length === 0 && (
+                <p className="text-sm text-center py-6" style={{ color: 'var(--muted-color)' }}>Nenhum grupo nesta categoria.</p>
+              )}
             </div>
           ) : loading ? (
             <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
