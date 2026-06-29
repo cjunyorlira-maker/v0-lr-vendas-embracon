@@ -44,6 +44,19 @@ export async function GET() {
     }
     const { data: vendas } = await q
 
+    // grupos onde a LR tem cliente no GERAL (toda a operação) — define quais
+    // grupos aparecem na tela. A contagem de clientes abaixo continua por escopo.
+    const { data: vendasGlobais } = await supabaseAdmin
+      .from('vendas')
+      .select('grupo')
+      .not('grupo', 'is', null)
+      .not('cliente_id', 'is', null)
+    const gruposComCliente = new Set<string>()
+    for (const v of (vendasGlobais || [])) {
+      const g = String(v.grupo).trim()
+      if (g) gruposComCliente.add(g)
+    }
+
     // empresas (pra nomes)
     const { data: empresas } = await supabaseAdmin.from('empresas').select('id, nome')
     const nomeEmpresa: Record<string, string> = {}
@@ -68,11 +81,10 @@ export async function GET() {
     // monta a lista: TODOS os grupos mapeados (todos veem todos), contagem respeita visibilidade
     const infoMap: Record<string, any> = {}
     for (const gi of (gruposInfo || [])) infoMap[String(gi.grupo).trim()] = gi
-    // grupos = todos os mapeados em assembleias_grupos_info + qualquer grupo que tenha histórico ou cliente
-    const todosGrupos = new Set<string>()
-    for (const gi of (gruposInfo || [])) todosGrupos.add(String(gi.grupo).trim())
-    for (const h of (historico || [])) todosGrupos.add(String(h.grupo).trim())
-    for (const g of Object.keys(clientesPorGrupo)) todosGrupos.add(g)
+    // a lista é SÓ os grupos onde a LR tem cliente (global). O catálogo
+    // (assembleias_grupos_info) e o histórico só ENRIQUECEM esses grupos,
+    // não criam linhas novas na tela.
+    const todosGrupos = gruposComCliente
 
     const grupos = Array.from(todosGrupos).map(g => {
       const info = infoMap[g] || {}
