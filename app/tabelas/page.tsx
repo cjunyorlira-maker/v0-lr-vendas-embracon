@@ -6,7 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import { BookOpen, Loader2, Home, Car, Truck, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react'
 
-interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number; estorno_ate_pgto: number | null; parcelas_nao_estornar: number | null; seguro_pct?: number | null; tx_adm_topo: number | null; cheia_incremento_pct: number | null; prazo_meses?: number | null; reduzida_25_pct?: number | null }
+interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number; estorno_ate_pgto: number | null; parcelas_nao_estornar: number | null; seguro_pct?: number | null; tx_adm_topo: number | null; cheia_incremento_pct: number | null; prazo_meses?: number | null; reduzida_25_pct?: number | null; pl_demais_50_pct?: number | null; pl_demais_25_pct?: number | null; pl_demais_int_pct?: number | null; pl_p12_50_pct?: number | null; pl_p12_25_pct?: number | null; pl_p12_int_pct?: number | null }
 interface Faixa { credito: number; primeira_parcela: number; demais_parcela: number; mais_7: number; total_nao_estornar: number; taxa_antecip: number }
 
 const fmtMoeda = (v: number | null) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
@@ -26,7 +26,7 @@ export default function TabelasPage() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.from('planos').select('id, sigla, nome_completo, bem, adesao_percent, estorno_ate_pgto, parcelas_nao_estornar, seguro_pct, tx_adm_topo, cheia_incremento_pct, prazo_meses, reduzida_25_pct').eq('ativo', true).order('bem').then(async ({ data, error }) => {
+    supabase.from('planos').select('id, sigla, nome_completo, bem, adesao_percent, estorno_ate_pgto, parcelas_nao_estornar, seguro_pct, tx_adm_topo, cheia_incremento_pct, prazo_meses, reduzida_25_pct, pl_demais_50_pct, pl_demais_25_pct, pl_demais_int_pct, pl_p12_50_pct, pl_p12_25_pct, pl_p12_int_pct').eq('ativo', true).order('bem').then(async ({ data, error }) => {
       if (error) console.error('Erro ao buscar planos:', error)
       if (data) {
         setPlanos(data as Plano[])
@@ -112,20 +112,20 @@ export default function TabelasPage() {
                                       <div className="flex items-center gap-2 mb-2">
                                         <button onClick={() => setComSeguro(false)} className="rounded-md px-3 py-1 text-[11px] font-semibold transition-colors" style={{ background: !comSeguro ? 'rgba(212,175,55,0.2)' : 'rgba(255,255,255,0.03)', border: `1px solid ${!comSeguro ? 'var(--accent)' : 'var(--border)'}`, color: !comSeguro ? 'var(--accent)' : 'var(--muted-color)' }}>SEM SEGURO</button>
                                         <button onClick={() => setComSeguro(true)} className="rounded-md px-3 py-1 text-[11px] font-semibold transition-colors" style={{ background: comSeguro ? 'rgba(212,175,55,0.2)' : 'rgba(255,255,255,0.03)', border: `1px solid ${comSeguro ? 'var(--accent)' : 'var(--border)'}`, color: comSeguro ? 'var(--accent)' : 'var(--muted-color)' }}>COM SEGURO</button>
-                                        {(p.reduzida_25_pct || 0) > 0 && (
+                                        {((p.reduzida_25_pct || 0) > 0 || (p.pl_demais_25_pct || 0) > 0) && (
                                           <button onClick={() => { setVerReducao25(v => !v); setVerCheia(false) }} className="rounded-md px-3 py-1 text-[11px] font-semibold transition-colors" style={{ background: verReducao25 ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.03)', border: `1px solid ${verReducao25 ? '#3b82f6' : 'var(--border)'}`, color: verReducao25 ? '#3b82f6' : 'var(--muted-color)' }}>{verReducao25 ? 'REDUÇÃO 25%' : 'VER 25%'}</button>
                                         )}
-                                        {(p.cheia_incremento_pct || 0) > 0 && (
+                                        {((p.cheia_incremento_pct || 0) > 0 || (p.pl_demais_int_pct || 0) > 0) && (
                                           <button onClick={() => { setVerCheia(v => !v); setVerReducao25(false) }} className="rounded-md px-3 py-1 text-[11px] font-semibold transition-colors" style={{ background: verCheia ? 'rgba(212,175,55,0.2)' : 'rgba(255,255,255,0.03)', border: `1px solid ${verCheia ? 'var(--accent)' : 'var(--border)'}`, color: verCheia ? 'var(--accent)' : 'var(--muted-color)' }}>{verCheia ? 'PARCELA CHEIA' : 'VER CHEIA'}</button>
                                         )}
                                       </div>
                                     )}
-                                    {!(p.seguro_pct > 0) && ((p.cheia_incremento_pct || 0) > 0 || (p.reduzida_25_pct || 0) > 0) && (
+                                    {!(p.seguro_pct > 0) && ((p.cheia_incremento_pct || 0) > 0 || (p.reduzida_25_pct || 0) > 0 || (p.pl_demais_25_pct || 0) > 0 || (p.pl_demais_int_pct || 0) > 0) && (
                                       <div className="flex items-center gap-2 mb-2">
-                                        {(p.reduzida_25_pct || 0) > 0 && (
+                                        {((p.reduzida_25_pct || 0) > 0 || (p.pl_demais_25_pct || 0) > 0) && (
                                           <button onClick={() => { setVerReducao25(v => !v); setVerCheia(false) }} className="rounded-md px-3 py-1 text-[11px] font-semibold transition-colors" style={{ background: verReducao25 ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.03)', border: `1px solid ${verReducao25 ? '#3b82f6' : 'var(--border)'}`, color: verReducao25 ? '#3b82f6' : 'var(--muted-color)' }}>{verReducao25 ? 'REDUÇÃO 25%' : 'VER 25%'}</button>
                                         )}
-                                        {(p.cheia_incremento_pct || 0) > 0 && (
+                                        {((p.cheia_incremento_pct || 0) > 0 || (p.pl_demais_int_pct || 0) > 0) && (
                                           <button onClick={() => { setVerCheia(v => !v); setVerReducao25(false) }} className="rounded-md px-3 py-1 text-[11px] font-semibold transition-colors" style={{ background: verCheia ? 'rgba(212,175,55,0.2)' : 'rgba(255,255,255,0.03)', border: `1px solid ${verCheia ? 'var(--accent)' : 'var(--border)'}`, color: verCheia ? 'var(--accent)' : 'var(--muted-color)' }}>{verCheia ? 'PARCELA CHEIA' : 'VER CHEIA'}</button>
                                         )}
                                       </div>
@@ -158,7 +158,20 @@ export default function TabelasPage() {
                                           // parcela individual: 50% (padrão), 25% ou cheia
                                           let pdBase = f.demais_parcela
                                           let p1Base = f.primeira_parcela
-                                          if (verReducao25 && (p.reduzida_25_pct || 0) > 0) {
+                                          const ehParc = (p.pl_demais_50_pct || 0) > 0
+                                          if (ehParc) {
+                                            // parcelinha: demais e 1ª-12ª têm percentuais próprios por nível
+                                            if (verReducao25) {
+                                              pdBase = Math.round(f.credito * (p.pl_demais_25_pct || 0) * 100) / 100
+                                              p1Base = Math.round(f.credito * (p.pl_p12_25_pct || 0) * 100) / 100
+                                            } else if (verCheia) {
+                                              pdBase = Math.round(f.credito * (p.pl_demais_int_pct || 0) * 100) / 100
+                                              p1Base = Math.round(f.credito * (p.pl_p12_int_pct || 0) * 100) / 100
+                                            } else {
+                                              pdBase = f.demais_parcela
+                                              p1Base = f.primeira_parcela
+                                            }
+                                          } else if (verReducao25 && (p.reduzida_25_pct || 0) > 0) {
                                             pdBase = Math.round(f.credito * (p.reduzida_25_pct || 0) * 100) / 100
                                             p1Base = pdBase + Math.round(f.credito * (p.adesao_percent || 0) / 100 * 100) / 100
                                           } else if (verCheia && (p.cheia_incremento_pct || 0) > 0) {

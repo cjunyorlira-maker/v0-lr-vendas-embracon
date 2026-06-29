@@ -65,9 +65,17 @@ export async function GET() {
       .from('vendas').select('grupo').not('grupo', 'is', null).not('cliente_id', 'is', null)
     const gruposComClienteSet = new Set<string>()
     for (const v of (vendasCli2 || [])) { const g = String(v.grupo).trim(); if (g) gruposComClienteSet.add(g) }
-    const { data: calGrupos2 } = await supabaseAdmin.from('calendario_grupo').select('grupo')
-    const noCalendario = new Set((calGrupos2 || []).map(c => String(c.grupo).trim()))
-    const naoMapeados = Array.from(gruposComClienteSet).filter(g => !noCalendario.has(g)).sort()
+    // verifica no calendário SÓ os grupos com cliente (evita o limite de 1000 linhas)
+    const listaComCliente = Array.from(gruposComClienteSet)
+    let naoMapeados: string[] = []
+    if (listaComCliente.length > 0) {
+      const { data: calMatch } = await supabaseAdmin
+        .from('calendario_grupo')
+        .select('grupo')
+        .in('grupo', listaComCliente)
+      const noCalendario = new Set((calMatch || []).map(c => String(c.grupo).trim()))
+      naoMapeados = listaComCliente.filter(g => !noCalendario.has(g)).sort()
+    }
 
     return NextResponse.json({ pendentes, total: pendentes.length, nao_mapeados: naoMapeados })
   } catch (err) {
