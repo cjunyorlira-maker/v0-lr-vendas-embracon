@@ -395,8 +395,14 @@ export default function SimuladorPage() {
 
                   <p className="text-xs mt-3" style={{ color: 'var(--muted-color)' }}>Prazo: {prazoPlano} meses {planoAtual?.tx_adm_topo ? `· Taxa adm. total: ${planoAtual.tx_adm_topo}%` : ''}</p>
                   {(red25Pct > 0 || cheiaInc > 0 || ehParcelinha) && faixa && (
-                    <button onClick={() => setVerCheia(v => !v)} className="mt-3 rounded-lg px-3 py-2 text-xs font-medium transition-colors w-full" style={{ background: verCheia ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', border: `1px solid ${verCheia ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.12)'}`, color: verCheia ? 'var(--accent)' : 'var(--muted-color)' }}>
-                      {verCheia ? 'Ocultar outras reduções' : 'Ver 25% e parcela cheia'}
+                    <button onClick={() => setVerCheia(v => !v)} className={`mt-3 rounded-lg px-3 py-2 text-xs font-semibold transition-colors w-full ${verCheia ? '' : 'animate-pulse'}`} style={{
+                      background: verCheia ? 'rgba(212,175,55,0.18)' : 'linear-gradient(135deg, rgba(200,32,46,0.85), rgba(160,20,34,0.85))',
+                      border: `1px solid ${verCheia ? 'rgba(212,175,55,0.5)' : 'rgba(255,120,130,0.5)'}`,
+                      color: verCheia ? 'var(--accent)' : '#fff',
+                      boxShadow: verCheia ? 'none' : '0 4px 16px rgba(200,32,46,0.35)',
+                      backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+                    }}>
+                      {verCheia ? 'Ocultar outras reduções' : '🔥 Ver 25% e parcela cheia'}
                     </button>
                   )}
                   {verCheia && faixa && (
