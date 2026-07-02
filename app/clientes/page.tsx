@@ -158,7 +158,8 @@ export default function ClientesPage() {
       if (fLance && c.status_lance !== fLance) return false
       if (fStatusBoleto && c.status_boleto !== fStatusBoleto) return false
       if (fEmpresa && c.empresa_id !== fEmpresa) return false
-      if (fEquipe && c.equipe_id !== fEquipe) return false
+      if (fEquipe === '__sem__') { if (c.equipe_id) return false }
+      else if (fEquipe && c.equipe_id !== fEquipe) return false
       if (fVendedor && c.vendedor_id !== fVendedor) return false
       if (dataDe || dataAte) {
         const dv = c.data_venda
@@ -240,13 +241,14 @@ export default function ClientesPage() {
               {['master','representante','adm'].includes(meuRole) && (
                 <select value={fEquipe} onChange={(e) => { setFEquipe(e.target.value); setFVendedor('') }} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={inputStyle}>
                   <option value="" style={{ background: '#131313' }}>Todas equipes</option>
+                <option value="__sem__" style={{ background: '#131313' }}>⚠️ Sem equipe</option>
                   {filtrosOpc.equipes.filter(eq => !fEmpresa || eq.empresa_id === fEmpresa).map(eq => <option key={eq.id} value={eq.id} style={{ background: '#131313' }}>{eq.nome}</option>)}
                 </select>
               )}
               {['master','representante','adm','supervisor'].includes(meuRole) && (
                 <select value={fVendedor} onChange={(e) => setFVendedor(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={inputStyle}>
                   <option value="" style={{ background: '#131313' }}>Todos vendedores</option>
-                  {filtrosOpc.vendedores.filter(vd => (!fEmpresa || vd.empresa_id === fEmpresa) && (!fEquipe || vd.equipe_id === fEquipe)).map(vd => <option key={vd.id} value={vd.id} style={{ background: '#131313' }}>{vd.nome}</option>)}
+                  {filtrosOpc.vendedores.filter(vd => (!fEmpresa || vd.empresa_id === fEmpresa) && (!fEquipe || fEquipe === '__sem__' || vd.equipe_id === fEquipe)).map(vd => <option key={vd.id} value={vd.id} style={{ background: '#131313' }}>{vd.nome}</option>)}
                 </select>
               )}
               <button onClick={aplicarSemana} className="rounded-lg px-3 py-1.5 text-xs" style={{ background: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.3)' }}>Semana</button>
