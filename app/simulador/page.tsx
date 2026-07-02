@@ -92,19 +92,6 @@ export default function SimuladorPage() {
   const primeira25 = faixa && red25Pct > 0 ? demais25 + Math.round(faixa.credito * (planoAtual?.adesao_percent || 0) / 100 * 100) / 100 : 0
   const p1 = (faixa?.primeira_parcela || 0) + seguroMensal
   const pd = (faixa?.demais_parcela || 0) + seguroMensal
-  // funções pra pegar a parcela conforme o tipo escolhido
-  const pdPorTipo = (t: string) => t === 'cheia' ? demaisCheia : t === 'red25' ? demais25 : pd
-  const p1PorTipo = (t: string) => t === 'cheia' ? primeiraCheia : t === 'red25' ? primeira25 : p1
-  const labelPorTipo = (t: string) => t === 'cheia' ? 'cheia' : t === 'red25' ? '25%' : '50%'
-  // parcela mostrada na proposta (escolha 1)
-  const p1Proposta = p1PorTipo(tipoParcela)
-  const pdProposta = pdPorTipo(tipoParcela)
-  // base da antecipação/entrada (escolha 2, independente)
-  const pdAntecip = pdPorTipo(tipoAntecipacao)
-  const p1Antecip = p1PorTipo(tipoAntecipacao)
-  // versões SEM seguro (o seguro é somado separadamente nas caixas do PDF)
-  const p1PropostaSemSeg = p1Proposta - seguroMensal
-  const pdPropostaSemSeg = pdProposta - seguroMensal
   // Parcelinha: as parcelas 1 a 12 são iguais (valor maior). Antecipar = antecipar as parcelas 1-12.
   const ehParcelinha = planoAtual?.categoria_comissao === 'imovel_parcelinha'
   // PARCELINHA: usa percentuais próprios (1ª-12ª = p1, demais = pd; sem adesão)
@@ -118,13 +105,32 @@ export default function SimuladorPage() {
     p1Parc25    = Math.round(C * (planoAtual?.pl_p12_25_pct || 0) * 100) / 100 + seguroMensal
     p1ParcCheia = Math.round(C * (planoAtual?.pl_p12_int_pct || 0) * 100) / 100 + seguroMensal
   }
-  // valor da entrada = 1ª (base antecip) + (qtd) demais (base antecip); na Parcelinha são qtd parcelas iguais
-  const entradaProposta = ehParcelinha ? p1Antecip * qtd : p1Antecip + pdAntecip * qtd
-  const nParcelasEntrada = ehParcelinha ? qtd : 1 + qtd
+  // funções pra pegar a parcela conforme o tipo escolhido
+  const pdPorTipo = (t: string) => {
+    if (ehParcelinha) return t === 'cheia' ? pdParcCheia : t === 'red25' ? pdParc25 : pd
+    return t === 'cheia' ? demaisCheia : t === 'red25' ? demais25 : pd
+  }
+  const p1PorTipo = (t: string) => {
+    if (ehParcelinha) return t === 'cheia' ? p1ParcCheia : t === 'red25' ? p1Parc25 : p1
+    return t === 'cheia' ? primeiraCheia : t === 'red25' ? primeira25 : p1
+  }
+  const labelPorTipo = (t: string) => t === 'cheia' ? 'cheia' : t === 'red25' ? '25%' : '50%'
+  // parcela mostrada na proposta (escolha 1)
+  const p1Proposta = p1PorTipo(tipoParcela)
+  const pdProposta = pdPorTipo(tipoParcela)
+  // base da antecipação/entrada (escolha 2, independente)
+  const pdAntecip = pdPorTipo(tipoAntecipacao)
+  const p1Antecip = p1PorTipo(tipoAntecipacao)
+  // versões SEM seguro (o seguro é somado separadamente nas caixas do PDF)
+  const p1PropostaSemSeg = p1Proposta - seguroMensal
+  const pdPropostaSemSeg = pdProposta - seguroMensal
+  // valor da entrada = 1ª (base antecip) + (qtd) demais (base antecip); na Parcelinha são (1+qtd) parcelas iguais
+  const entradaProposta = ehParcelinha ? p1Antecip * (1 + qtd) : p1Antecip + pdAntecip * qtd
+  const nParcelasEntrada = 1 + qtd
   const entradaPropostaSemSeg = entradaProposta - seguroMensal * nParcelasEntrada
   // antecipadas: na Parcelinha o cliente antecipa as parcelas 1-12 (valor p1); nos outros antecipa as demais (pd)
   const valorAntecipadas = ehParcelinha ? p1 * qtd : pd * qtd
-  const totalCliente = ehParcelinha ? p1 * qtd : p1 + pd * qtd
+  const totalCliente = ehParcelinha ? p1 * (1 + qtd) : p1 + pd * qtd
   // não estornar (só planos com estorno; Parcelinha não tem)
   const limiteEstorno = planoAtual?.estorno_ate_pgto || 0
   const totalNaoEstornar = limiteEstorno > 0 ? p1 + pd * (limiteEstorno - 1) : (faixa?.total_nao_estornar || 0)
@@ -137,8 +143,7 @@ export default function SimuladorPage() {
   const formatarMoeda = (valor: string) => {
     const num = valor.replace(/\D/g, '')
     if (!num) return ''
-    const n = parseInt(num) / 100
-    return n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    return parseInt(num).toLocaleString('pt-BR')
   }
 
   const gerarPDF = () => {
@@ -221,8 +226,8 @@ export default function SimuladorPage() {
       ['Crédito líquido', fmt(creditoLiquido), 40],
       ['Prazo', prazoRestante + ' meses', 30],
       ['Taxa adm', (planoAtual.tx_adm_topo || '-') + '%', 30],
-      ['Taxa antecipada', planoAtual.adesao_percent + '%', 36],
-      ['Fundo reserva', '2%', 34],
+    ['Adesão', planoAtual.adesao_percent + '%', 36],
+    ['Fundo reserva', (planoAtual.bem === 'Imóvel' ? '2%' : '3%'), 34],
     ]
     resumoItens.forEach(([k,v,bw]) => { badge(18, ry, bw, k); valor(18 + bw + 4, ry, v); ry += 10.5 })
 
