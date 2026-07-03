@@ -552,9 +552,14 @@ export default function ComissoesPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {[...mapaClientesFiltrados].sort((a, b) => (a.casada === b.casada ? 0 : a.casada ? -1 : 1)).map((cl: any, i: number) => (
+                        {[...mapaClientesFiltrados].sort((a, b) => (a.casada === b.casada ? 0 : a.casada ? 1 : -1)).map((cl: any, i: number) => (
                           <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', ...(cl.casada === false ? { background: 'rgba(245,158,11,0.08)', borderLeft: '1px solid rgba(245,158,11,0.4)', borderRight: '1px solid rgba(245,158,11,0.4)' } : {}) }}>
-                            <td className="p-2 font-medium" style={{ color: cl.casada === false ? '#f59e0b' : 'var(--text)' }}>{cl.casada === false ? '⚠️ Sem venda no sistema' : cl.cliente}</td>
+                            <td className="p-2 font-medium" style={{ color: cl.casada === false ? '#f59e0b' : 'var(--text)' }}>
+                              <span className="inline-flex items-center gap-2">
+                                {cl.casada === false ? `⚠️ Sem venda no sistema · Grupo ${cl.grupo || '-'} · Cota ${cl.cota || '-'} · Contrato ${cl.contrato}` : cl.cliente}
+                                {cl.estorno && <span style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', borderRadius: 999, padding: '2px 8px', fontSize: 10, fontWeight: 700 }}>ESTORNO</span>}
+                              </span>
+                            </td>
                             <td className="p-2" style={{ color: cl.casada === false ? '#f59e0b' : 'var(--muted-color)' }}>{cl.contrato}</td>
                             <td className="p-2 text-center" style={{ color: 'var(--text2)' }}>{cl.percentualTotal}%</td>
                             <td className="p-2" style={{ color: 'var(--muted-color)' }}>{cl.parcelas.join(', ')}</td>

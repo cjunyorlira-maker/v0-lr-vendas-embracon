@@ -109,28 +109,24 @@ export async function POST(req: NextRequest) {
     }
 
     // Linhas de ESTORNO (situação C = cota cancelada, valor negativo em Canc Cota)
-    // Ex: "9766459 009913-0157-01 C 1 1 ... 0,5000 2.100,00 0,00 0,00 -700,00"
+    // Ex: "9766459 009913-0157-01 006050 000085 0,5000 C 1 1 2.100,00 0,00 0,00 -700,00"
     const padroesC = [
-      /(\d{6,8}) (\d{6}-\d{4}-\d{2}) \d+ \d+ ([\d,]+)C (\d+) (\d+) ([\d.,]+)[^-]{0,40}(-[\d.,]+)/g,
-      /(\d{6,8})\s+(\d{6}-\d{4}-\d{2})\s+C\s+(\d+)\s+(\d+)[^-]{0,60}?([\d,]+)\s+([\d.,]+)[^-]{0,40}(-[\d.,]+)/g,
+      /(\d{6,8}) (\d{6}-\d{4}-\d{2}) \d{6} \d{6} ([\d,]+) C (\d+) (\d+) ([\d.,]+) [\d.,]+ [\d.,]+ (-[\d.,]+)/g,
     ]
     for (const padraoC of padroesC) {
       let mc
       const tmpC: any[] = []
       while ((mc = padraoC.exec(textoNorm)) !== null) {
-        // o último grupo capturado é sempre o valor negativo (Canc Cota)
-        const grupos = mc.slice(1)
-        const valorNeg = parseNum(grupos[grupos.length - 1])
         tmpC.push({
-          contrato: grupos[0],
-          consorciado: grupos[1],
-          percentual_comis: 0,
-          parcela_de: 0,
-          parcela_ate: 0,
-          calc_comis: 0,
-          valor_comissao: valorNeg,   // NEGATIVO — desconta do total
+          contrato: mc[1],
+          consorciado: mc[2],
+          percentual_comis: parseNum(mc[3]),
+          parcela_de: parseInt(mc[4]),
+          parcela_ate: parseInt(mc[5]),
+          calc_comis: parseNum(mc[6]),
+          valor_comissao: parseNum(mc[7]),   // negativo
           bem: null,
-          valor_estorno: Math.abs(valorNeg),
+          valor_estorno: Math.abs(parseNum(mc[7])),
         })
       }
       if (tmpC.length > 0) { linhas.push(...tmpC); break }
