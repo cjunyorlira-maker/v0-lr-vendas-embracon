@@ -61,11 +61,13 @@ export async function GET(req: NextRequest) {
       const porCliente: Record<string, any> = {}
       for (const l of linhasFiltradas) {
         const chave = String(l.contrato)
-        if (!porCliente[chave]) porCliente[chave] = { contrato: l.contrato, cliente: nomePorContrato[chave] || l.consorciado || 'Não cadastrado', parcelas: [], percentualTotal: 0, total: 0, empresa_id: empresaPorContrato[chave] || null, casada: !!nomePorContrato[String(l.contrato)] }
+        const [gr, ct] = String(l.consorciado || '').split('-')
+        if (!porCliente[chave]) porCliente[chave] = { contrato: l.contrato, cliente: nomePorContrato[chave] || l.consorciado || 'Não cadastrado', parcelas: [], percentualTotal: 0, total: 0, empresa_id: empresaPorContrato[chave] || null, casada: !!nomePorContrato[String(l.contrato)], estorno: false, grupo: gr ? String(parseInt(gr)) : null, cota: ct ? String(parseInt(ct)) : null }
         // lista de parcelas (de-ate)
         for (let p = l.parcela_de; p <= l.parcela_ate; p++) porCliente[chave].parcelas.push(p)
         porCliente[chave].percentualTotal += l.percentual_comis
         porCliente[chave].total += l.valor_comissao
+        if ((l.valor_comissao || 0) < 0) porCliente[chave].estorno = true
       }
       const clientes = Object.values(porCliente).map((c: any) => ({ ...c, parcelas: [...new Set(c.parcelas)].sort((a: any, b: any) => a - b) }))
       const totalGeral = clientes.reduce((s: number, c: any) => s + c.total, 0)
