@@ -308,6 +308,9 @@ export default function ComissoesPage() {
 
   const mapaClientesFiltrados = mapaDetalhe?.clientes ? mapaDetalhe.clientes.filter((cl: any) => !fEmpresa || cl.empresa_id === fEmpresa) : []
   const mapaTotalFiltrado = mapaClientesFiltrados.reduce((s: number, c: any) => s + (c.total || 0), 0)
+  const mapaNaoCasadas = mapaClientesFiltrados.filter((c: any) => c.casada === false)
+  const mapaNaoCasadasTotal = mapaNaoCasadas.reduce((s: number, c: any) => s + (c.total || 0), 0)
+  const mapaEstornosTotal = mapaClientesFiltrados.reduce((s: number, c: any) => s + ((c.total || 0) < 0 ? c.total : 0), 0)
 
   // Prévia Próxima Semana: vendas com boleto efetivado até a quinta desta semana,
   // contando o que ainda falta receber (comissão total do plano − já recebido no mapa)
@@ -549,19 +552,29 @@ export default function ComissoesPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {mapaClientesFiltrados.map((cl: any, i: number) => (
-                          <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
-                            <td className="p-2 font-medium" style={{ color: 'var(--text)' }}>{cl.cliente}</td>
-                            <td className="p-2" style={{ color: 'var(--muted-color)' }}>{cl.contrato}</td>
+                        {[...mapaClientesFiltrados].sort((a, b) => (a.casada === b.casada ? 0 : a.casada ? -1 : 1)).map((cl: any, i: number) => (
+                          <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', ...(cl.casada === false ? { background: 'rgba(245,158,11,0.08)', borderLeft: '1px solid rgba(245,158,11,0.4)', borderRight: '1px solid rgba(245,158,11,0.4)' } : {}) }}>
+                            <td className="p-2 font-medium" style={{ color: cl.casada === false ? '#f59e0b' : 'var(--text)' }}>{cl.casada === false ? '⚠️ Sem venda no sistema' : cl.cliente}</td>
+                            <td className="p-2" style={{ color: cl.casada === false ? '#f59e0b' : 'var(--muted-color)' }}>{cl.contrato}</td>
                             <td className="p-2 text-center" style={{ color: 'var(--text2)' }}>{cl.percentualTotal}%</td>
                             <td className="p-2" style={{ color: 'var(--muted-color)' }}>{cl.parcelas.join(', ')}</td>
-                            <td className="p-2 text-right font-semibold" style={{ color: '#22c55e' }}>{fmtMoeda(cl.total)}</td>
+                            <td className="p-2 text-right font-semibold" style={{ color: cl.total < 0 ? '#ef4444' : '#22c55e', fontWeight: cl.total < 0 ? 700 : 600 }}>{fmtMoeda(cl.total)}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
+                    {(mapaNaoCasadas.length > 0 || mapaEstornosTotal < 0) && (
+                      <div className="flex flex-col gap-1 pt-3 mt-2 text-xs" style={{ borderTop: '1px solid var(--border)' }}>
+                        {mapaNaoCasadas.length > 0 && (
+                          <div className="flex justify-between"><span style={{ color: '#f59e0b' }}>Não casadas: {mapaNaoCasadas.length} contrato(s)</span><span style={{ color: '#f59e0b' }}>{fmtMoeda(mapaNaoCasadasTotal)}</span></div>
+                        )}
+                        {mapaEstornosTotal < 0 && (
+                          <div className="flex justify-between"><span style={{ color: '#ef4444' }}>Estornos</span><span style={{ color: '#ef4444', fontWeight: 700 }}>{fmtMoeda(mapaEstornosTotal)}</span></div>
+                        )}
+                      </div>
+                    )}
                     <div className="flex justify-between pt-3 mt-2 text-base font-bold" style={{ borderTop: '1px solid var(--border)' }}>
-                      <span style={{ color: 'var(--text)' }}>VALOR TOTAL</span>
+                      <span style={{ color: 'var(--text)' }}>Total líquido do mapa</span>
                       <span style={{ color: 'var(--accent)' }}>{fmtMoeda(mapaTotalFiltrado)}</span>
                     </div>
                   </div>
