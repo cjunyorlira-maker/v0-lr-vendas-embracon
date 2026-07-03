@@ -108,6 +108,34 @@ export async function POST(req: NextRequest) {
       if (tmp.length > 0) { linhas.push(...tmp); break }
     }
 
+    // Linhas de ESTORNO (situação C = cota cancelada, valor negativo em Canc Cota)
+    // Ex: "9766459 009913-0157-01 C 1 1 ... 0,5000 2.100,00 0,00 0,00 -700,00"
+    const padroesC = [
+      /(\d{6,8}) (\d{6}-\d{4}-\d{2}) \d+ \d+ ([\d,]+)C (\d+) (\d+) ([\d.,]+)[^-]{0,40}(-[\d.,]+)/g,
+      /(\d{6,8})\s+(\d{6}-\d{4}-\d{2})\s+C\s+(\d+)\s+(\d+)[^-]{0,60}?([\d,]+)\s+([\d.,]+)[^-]{0,40}(-[\d.,]+)/g,
+    ]
+    for (const padraoC of padroesC) {
+      let mc
+      const tmpC: any[] = []
+      while ((mc = padraoC.exec(textoNorm)) !== null) {
+        // o último grupo capturado é sempre o valor negativo (Canc Cota)
+        const grupos = mc.slice(1)
+        const valorNeg = parseNum(grupos[grupos.length - 1])
+        tmpC.push({
+          contrato: grupos[0],
+          consorciado: grupos[1],
+          percentual_comis: 0,
+          parcela_de: 0,
+          parcela_ate: 0,
+          calc_comis: 0,
+          valor_comissao: valorNeg,   // NEGATIVO — desconta do total
+          bem: null,
+          valor_estorno: Math.abs(valorNeg),
+        })
+      }
+      if (tmpC.length > 0) { linhas.push(...tmpC); break }
+    }
+
     if (linhas.length === 0) {
       // retorna um trecho do texto pra diagnosticar como o PDF foi extraído
       return NextResponse.json({
@@ -201,6 +229,8 @@ export async function POST(req: NextRequest) {
       if (!vendaPorContrato.get(contrato)) naoEncontrados.push(contrato)
     }
 
+    const linhasEstorno = linhas.filter(l => l.valor_comissao < 0)
+
     return NextResponse.json({
       success: true,
       mapa_id: mapa.id,
@@ -208,6 +238,8 @@ export async function POST(req: NextRequest) {
       total_contratos: contratosUnicos.size,
       total_comissao: totalComissao,
       contratos_nao_encontrados: naoEncontrados,
+      total_estornos: linhasEstorno.reduce((s, l) => s + l.valor_comissao, 0),
+      contratos_estornados: linhasEstorno.map(l => l.contrato),
     })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })

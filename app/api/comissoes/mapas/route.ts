@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
       const porCliente: Record<string, any> = {}
       for (const l of linhasFiltradas) {
         const chave = String(l.contrato)
-        if (!porCliente[chave]) porCliente[chave] = { contrato: l.contrato, cliente: nomePorContrato[chave] || l.consorciado || 'Não cadastrado', parcelas: [], percentualTotal: 0, total: 0, empresa_id: empresaPorContrato[chave] || null }
+        if (!porCliente[chave]) porCliente[chave] = { contrato: l.contrato, cliente: nomePorContrato[chave] || l.consorciado || 'Não cadastrado', parcelas: [], percentualTotal: 0, total: 0, empresa_id: empresaPorContrato[chave] || null, casada: !!nomePorContrato[String(l.contrato)] }
         // lista de parcelas (de-ate)
         for (let p = l.parcela_de; p <= l.parcela_ate; p++) porCliente[chave].parcelas.push(p)
         porCliente[chave].percentualTotal += l.percentual_comis
