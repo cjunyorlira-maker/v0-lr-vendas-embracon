@@ -387,15 +387,18 @@ export default function ComissoesPage() {
             </div>
           )}
 
-          {ehGestao && totalProximoPagamento > 0 && (
+          {ehGestao && filaPagamentos.length > 0 && (
             <div className="rounded-2xl p-5 mb-6" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.14), rgba(17,18,22,0.94))', border: '1px solid rgba(59,130,246,0.3)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
               <div className="flex items-center gap-2 mb-1.5"><Clock size={14} style={{ color: '#3b82f6' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Próximo Pagamento</p></div>
-              <p className="text-2xl font-bold" style={{ color: '#3b82f6' }}>{fmtMoeda(totalProximoPagamento)}</p>
-              {proximaDataPag && <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>Embracon paga {fmtDataPag(proximaDataPag)} (sexta) · faltam {diasAtePag(proximaDataPag)} dia(s)</p>}
+              <p className="text-2xl font-bold" style={{ color: '#3b82f6' }}>{fmtMoeda(filaPagamentos[0].total)}</p>
+              <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>Embracon paga {fmtDataPag(filaPagamentos[0].data)} (sexta) · faltam {diasAtePag(filaPagamentos[0].data)} dia(s)</p>
               {filaPagamentos.length > 1 && (
-                <div className="mt-2 pt-2" style={{ borderTop: '1px solid rgba(59,130,246,0.2)' }}>
+                <div className="mt-2 pt-2 space-y-1" style={{ borderTop: '1px solid rgba(59,130,246,0.2)' }}>
                   {filaPagamentos.slice(1).map((f, i) => (
-                    <p key={i} className="text-[10px]" style={{ color: 'var(--muted-color)' }}>+ aguardando ({fmtDataPag(f.data)})</p>
+                    <div key={i} className="flex items-center justify-between">
+                      <p className="text-[10px]" style={{ color: 'var(--muted-color)' }}>Aguardando · {fmtDataPag(f.data)} (sexta)</p>
+                      <p className="text-xs font-semibold" style={{ color: '#60a5fa' }}>{fmtMoeda(f.total)}</p>
+                    </div>
                   ))}
                 </div>
               )}
