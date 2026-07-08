@@ -100,6 +100,13 @@ export default function AssembleiasPage() {
 
   // mês corrente no formato YYYY-MM
   const mesCorrente = new Date().toISOString().slice(0, 7)
+  // mês a exibir na visão "atual": o corrente se houver resultado, senão o último disponível
+  const mesesComResultado = Array.from(new Set(
+    grupos.flatMap((g: any) => (g.historico || []).map((h: any) => h.mes_referencia))
+  )).sort()
+  const mesExibicao = mesesComResultado.includes(mesCorrente)
+    ? mesCorrente
+    : (mesesComResultado[mesesComResultado.length - 1] || mesCorrente)
   // média de contemplados dos últimos meses do grupo
   const mediaContemplados = (g: Grupo) => {
     if (!g.historico || g.historico.length === 0) return 0
@@ -137,8 +144,8 @@ export default function AssembleiasPage() {
     (!fEmpresa || g.empresa_ids.includes(fEmpresa)) &&
     (!fEquipe || g.equipe_ids.includes(fEquipe)) &&
     (!fVendedor || g.vendedor_ids.includes(fVendedor)) &&
-    // na visão "mês atual", só grupos que têm registro do mês corrente
-    (visao === 'historico' || g.historico?.some(h => h.mes_referencia === mesCorrente))
+    // na visão "mês atual", só grupos que têm registro do mês exibido
+    (visao !== 'atual' || g.historico?.some(h => h.mes_referencia === mesExibicao))
   ).sort((a, b) => {
     if (ordenacao === 'contemplam') {
       // ordena pela média de contemplados (maior primeiro)
@@ -337,11 +344,8 @@ export default function AssembleiasPage() {
             </div>
           ) : loading ? (
             <div className="flex items-center justify-center py-16"><Loader2 size={24} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
-          ) : gruposDaCat.length === 0 ? (
-            <p className="text-sm text-center py-16" style={{ color: 'var(--muted-color)' }}>Nenhum grupo nesta categoria.</p>
-          ) : (
+          ) : visao === 'extrato' ? (
             <div className="flex flex-col gap-3">
-              {visao === 'extrato' && (
                 <div className="mb-4">
                   {podeSubirExtrato && (
                     <div className="mb-4 rounded-xl p-4" style={{ background: 'rgba(212,175,55,0.08)', border: '1px solid var(--border)' }}>
@@ -377,9 +381,17 @@ export default function AssembleiasPage() {
                     )}
                   </div>
                 </div>
+            </div>
+          ) : gruposDaCat.length === 0 ? (
+            <p className="text-sm text-center py-16" style={{ color: 'var(--muted-color)' }}>Nenhum grupo nesta categoria.</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {visao === 'atual' && mesExibicao !== mesCorrente && (
+                <div className="rounded-xl p-3 mb-3 text-xs" style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)', color: '#60a5fa' }}>
+                  ℹ️ Resultados de {new Date(mesCorrente + '-15').toLocaleDateString('pt-BR', { month: 'long' })} ainda não subidos — mostrando {new Date(mesExibicao + '-15').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })} (último disponível).
+                </div>
               )}
-
-              {visao !== 'extrato' && gruposDaCat.map(g => (
+              {gruposDaCat.map(g => (
                 <div key={g.grupo} className="rounded-xl overflow-hidden" style={inputStyle}>
                   {/* cabeçalho do grupo */}
                   <button onClick={() => setAberto(aberto === g.grupo ? null : g.grupo)} className="w-full flex items-center justify-between p-4 text-left">
