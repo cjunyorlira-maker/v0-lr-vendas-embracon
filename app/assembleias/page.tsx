@@ -359,14 +359,13 @@ export default function AssembleiasPage() {
                   )}
                   <div className="flex flex-col gap-2">
                     {extratos
-                      .filter(e => (!buscaGrupo || e.grupo.includes(buscaGrupo.trim())))
+                      .filter(e => e.bem === catAtiva && (!buscaGrupo || e.grupo.includes(buscaGrupo.trim())))
                       .map(e => (
                         <div key={e.grupo} className="flex items-center justify-between rounded-xl p-3" style={{ background: 'rgba(17,18,22,0.92)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)', border: '1px solid var(--border)' }}>
                           <div className="flex items-center gap-2">
                             <FileText size={15} style={{ color: 'var(--accent)' }} />
                             <div>
                 <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>Grupo {e.grupo}</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full ml-2" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--muted-color)' }}>{e.bem === 'Veículo' ? '🚗 Auto' : e.bem === 'Pesados' ? '🚛 Pesados' : '🏠 Imóvel'}</span>
                 {e.faixa_credito && <span className="text-[11px] block" style={{ color: 'var(--accent)' }}>R$ {e.faixa_credito}</span>}
                 <span className="text-[10px] block" style={{ color: 'var(--muted-color)' }}>Atualizado em {new Date(e.atualizado_em).toLocaleDateString('pt-BR')}</span>
                             </div>
@@ -376,8 +375,8 @@ export default function AssembleiasPage() {
                           </button>
                         </div>
                       ))}
-              {extratos.filter(e => (!buscaGrupo || e.grupo.includes(buscaGrupo.trim()))).length === 0 && (
-                <p className="text-sm text-center py-6" style={{ color: 'var(--muted-color)' }}>Nenhum extrato subido ainda.</p>
+              {extratos.filter(e => e.bem === catAtiva && (!buscaGrupo || e.grupo.includes(buscaGrupo.trim()))).length === 0 && (
+                <p className="text-sm text-center py-6" style={{ color: 'var(--muted-color)' }}>Nenhum extrato nesta categoria ainda.</p>
                     )}
                   </div>
                 </div>
