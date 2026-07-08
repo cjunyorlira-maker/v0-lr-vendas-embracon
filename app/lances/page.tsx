@@ -171,6 +171,15 @@ export default function LancesPage() {
     } catch { alert('Erro ao baixar') }
   }
 
+  async function baixarComprovanteHistorico(of: any) {
+    if (!of.comprovante_url) return
+    try {
+      const supabase = createClient()
+      const { data } = await supabase.storage.from('comprovantes-lance').createSignedUrl(of.comprovante_url, 60)
+      if (data?.signedUrl) window.open(data.signedUrl, '_blank')
+    } catch (e) { alert('Erro ao baixar o comprovante.') }
+  }
+
   function formatarMoedaInput(v: string): string {
     const num = v.replace(/\D/g, '')
     if (!num) return ''
@@ -444,7 +453,14 @@ export default function LancesPage() {
                         <span className="text-xs font-medium" style={{ color: stCor }}>{stLabel}</span>
                         {of.data_assembleia && <span className="text-[10px]" style={{ color: 'var(--muted-color)' }}>Assemb: {fmtData(of.data_assembleia)}</span>}
                       </div>
-                      {of.comprovante_nome && <p className="text-[10px]" style={{ color: 'var(--muted-color)' }}>{of.comprovante_nome}</p>}
+                      {of.comprovante_nome && (
+                  <div className="flex items-center justify-between gap-2 mt-1">
+                    <p className="text-[10px] truncate" style={{ color: 'var(--muted-color)' }}>{of.comprovante_nome}</p>
+                    <button onClick={() => baixarComprovanteHistorico(of)} className="flex items-center gap-1 text-[10px] px-2 py-1 rounded-lg font-medium shrink-0" style={{ background: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.3)' }}>
+                      <Download size={11} /> Baixar
+                    </button>
+                  </div>
+                )}
                       {of.justificativa_sem_comprovante && <p className="text-[10px] italic" style={{ color: '#f59e0b' }}>Sem comprovante: {of.justificativa_sem_comprovante}</p>}
                     </div>
                   )
