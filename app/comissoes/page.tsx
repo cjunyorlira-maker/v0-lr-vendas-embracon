@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import { DollarSign, Loader2, AlertTriangle, Settings, Check, TrendingUp, Lock, Upload, FileText, Calculator, ChevronRight, Download, ChevronUp, ChevronDown, Shield, Clock } from 'lucide-react'
@@ -44,6 +44,13 @@ export default function ComissoesPage() {
   const [prodInicio, setProdInicio] = useState('')
   const [prodFim, setProdFim] = useState('')
   const [salvandoProducao, setSalvandoProducao] = useState(false)
+  const [producoes, setProducoes] = useState<any[]>([])
+  const [producaoSel, setProducaoSel] = useState<string>('') // id da produção ou '' = total
+  const [novaProdOpen, setNovaProdOpen] = useState(false)
+  const [novaProdNome, setNovaProdNome] = useState('')
+  const [novaProdIni, setNovaProdIni] = useState('')
+  const [novaProdFim, setNovaProdFim] = useState('')
+  const [salvandoNovaProd, setSalvandoNovaProd] = useState(false)
   const [fEmpresa, setFEmpresa] = useState('')
   const [fEquipe, setFEquipe] = useState('')
   const [fVendedor, setFVendedor] = useState('')
@@ -86,6 +93,12 @@ export default function ComissoesPage() {
     if (data.vendas) setVendas(data.vendas)
     if (typeof data.proxima_sexta_pagamento !== 'undefined') setProximaSextaPag(data.proxima_sexta_pagamento)
     if (data.fila_pagamentos) setFilaPagamentos(data.fila_pagamentos)
+    if (data.producoes) {
+      setProducoes(data.producoes)
+      const hoje = new Date().toISOString().slice(0, 10)
+      const atual = data.producoes.find((p: any) => hoje >= p.data_inicio && hoje <= p.data_fim)
+      setProducaoSel(atual ? atual.id : '')
+    }
     if (data.filtros) setFiltros(data.filtros)
     if (data.meu_role) setMeuRole(data.meu_role)
     if (data.config_categorias) {
@@ -116,6 +129,17 @@ export default function ComissoesPage() {
     setSalvandoProducao(true)
     await fetch('/api/config-producao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ data_inicio: prodInicio, data_fim: prodFim }) })
     setSalvandoProducao(false)
+  }
+
+  async function salvarNovaProducao() {
+    if (!novaProdNome || !novaProdIni || !novaProdFim) { alert('Informe nome, início e fim'); return }
+    setSalvandoNovaProd(true)
+    const res = await fetch('/api/comissoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'criar_producao', nome: novaProdNome, data_inicio: novaProdIni, data_fim: novaProdFim }) })
+    const d = await res.json()
+    setSalvandoNovaProd(false)
+    if (!res.ok) { alert(d.error || 'Erro ao criar produção'); return }
+    setNovaProdOpen(false); setNovaProdNome(''); setNovaProdIni(''); setNovaProdFim('')
+    await loadData()
   }
 
   async function aplicar() {
@@ -246,8 +270,17 @@ export default function ComissoesPage() {
     }
   }
 
+  const periodoProducao = useMemo(() => {
+    const p = producoes.find(x => x.id === producaoSel)
+    return p ? { de: p.data_inicio, ate: p.data_fim } : null
+  }, [producoes, producaoSel])
+
   const vendasFiltradas = vendas.filter(v => {
     const va = v as any
+    if (periodoProducao) {
+      const dv = (va.data_venda || va.criado_em || '').slice(0, 10)
+      if (dv < periodoProducao.de || dv > periodoProducao.ate) return false
+    }
     if (fEmpresa && va.empresa_id !== fEmpresa) return false
     if (fEquipe && va.equipe_id !== fEquipe) return false
     if (fVendedor && va.vendedor_id !== fVendedor) return false
@@ -267,6 +300,17 @@ export default function ComissoesPage() {
   const fmtDataPag = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
   const diasAtePag = (iso: string) => Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000))
   const proximaDataPag = filaPagamentos.length > 0 ? filaPagamentos[0].data : null
+  const temFiltro = !!(fEmpresa || fEquipe || fVendedor || dataDe || dataAte || producaoSel)
+  const filaExibida = useMemo(() => {
+    if (!temFiltro) return filaPagamentos
+    const porData: Record<string, number> = {}
+    vendasFiltradas.forEach((v: any) => {
+      Object.entries(v.a_receber_por_data || {}).forEach(([data, val]) => {
+        porData[data] = (porData[data] || 0) + (val as number)
+      })
+    })
+    return Object.entries(porData).map(([data, total]) => ({ data, total })).sort((a, b) => a.data.localeCompare(b.data))
+  }, [temFiltro, filaPagamentos, vendasFiltradas])
   const emRisco = vendasFiltradas.filter(v => v.em_risco).length
   const totalVendedores = vendasFiltradas.reduce((s, v: any) => s + (v.venda_propria_supervisor ? 0 : (v.comissao_vendedor || 0)), 0)
   const totalSupervisores = vendasFiltradas.reduce((s, v) => s + (v.comissao_supervisor || 0), 0)
@@ -357,6 +401,50 @@ export default function ComissoesPage() {
       <div className="relative lg:ml-60" style={{ zIndex: 1 }}>
         <Header title="Comissões" />
         <main className="mx-auto max-w-[1400px] px-6 py-8 lg:px-8">
+          {/* Seletor de período de produção */}
+          {ehGestao && (
+            <div className="flex flex-wrap items-center gap-2 mb-6">
+              {producoes.map((p: any) => {
+                const ativo = producaoSel === p.id
+                const dd = (s: string) => new Date(s + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })
+                return (
+                  <button key={p.id} onClick={() => setProducaoSel(p.id)} className="rounded-full px-3 py-1.5 text-xs font-medium transition-colors" style={{ background: ativo ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${ativo ? 'var(--accent)' : 'var(--border)'}`, color: ativo ? 'var(--accent)' : 'var(--muted-color)' }}>
+                    {p.nome} <span style={{ opacity: 0.7 }}>· {dd(p.data_inicio)}–{dd(p.data_fim)}</span>
+                  </button>
+                )
+              })}
+              <button onClick={() => setProducaoSel('')} className="rounded-full px-3 py-1.5 text-xs font-medium transition-colors" style={{ background: producaoSel === '' ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${producaoSel === '' ? 'var(--accent)' : 'var(--border)'}`, color: producaoSel === '' ? 'var(--accent)' : 'var(--muted-color)' }}>
+                Total Acumulado
+              </button>
+              {meuRole === 'master' && (
+                <button onClick={() => setNovaProdOpen(true)} className="rounded-full px-3 py-1.5 text-xs font-medium transition-colors" style={{ background: 'rgba(255,255,255,0.04)', border: '1px dashed var(--border)', color: 'var(--muted-color)' }}>
+                  + Nova produção
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Mini-modal: nova produção */}
+          {novaProdOpen && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={() => setNovaProdOpen(false)}>
+              <div className="rounded-2xl p-5 w-full max-w-sm" style={{ background: 'rgba(17,18,22,0.98)', border: '1px solid var(--border)', boxShadow: '0 12px 32px rgba(0,0,0,0.6)' }} onClick={e => e.stopPropagation()}>
+                <p className="text-sm font-semibold mb-4" style={{ color: 'var(--text)' }}>Nova produção</p>
+                <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Nome</label>
+                <input value={novaProdNome} onChange={e => setNovaProdNome(e.target.value)} placeholder="Ex.: Produção Julho/26" className="w-full rounded-lg px-3 py-2 text-sm mb-3" style={inputStyle} />
+                <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Data início</label>
+                <input type="date" value={novaProdIni} onChange={e => setNovaProdIni(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm mb-3" style={inputStyle} />
+                <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Data fim</label>
+                <input type="date" value={novaProdFim} onChange={e => setNovaProdFim(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm mb-4" style={inputStyle} />
+                <div className="flex gap-2 justify-end">
+                  <button onClick={() => setNovaProdOpen(false)} className="rounded-lg px-3 py-2 text-xs font-medium" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--muted-color)' }}>Cancelar</button>
+                  <button onClick={salvarNovaProducao} disabled={salvandoNovaProd} className="rounded-lg px-3 py-2 text-xs font-semibold flex items-center gap-1" style={{ background: 'var(--accent)', color: '#0a0a0a' }}>
+                    {salvandoNovaProd && <Loader2 size={12} className="animate-spin" />} Salvar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Resumo: LR total, Recebido, A receber, Risco */}
           {ehGestao && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
@@ -387,14 +475,15 @@ export default function ComissoesPage() {
             </div>
           )}
 
-          {ehGestao && filaPagamentos.length > 0 && (
+          {ehGestao && filaExibida.length > 0 && (
             <div className="rounded-2xl p-5 mb-6" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.14), rgba(17,18,22,0.94))', border: '1px solid rgba(59,130,246,0.3)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
               <div className="flex items-center gap-2 mb-1.5"><Clock size={14} style={{ color: '#3b82f6' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Próximo Pagamento</p></div>
-              <p className="text-2xl font-bold" style={{ color: '#3b82f6' }}>{fmtMoeda(filaPagamentos[0].total)}</p>
-              <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>Embracon paga {fmtDataPag(filaPagamentos[0].data)} (sexta) · faltam {diasAtePag(filaPagamentos[0].data)} dia(s)</p>
-              {filaPagamentos.length > 1 && (
+              <p className="text-2xl font-bold" style={{ color: '#3b82f6' }}>{fmtMoeda(filaExibida[0].total)}</p>
+              <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>Embracon paga {fmtDataPag(filaExibida[0].data)} (sexta) · faltam {diasAtePag(filaExibida[0].data)} dia(s)</p>
+              {temFiltro && <p className="text-[10px] mt-0.5" style={{ color: '#60a5fa' }}>somente vendas do filtro atual</p>}
+              {filaExibida.length > 1 && (
                 <div className="mt-2 pt-2 space-y-1" style={{ borderTop: '1px solid rgba(59,130,246,0.2)' }}>
-                  {filaPagamentos.slice(1).map((f, i) => (
+                  {filaExibida.slice(1).map((f, i) => (
                     <div key={i} className="flex items-center justify-between">
                       <p className="text-[10px]" style={{ color: 'var(--muted-color)' }}>Aguardando · {fmtDataPag(f.data)} (sexta)</p>
                       <p className="text-xs font-semibold" style={{ color: '#60a5fa' }}>{fmtMoeda(f.total)}</p>

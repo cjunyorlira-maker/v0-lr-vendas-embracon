@@ -101,6 +101,20 @@ export async function GET() {
     }
     const filaPagamentos = Array.from(filaPorData.entries()).map(([data, total]) => ({ data, total })).sort((a, b) => a.data.localeCompare(b.data))
 
+    // períodos de produção configurados
+    const { data: producoes } = await supabaseAdmin.from('producoes').select('*').order('data_inicio', { ascending: false })
+
+    // a receber POR DATA de pagamento, por contrato
+    const aReceberPorContratoData = new Map<string, Record<string, number>>()
+    for (const l of (linhasAll || []) as any[]) {
+      if (mapaPago.get(l.mapa_id)) continue
+      const dp = mapaDataPag.get(l.mapa_id); if (!dp) continue
+      const c = String(l.contrato).trim()
+      const obj = aReceberPorContratoData.get(c) || {}
+      obj[dp.toISOString()] = (obj[dp.toISOString()] || 0) + (l.valor_comissao || 0)
+      aReceberPorContratoData.set(c, obj)
+    }
+
     const lista = (vendas || []).map((v: any) => {
       const plano = Array.isArray(v.planos) ? v.planos[0] : v.planos
       const cliente = Array.isArray(v.clientes) ? v.clientes[0] : v.clientes
@@ -149,6 +163,7 @@ export async function GET() {
         comissao_supervisor_propria: vendaPropriaSupervisor ? comVend : 0,
         comissao_recebida_rs: (recebidoPagoPorContrato.get(String(v.numero_contrato || '').trim()) || recebidoPagoPorContrato.get(String(v.numero_proposta || '').trim()) || 0),
         comissao_a_receber_rs: (aReceberPorContrato.get(String(v.numero_contrato || '').trim()) || aReceberPorContrato.get(String(v.numero_proposta || '').trim()) || 0),
+        a_receber_por_data: (aReceberPorContratoData.get(String(v.numero_contrato || '').trim()) || aReceberPorContratoData.get(String(v.numero_proposta || '').trim()) || {}),
         comissao_mapeada_rs: (mapeadoTotalPorContrato.get(String(v.numero_contrato || '').trim()) || mapeadoTotalPorContrato.get(String(v.numero_proposta || '').trim()) || 0),
         comissao_recebida_percent: v.comissao_recebida_percent || 0,
         boleto_status: boleto?.status || null,
@@ -181,6 +196,7 @@ export async function GET() {
       filtros: { empresas: empresasOpc, equipes: equipesOpc, vendedores: vendedoresOpc },
       proxima_sexta_pagamento: proximaSextaPagamento ? proximaSextaPagamento.toISOString() : null,
       fila_pagamentos: filaPagamentos,
+      producoes: producoes || [],
     })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
@@ -204,6 +220,14 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
+
+    // criar período de produção (só master)
+    if (body.acao === 'criar_producao') {
+      if (me.role !== 'master') return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
+      const { error } = await supabaseAdmin.from('producoes').insert({ nome: body.nome, data_inicio: body.data_inicio, data_fim: body.data_fim })
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ ok: true })
+    }
 
     // salvar config padrão
     if (body.acao === 'salvar_config') {
