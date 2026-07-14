@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import { DollarSign, Loader2, AlertTriangle, Settings, Check, TrendingUp, Lock, Upload, FileText, Calculator, ChevronRight, Download, ChevronUp, ChevronDown, Shield, Clock } from 'lucide-react'
@@ -267,6 +267,27 @@ export default function ComissoesPage() {
   const fmtDataPag = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
   const diasAtePag = (iso: string) => Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000))
   const proximaDataPag = filaPagamentos.length > 0 ? filaPagamentos[0].data : null
+  const temFiltro = !!(fEmpresa || fEquipe || fVendedor || dataDe || dataAte)
+  const filaExibida = useMemo(() => {
+    if (!temFiltro) return filaPagamentos
+    const porData: Record<string, number> = {}
+    vendasFiltradas.forEach((v: any) => {
+      Object.entries(v.a_receber_por_data || {}).forEach(([data, val]) => {
+        porData[data] = (porData[data] || 0) + (val as number)
+      })
+    })
+    return Object.entries(porData).map(([data, total]) => ({ data, total })).sort((a, b) => a.data.localeCompare(b.data))
+  }, [temFiltro, filaPagamentos, vendasFiltradas])
+  // (b) prévia: efetivadas cuja comissão garantida ainda supera o que já veio nos borderôs
+  const previaProximoBordero = useMemo(() => {
+    const lista = vendasFiltradas.filter((v: any) =>
+      v.boleto_status === 'efetivado' && ((v.comissao_lr || 0) - (v.comissao_mapeada_rs || 0)) > 1
+    )
+    return {
+      total: lista.reduce((s: number, v: any) => s + ((v.comissao_lr || 0) - (v.comissao_mapeada_rs || 0)), 0),
+      qtd: lista.length,
+    }
+  }, [vendasFiltradas])
   const emRisco = vendasFiltradas.filter(v => v.em_risco).length
   const totalVendedores = vendasFiltradas.reduce((s, v: any) => s + (v.venda_propria_supervisor ? 0 : (v.comissao_vendedor || 0)), 0)
   const totalSupervisores = vendasFiltradas.reduce((s, v) => s + (v.comissao_supervisor || 0), 0)
@@ -387,21 +408,35 @@ export default function ComissoesPage() {
             </div>
           )}
 
-          {ehGestao && filaPagamentos.length > 0 && (
+          {ehGestao && (filaExibida.length > 0 || previaProximoBordero.qtd > 0) && (
             <div className="rounded-2xl p-5 mb-6" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.14), rgba(17,18,22,0.94))', border: '1px solid rgba(59,130,246,0.3)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
               <div className="flex items-center gap-2 mb-1.5"><Clock size={14} style={{ color: '#3b82f6' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Próximo Pagamento</p></div>
-              <p className="text-2xl font-bold" style={{ color: '#3b82f6' }}>{fmtMoeda(filaPagamentos[0].total)}</p>
-              <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>Embracon paga {fmtDataPag(filaPagamentos[0].data)} (sexta) · faltam {diasAtePag(filaPagamentos[0].data)} dia(s)</p>
-              {filaPagamentos.length > 1 && (
-                <div className="mt-2 pt-2 space-y-1" style={{ borderTop: '1px solid rgba(59,130,246,0.2)' }}>
-                  {filaPagamentos.slice(1).map((f, i) => (
-                    <div key={i} className="flex items-center justify-between">
-                      <p className="text-[10px]" style={{ color: 'var(--muted-color)' }}>Aguardando · {fmtDataPag(f.data)} (sexta)</p>
-                      <p className="text-xs font-semibold" style={{ color: '#60a5fa' }}>{fmtMoeda(f.total)}</p>
+              {filaExibida.length > 0 ? (
+                <>
+                  <p className="text-2xl font-bold" style={{ color: '#3b82f6' }}>{fmtMoeda(filaExibida[0].total)}</p>
+                  <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>Embracon paga {fmtDataPag(filaExibida[0].data)} (sexta) · faltam {diasAtePag(filaExibida[0].data)} dia(s)</p>
+                  {temFiltro && <p className="text-[9px]" style={{ color: '#60a5fa' }}>somente vendas do filtro atual</p>}
+                  {filaExibida.length > 1 && (
+                    <div className="mt-2 pt-2 space-y-1" style={{ borderTop: '1px solid rgba(59,130,246,0.2)' }}>
+                      {filaExibida.slice(1).map((f, i) => (
+                        <div key={i} className="flex items-center justify-between">
+                          <p className="text-[10px]" style={{ color: 'var(--muted-color)' }}>Aguardando · {fmtDataPag(f.data)} (sexta)</p>
+                          <p className="text-xs font-semibold" style={{ color: '#60a5fa' }}>{fmtMoeda(f.total)}</p>
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
+                  )}
+                </>
+              ) : (
+                <p className="text-sm" style={{ color: 'var(--muted-color)' }}>Nenhum borderô aguardando pagamento</p>
               )}
+              {/* PRÉVIA do próximo borderô */}
+              <div className="mt-2 pt-2" style={{ borderTop: '1px solid rgba(59,130,246,0.2)' }}>
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px]" style={{ color: 'var(--muted-color)' }}>Prévia do próximo borderô ({previaProximoBordero.qtd} venda{previaProximoBordero.qtd === 1 ? '' : 's'} efetivada{previaProximoBordero.qtd === 1 ? '' : 's'} aguardando)</p>
+                  <p className="text-sm font-bold" style={{ color: '#60a5fa' }}>{fmtMoeda(previaProximoBordero.total)}</p>
+                </div>
+              </div>
             </div>
           )}
 
@@ -591,7 +626,7 @@ export default function ComissoesPage() {
             </div>
           ) : aba === 'calculo' ? (
             <div className="space-y-3">
-              <p className="text-sm mb-2" style={{ color: 'var(--muted-color)' }}>Comissão do representante por plano. Clique para expandir e simular antecipação.</p>
+              <p className="text-sm mb-2" style={{ color: 'var(--muted-color)' }}>Comiss��o do representante por plano. Clique para expandir e simular antecipação.</p>
               {planosCalc.length === 0 ? (
                 <div className="flex justify-center py-12"><Loader2 size={20} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
               ) : planosCalc.map(p => {
