@@ -193,7 +193,20 @@ export async function POST(req: NextRequest) {
 
     // RECALCULA DO ZERO: varre TODAS as linhas de TODOS os mapas e recruza com TODAS as vendas
     // Assim funciona mesmo que a venda tenha sido cadastrada depois do mapa
-    const { data: todasLinhas } = await supabaseAdmin.from('mapa_linhas').select('contrato, valor_comissao')
+    let todasLinhas: any[] = []
+    {
+      let from = 0
+      const PAGE = 1000
+      while (true) {
+        const { data: pg } = await supabaseAdmin.from('mapa_linhas')
+          .select('contrato, valor_comissao')
+          .order('id', { ascending: true })
+          .range(from, from + PAGE - 1)
+        todasLinhas = todasLinhas.concat(pg || [])
+        if (!pg || pg.length < PAGE) break
+        from += PAGE
+      }
+    }
 
     // soma o recebido por contrato (todos os mapas)
     const recebidoTotalPorContrato = new Map<string, number>()

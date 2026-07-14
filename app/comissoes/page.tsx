@@ -333,22 +333,6 @@ export default function ComissoesPage() {
   const mapaNaoCasadasTotal = mapaNaoCasadas.reduce((s: number, c: any) => s + (c.total || 0), 0)
   const mapaEstornosTotal = mapaClientesFiltrados.reduce((s: number, c: any) => s + ((c.total || 0) < 0 ? c.total : 0), 0)
 
-  // Prévia Próxima Semana: vendas com boleto efetivado até a quinta desta semana,
-  // contando o que ainda falta receber (comissão total do plano − já recebido no mapa)
-  const previaProximaSemana = (() => {
-    const hoje = new Date()
-    const diaSemana = hoje.getDay()
-    const diasAteQuinta = (4 - diaSemana + 7) % 7
-    const quinta = new Date(hoje); quinta.setDate(hoje.getDate() + diasAteQuinta); quinta.setHours(23, 59, 59, 999)
-    const limite = (diaSemana > 4 || diaSemana === 0) ? new Date(quinta.getTime() + 7 * 86400000) : quinta
-    return vendasFiltradas.reduce((soma: number, v: any) => {
-      if (v.boleto_status !== 'efetivado' || !v.boleto_data_efetivado) return soma
-      if (new Date(v.boleto_data_efetivado) > limite) return soma
-      const falta = (v.comissao_lr_total || 0) - (v.comissao_mapeada_rs ?? v.comissao_recebida_rs ?? 0)
-      return soma + (falta > 0 ? falta : 0)
-    }, 0)
-  })()
-
   // Ranking de Faturamento: agrupa a comissão GERADA usando vendasFiltradas (o que já está na tela)
   const nomeEmpresa = (id: string) => filtros.empresas.find((e: any) => e.id === id)?.nome || 'Sem empresa'
   const nomeEquipe = (id: string) => filtros.equipes.find((e: any) => e.id === id)?.nome || 'Sem equipe'
@@ -398,14 +382,6 @@ export default function ComissoesPage() {
               <p className="text-2xl font-bold" style={{ color: emRisco > 0 ? '#ef4444' : 'var(--text)' }}>{emRisco}</p>
             </div>
           </div>
-          )}
-
-          {ehGestao && previaProximaSemana > 0 && (
-            <div className="rounded-2xl p-5 mb-6" style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.1), rgba(17,18,22,0.94))', border: '1px solid rgba(34,197,94,0.25)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
-              <div className="flex items-center gap-2 mb-1.5"><TrendingUp size={14} style={{ color: '#22c55e' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Prévia Próxima Semana</p></div>
-              <p className="text-2xl font-bold" style={{ color: '#22c55e' }}>{fmtMoeda(previaProximaSemana)}</p>
-              <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>Vendas efetivadas até quinta que ainda não foram 100% recebidas</p>
-            </div>
           )}
 
           {ehGestao && (filaExibida.length > 0 || previaProximoBordero.qtd > 0) && (

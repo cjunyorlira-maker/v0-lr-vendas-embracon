@@ -67,7 +67,20 @@ export async function GET() {
     }
     const agora = new Date()
     const { data: mapasAll } = await supabaseAdmin.from('mapas_comissao').select('id, data_encerramento')
-    const { data: linhasAll } = await supabaseAdmin.from('mapa_linhas').select('mapa_id, contrato, valor_comissao')
+    let linhasAll: any[] = []
+    {
+      let from = 0
+      const PAGE = 1000
+      while (true) {
+        const { data: pg } = await supabaseAdmin.from('mapa_linhas')
+          .select('mapa_id, contrato, valor_comissao')
+          .order('id', { ascending: true })
+          .range(from, from + PAGE - 1)
+        linhasAll = linhasAll.concat(pg || [])
+        if (!pg || pg.length < PAGE) break
+        from += PAGE
+      }
+    }
     const mapaPago = new Map<string, boolean>()
     const mapaDataPag = new Map<string, Date>()
     for (const mp of (mapasAll || []) as any[]) {
