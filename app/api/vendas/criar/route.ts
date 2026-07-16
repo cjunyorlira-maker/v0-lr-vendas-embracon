@@ -46,6 +46,9 @@ export async function POST(req: NextRequest) {
     if (!nome_cliente || !valor_credito) {
       return NextResponse.json({ error: "Nome do cliente e valor do crédito são obrigatórios" }, { status: 400 })
     }
+    if (!data_assembleia_entrada) {
+      return NextResponse.json({ error: "A data da assembleia de entrada é obrigatória. Digite o grupo e aguarde o preenchimento automático, ou informe manualmente." }, { status: 400 })
+    }
 
     // Determina empresa/equipe/vendedor da venda
     let empresa_id = criador.empresa_id
