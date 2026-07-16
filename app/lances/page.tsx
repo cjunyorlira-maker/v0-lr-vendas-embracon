@@ -92,6 +92,8 @@ export default function LancesPage() {
   const [fGrupo, setFGrupo] = useState('')
   const [busca, setBusca] = useState('')
   const [confirmarContemplado, setConfirmarContemplado] = useState<Lance | null>(null)
+  const [naoBaixados, setNaoBaixados] = useState<any[]>([])
+  const [mostrarNaoBaixados, setMostrarNaoBaixados] = useState(false)
   const [mobileCol, setMobileCol] = useState<'pendente' | 'solicitado' | 'ofertado'>('pendente')
   const [filtroMes, setFiltroMes] = useState<'atual' | 'todos'>('atual')
   const [filtrosOpc, setFiltrosOpc] = useState<{ empresas: any[]; equipes: any[]; vendedores: any[] }>({ empresas: [], equipes: [], vendedores: [] })
@@ -122,6 +124,7 @@ export default function LancesPage() {
     const data = await res.json()
     if (data.lances) { setLances(data.lances); setMesRef(data.mes_referencia); setRole(data.meu_role) }
     if (data.contemplados) setContemplados(data.contemplados)
+    if (data.comprovantes_nao_baixados) setNaoBaixados(data.comprovantes_nao_baixados)
     if (data.filtros) setFiltrosOpc(data.filtros)
     setLoading(false)
   }
@@ -208,6 +211,22 @@ export default function LancesPage() {
         await loadData()
       }
     } catch { alert('Erro ao baixar') }
+  }
+
+  // Régua de cobrança: baixa o comprovante e remove o item da lista na hora
+  async function baixarNaoBaixado(c: any) {
+    if (!c.comprovante_url) return
+    setProcessando(c.id)
+    try {
+      const supabase = createClient()
+      const { data } = await supabase.storage.from('comprovantes-lance').createSignedUrl(c.comprovante_url, 60)
+      if (data?.signedUrl) {
+        window.open(data.signedUrl, '_blank')
+        await fetch('/api/lances/acao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'baixou_comprovante', lance_id: c.id }) })
+        setNaoBaixados(prev => prev.filter(x => x.id !== c.id)) // sai da lista na hora
+      }
+    } catch { alert('Erro ao baixar') }
+    setProcessando(null)
   }
 
   async function baixarComprovanteHistorico(of: any) {
@@ -372,6 +391,43 @@ export default function LancesPage() {
                   <p className="text-2xl font-bold" style={{ color: perdidos > 0 ? '#ef4444' : 'var(--text)' }}>{perdidos}</p>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* KPI: comprovantes não baixados (régua de cobrança) */}
+          {!loading && naoBaixados.length > 0 && (
+            <button onClick={() => setMostrarNaoBaixados(v => !v)} className="w-full text-left rounded-xl p-4 mb-6 transition-transform hover:scale-[1.005] active:scale-[0.995]" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.4)' }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs mb-1 flex items-center gap-1.5" style={{ color: '#ef4444' }}>
+                    <span>{'\u26a0\ufe0f'}</span>{['master', 'adm'].includes(role) ? 'Comprovantes não baixados' : 'Comprovantes a baixar'}
+                  </p>
+                  <p className="text-2xl font-bold" style={{ color: '#ef4444' }}>{naoBaixados.length}</p>
+                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--muted-color)' }}>assembleia já passou — cobrar as representações</p>
+                </div>
+                <span className="text-xs px-3 py-1.5 rounded-lg" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}>{mostrarNaoBaixados ? 'Ocultar' : 'Ver lista'}</span>
+              </div>
+            </button>
+          )}
+
+          {/* Seção expandível: lista de comprovantes não baixados */}
+          {!loading && mostrarNaoBaixados && naoBaixados.length > 0 && (
+            <div className="rounded-xl p-4 mb-6" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid rgba(239,68,68,0.3)' }}>
+              <h3 className="text-sm font-semibold mb-3 flex items-center gap-1.5" style={{ color: '#ef4444' }}>{'\u26a0'} Comprovantes não baixados</h3>
+              <div className="flex flex-col gap-2">
+                {naoBaixados.map((c: any) => (
+                  <div key={c.id} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 flex-wrap" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)' }}>
+                    <div className="flex items-center gap-2 text-xs flex-wrap min-w-0">
+                      <span className="font-medium" style={{ color: 'var(--text)' }}>{c.cliente_nome || 'Cliente'}</span>
+                      {c.empresa_nome && <span style={{ color: 'var(--muted-color)' }}>· {c.empresa_nome}</span>}
+                      <span style={{ color: 'var(--muted-color)' }}>· assembleia {fmtData(c.data_assembleia)}</span>
+                    </div>
+                    <button onClick={() => baixarNaoBaixado(c)} disabled={processando === c.id} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium shrink-0 disabled:opacity-50" style={{ background: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.3)' }}>
+                      {processando === c.id ? <Loader2 size={12} className="animate-spin" /> : <><Download size={12} />Baixar comprovante</>}
+                    </button>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

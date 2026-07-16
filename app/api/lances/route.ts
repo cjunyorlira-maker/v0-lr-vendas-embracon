@@ -160,6 +160,41 @@ export async function GET() {
       return { ...l, grupo: venda?.grupo || null, cota: venda?.cota || null, numero_proposta: venda?.numero_proposta || venda?.numero_contrato || null }
     })
 
+    // ── COMPROVANTES NÃO BAIXADOS (régua de cobrança): assembleia já passou e ninguém baixou ──
+    // independe de mês e de ciclo_encerrado
+    let qn = supabaseAdmin
+      .from('lances_mensais')
+      .select('*, lances_config!inner(venda_id, cliente_id, empresa_id, vendedor_id, tipo), clientes(nome), usuarios:vendedor_id(nome), empresas(nome)')
+      .not('comprovante_url', 'is', null)
+      .eq('comprovante_baixado', false)
+      .lt('data_assembleia', hojeStr)
+      .order('data_assembleia', { ascending: true })
+
+    if (escopoGlobal) { /* vê tudo */ }
+    else if (['representante', 'adm'].includes(me.role)) qn = qn.eq('empresa_id', me.empresa_id)
+    else if (me.role === 'supervisor') qn = qn.eq('equipe_id', me.equipe_id)
+    else qn = qn.eq('vendedor_id', me.id)
+
+    const { data: naoBaixadosRaw } = await qn
+    const vendaIdsN = (naoBaixadosRaw || []).map((l: any) => l.lances_config?.venda_id).filter(Boolean)
+    let vendasMapN: Record<string, any> = {}
+    if (vendaIdsN.length > 0) {
+      const { data: vendasN } = await supabaseAdmin.from('vendas').select('id, grupo, cota, numero_proposta, numero_contrato').in('id', vendaIdsN)
+      for (const v of (vendasN || [])) vendasMapN[v.id] = v
+    }
+    const comprovantes_nao_baixados = (naoBaixadosRaw || []).map((l: any) => {
+      const venda = l.lances_config?.venda_id ? vendasMapN[l.lances_config.venda_id] : null
+      return {
+        ...l,
+        cliente_nome: l.clientes?.nome || null,
+        empresa_nome: l.empresas?.nome || null,
+        vendedor_nome: l.usuarios?.nome || null,
+        grupo: venda?.grupo || null,
+        cota: venda?.cota || null,
+        numero_proposta: venda?.numero_proposta || venda?.numero_contrato || null,
+      }
+    })
+
     // opções de filtro conforme o role
     let empresasOpc: any[] = [], equipesOpc: any[] = [], vendedoresOpc: any[] = []
     if (escopoGlobal) {
@@ -174,7 +209,7 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      mes_referencia: mesRef, lances: lancesEnriq, contemplados, meu_role: me.role,
+      mes_referencia: mesRef, lances: lancesEnriq, contemplados, comprovantes_nao_baixados, meu_role: me.role,
       filtros: { empresas: empresasOpc, equipes: equipesOpc, vendedores: vendedoresOpc },
     })
   } catch (err) {
