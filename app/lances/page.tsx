@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
@@ -166,6 +166,27 @@ export default function LancesPage() {
   // lances pendentes cuja assembleia já passou = não ofertados a tempo
   const perdidos = lancesFiltrados.filter(l => l.status === 'pendente' && l.data_assembleia && l.data_assembleia < hojeStr && !l.contemplado).length
   const mostrarPerdidos = ['master', 'adm'].includes(role)
+
+  // Comprovantes não baixados respeitando os filtros ativos da tela
+  const naoBaixadosFiltrados = useMemo(() => {
+    return naoBaixados.filter((c: any) => {
+      if (fEmpresa && c.empresa_id !== fEmpresa) return false
+      if (fEquipe && c.equipe_id !== fEquipe) return false
+      if (fVendedor && c.vendedor_id !== fVendedor) return false
+      return true
+    })
+  }, [naoBaixados, fEmpresa, fEquipe, fVendedor])
+
+  // Agrupa por empresa, ordenando os grupos pelo maior número de pendências
+  const naoBaixadosGrupos = useMemo(() => {
+    const map: Record<string, { empresa_id: string | null; empresa_nome: string; itens: any[] }> = {}
+    naoBaixadosFiltrados.forEach((c: any) => {
+      const k = c.empresa_id || '__sem__'
+      if (!map[k]) map[k] = { empresa_id: c.empresa_id || null, empresa_nome: c.empresa_nome || 'Sem empresa', itens: [] }
+      map[k].itens.push(c)
+    })
+    return Object.values(map).sort((a, b) => b.itens.length - a.itens.length)
+  }, [naoBaixadosFiltrados])
 
   function handlePdf(file: File) {
     if (file.type !== 'application/pdf' && !file.type.startsWith('image/')) { alert('Anexe PDF ou imagem'); return }
@@ -395,14 +416,14 @@ export default function LancesPage() {
           )}
 
           {/* KPI: comprovantes não baixados (régua de cobrança) */}
-          {!loading && naoBaixados.length > 0 && (
+          {!loading && naoBaixadosFiltrados.length > 0 && (
             <button onClick={() => setMostrarNaoBaixados(v => !v)} className="w-full text-left rounded-xl p-4 mb-6 transition-transform hover:scale-[1.005] active:scale-[0.995]" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.4)' }}>
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs mb-1 flex items-center gap-1.5" style={{ color: '#ef4444' }}>
                     <span>{'\u26a0\ufe0f'}</span>{['master', 'adm'].includes(role) ? 'Comprovantes não baixados' : 'Comprovantes a baixar'}
                   </p>
-                  <p className="text-2xl font-bold" style={{ color: '#ef4444' }}>{naoBaixados.length}</p>
+                  <p className="text-2xl font-bold" style={{ color: '#ef4444' }}>{naoBaixadosFiltrados.length}</p>
                   <p className="text-[11px] mt-0.5" style={{ color: 'var(--muted-color)' }}>assembleia já passou — cobrar as representações</p>
                 </div>
                 <span className="text-xs px-3 py-1.5 rounded-lg" style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}>{mostrarNaoBaixados ? 'Ocultar' : 'Ver lista'}</span>
@@ -411,20 +432,29 @@ export default function LancesPage() {
           )}
 
           {/* Seção expandível: lista de comprovantes não baixados */}
-          {!loading && mostrarNaoBaixados && naoBaixados.length > 0 && (
+          {!loading && mostrarNaoBaixados && naoBaixadosFiltrados.length > 0 && (
             <div className="rounded-xl p-4 mb-6" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid rgba(239,68,68,0.3)' }}>
               <h3 className="text-sm font-semibold mb-3 flex items-center gap-1.5" style={{ color: '#ef4444' }}>{'\u26a0'} Comprovantes não baixados</h3>
-              <div className="flex flex-col gap-2">
-                {naoBaixados.map((c: any) => (
-                  <div key={c.id} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 flex-wrap" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)' }}>
-                    <div className="flex items-center gap-2 text-xs flex-wrap min-w-0">
-                      <span className="font-medium" style={{ color: 'var(--text)' }}>{c.cliente_nome || 'Cliente'}</span>
-                      {c.empresa_nome && <span style={{ color: 'var(--muted-color)' }}>· {c.empresa_nome}</span>}
-                      <span style={{ color: 'var(--muted-color)' }}>· assembleia {fmtData(c.data_assembleia)}</span>
-                    </div>
-                    <button onClick={() => baixarNaoBaixado(c)} disabled={processando === c.id} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium shrink-0 disabled:opacity-50" style={{ background: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.3)' }}>
-                      {processando === c.id ? <Loader2 size={12} className="animate-spin" /> : <><Download size={12} />Baixar comprovante</>}
-                    </button>
+              <div className="flex flex-col gap-4">
+                {naoBaixadosGrupos.map((g) => (
+                  <div key={g.empresa_id || '__sem__'} className="flex flex-col gap-2">
+                    {naoBaixadosGrupos.length > 1 && (
+                      <div className="flex items-center justify-between pb-1" style={{ borderBottom: '1px solid var(--border)' }}>
+                        <span className="text-[11px] font-medium" style={{ color: 'var(--muted-color)' }}>{g.empresa_nome}</span>
+                        <span className="text-[11px]" style={{ color: 'var(--muted-color)' }}>{g.itens.length} pendente{g.itens.length === 1 ? '' : 's'}</span>
+                      </div>
+                    )}
+                    {g.itens.map((c: any) => (
+                      <div key={c.id} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 flex-wrap" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid var(--border)' }}>
+                        <div className="flex items-center gap-2 text-xs flex-wrap min-w-0">
+                          <span className="font-medium" style={{ color: 'var(--text)' }}>{c.cliente_nome || 'Cliente'}</span>
+                          <span style={{ color: 'var(--muted-color)' }}>· assembleia {fmtData(c.data_assembleia)}</span>
+                        </div>
+                        <button onClick={() => baixarNaoBaixado(c)} disabled={processando === c.id} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium shrink-0 disabled:opacity-50" style={{ background: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.3)' }}>
+                          {processando === c.id ? <Loader2 size={12} className="animate-spin" /> : <><Download size={12} />Baixar comprovante</>}
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>
