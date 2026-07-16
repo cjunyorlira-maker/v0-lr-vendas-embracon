@@ -21,7 +21,16 @@ export default function ComissoesPage() {
   const [semAcesso, setSemAcesso] = useState(false)
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set())
   const [rankModo, setRankModo] = useState<'pessoa' | 'equipe' | 'empresa'>('pessoa')
-  const [aba, setAba] = useState<'vendas' | 'config' | 'mapa' | 'calculo' | 'ranking' | 'seguro'>('vendas')
+  const [aba, setAba] = useState<'vendas' | 'config' | 'mapa' | 'calculo' | 'ranking' | 'seguro' | 'master'>('vendas')
+  const [masterData, setMasterData] = useState<{ cards: any; vendas: any[]; recebimentos: any[] } | null>(null)
+  const [loadingMaster, setLoadingMaster] = useState(false)
+  const [mFiltroEmpresa, setMFiltroEmpresa] = useState('')
+  const [mBusca, setMBusca] = useState('')
+  const [mModalAberto, setMModalAberto] = useState(false)
+  const [mData, setMData] = useState('')
+  const [mValor, setMValor] = useState('')
+  const [mObs, setMObs] = useState('')
+  const [mSalvando, setMSalvando] = useState(false)
   const [proximaSextaPag, setProximaSextaPag] = useState<string | null>(null)
   const [filaPagamentos, setFilaPagamentos] = useState<{ data: string; total: number }[]>([])
   const [vendasSeguro, setVendasSeguro] = useState<any[]>([])
@@ -76,6 +85,32 @@ export default function ComissoesPage() {
       fetch('/api/comissoes/seguro').then(r => r.json()).then(d => { setVendasSeguro(d.vendas || []); setLoadingSeguro(false) }).catch(() => setLoadingSeguro(false))
     }
   }, [aba])
+  useEffect(() => { if (aba === 'master' && meuRole === 'master') carregarMaster() }, [aba, meuRole])
+
+  async function carregarMaster() {
+    setLoadingMaster(true)
+    try {
+      const res = await fetch('/api/comissoes/master')
+      if (!res.ok) { setMasterData(null); setLoadingMaster(false); return }
+      const data = await res.json()
+      setMasterData(data)
+    } catch { setMasterData(null) }
+    setLoadingMaster(false)
+  }
+
+  async function lancarRecebimentoMaster() {
+    if (!mData || !mValor) { alert('Informe data e valor'); return }
+    setMSalvando(true)
+    await fetch('/api/comissoes/master', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'lancar', data_pagamento: mData, valor: Number(mValor.replace(',', '.')), observacao: mObs || undefined }) })
+    setMData(''); setMValor(''); setMObs(''); setMModalAberto(false); setMSalvando(false)
+    await carregarMaster()
+  }
+
+  async function excluirRecebimentoMaster(id: string) {
+    if (!confirm('Excluir este recebimento?')) return
+    await fetch('/api/comissoes/master', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'excluir', id }) })
+    await carregarMaster()
+  }
 
   async function loadData() {
     setLoading(true)
@@ -551,6 +586,9 @@ export default function ComissoesPage() {
             <button onClick={() => setAba('ranking')} className={`tab-btn ${aba === 'ranking' ? 'ativo' : ''}`}><TrendingUp size={14} />Ranking de Faturamento</button>
             <button onClick={() => setAba('seguro')} className={`tab-btn ${aba === 'seguro' ? 'ativo' : ''}`}><Shield size={14} />Seguro</button>
             </>)}
+            {meuRole === 'master' && (
+              <button onClick={() => setAba('master')} className={`tab-btn ${aba === 'master' ? 'ativo' : ''}`}><Lock size={14} />Master 0,25%</button>
+            )}
           </div>
 
           {loading ? (
@@ -755,6 +793,136 @@ export default function ComissoesPage() {
                 </div>
               )}
             </div>
+          ) : aba === 'master' ? (
+            meuRole !== 'master' ? null : loadingMaster ? (
+              <div className="flex items-center justify-center py-12"><Loader2 size={20} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
+            ) : !masterData ? (
+              <p className="text-sm" style={{ color: 'var(--muted-color)' }}>Não foi possível carregar os dados.</p>
+            ) : (() => {
+              const empresasMaster = Array.from(new Map((masterData.vendas || []).map((v: any) => [v.empresa_id, v.empresa])).entries()).filter(([id]) => id)
+              const b = mBusca.trim().toLowerCase()
+              const vendasMaster = (masterData.vendas || [])
+                .filter((v: any) => !mFiltroEmpresa || v.empresa_id === mFiltroEmpresa)
+                .filter((v: any) => !b || (v.cliente || '').toLowerCase().includes(b) || String(v.contrato || '').toLowerCase().includes(b))
+                .sort((x: any, y: any) => (y.valor_pendente || 0) - (x.valor_pendente || 0))
+              return (
+                <div>
+                  {/* 4 cards */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div className="rounded-2xl p-5" style={{ background: 'rgba(17,18,22,0.92)', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
+                      <p className="text-xs mb-1.5" style={{ color: 'var(--muted-color)' }}>Devido (borderôs × 0,25%÷8)</p>
+                      <p className="text-2xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(masterData.cards?.devido_total || 0)}</p>
+                    </div>
+                    <div className="rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.14), rgba(17,18,22,0.94))', border: '1px solid rgba(34,197,94,0.3)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
+                      <p className="text-xs mb-1.5" style={{ color: 'var(--muted-color)' }}>Recebido</p>
+                      <p className="text-2xl font-bold" style={{ color: '#22c55e' }}>{fmtMoeda(masterData.cards?.recebido_total || 0)}</p>
+                    </div>
+                    <div className="rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, rgba(212,175,55,0.16), rgba(17,18,22,0.94))', border: '1px solid rgba(212,175,55,0.35)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
+                      <p className="text-xs mb-1.5" style={{ color: 'var(--muted-color)' }}>A RECEBER</p>
+                      <p className="text-2xl font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(masterData.cards?.a_receber || 0)}</p>
+                    </div>
+                    <div className="rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.14), rgba(17,18,22,0.94))', border: '1px solid rgba(59,130,246,0.3)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
+                      <p className="text-xs mb-1.5" style={{ color: 'var(--muted-color)' }}>A vencer (garantido)</p>
+                      <p className="text-2xl font-bold" style={{ color: '#3b82f6' }}>{fmtMoeda(masterData.cards?.a_vencer_garantido || 0)}</p>
+                      <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>parcelas pagas pelo cliente aguardando borderô</p>
+                    </div>
+                  </div>
+
+                  {/* Lançar recebimento + filtros */}
+                  <div className="flex items-end gap-2 mb-4 flex-wrap">
+                    <button onClick={() => { setMData(new Date().toISOString().slice(0, 10)); setMModalAberto(true) }} className="flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition-transform hover:scale-105 active:scale-95" style={{ background: 'rgba(212,175,55,0.15)', color: 'var(--accent)', border: '1px solid rgba(212,175,55,0.35)' }}>+ Lançar recebimento</button>
+                    <div className="flex-1" />
+                    <select value={mFiltroEmpresa} onChange={(e) => setMFiltroEmpresa(e.target.value)} className="rounded-lg px-2 py-2 text-xs outline-none" style={inputStyle}>
+                      <option value="">Todas as empresas</option>
+                      {empresasMaster.map(([id, nome]) => <option key={id as string} value={id as string}>{nome as string}</option>)}
+                    </select>
+                    <input value={mBusca} onChange={(e) => setMBusca(e.target.value)} placeholder="Buscar cliente ou contrato..." className="rounded-lg px-3 py-2 text-xs outline-none" style={{ ...inputStyle, minWidth: 200 }} />
+                  </div>
+
+                  {/* Lista de recebimentos lançados */}
+                  {(masterData.recebimentos || []).length > 0 && (
+                    <div className="rounded-xl p-4 mb-5" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+                      <h3 className="text-xs font-semibold mb-2" style={{ color: 'var(--muted-color)' }}>Recebimentos lançados</h3>
+                      <div className="flex flex-col gap-1.5">
+                        {(masterData.recebimentos || []).map((r: any) => (
+                          <div key={r.id} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 flex-wrap" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)' }}>
+                            <div className="flex items-center gap-2 text-xs flex-wrap min-w-0">
+                              <span className="font-medium" style={{ color: 'var(--text)' }}>{new Date(r.data_pagamento + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
+                              <span className="font-semibold" style={{ color: '#22c55e' }}>{fmtMoeda(r.valor)}</span>
+                              {r.observacao && <span style={{ color: 'var(--muted-color)' }}>· {r.observacao}</span>}
+                            </div>
+                            <button onClick={() => excluirRecebimentoMaster(r.id)} className="text-xs px-2 py-1 rounded shrink-0" style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}>Excluir</button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Lista por venda */}
+                  {vendasMaster.length === 0 ? (
+                    <p className="text-sm" style={{ color: 'var(--muted-color)' }}>Nenhuma venda encontrada.</p>
+                  ) : (
+                    <div className="flex flex-col gap-2">
+                      {vendasMaster.map((v: any) => {
+                        const status = v.parcelas_pendentes === 0 ? 'ok' : v.parcelas_recebidas > 0 ? 'parcial' : 'pendente'
+                        const badge = status === 'ok'
+                          ? { txt: '\u2713 quitado', cor: '#22c55e', bg: 'rgba(34,197,94,0.12)', bd: 'rgba(34,197,94,0.4)' }
+                          : status === 'parcial'
+                          ? { txt: '\u{1F7E1} parcial', cor: '#eab308', bg: 'rgba(234,179,8,0.12)', bd: 'rgba(234,179,8,0.4)' }
+                          : { txt: '\u{1F534} tudo pendente', cor: '#ef4444', bg: 'rgba(239,68,68,0.12)', bd: 'rgba(239,68,68,0.4)' }
+                        return (
+                          <div key={v.contrato} className="rounded-xl px-4 py-3" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+                            <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
+                              <div className="flex items-center gap-2 text-sm flex-wrap min-w-0">
+                                <span className="font-semibold" style={{ color: 'var(--text)' }}>{v.cliente}</span>
+                                <span style={{ color: 'var(--muted-color)' }}>· {v.empresa}</span>
+                                <span style={{ color: 'var(--muted-color)' }}>· {v.contrato}</span>
+                              </div>
+                              <span className="text-[11px] px-2 py-0.5 rounded shrink-0" style={{ background: badge.bg, color: badge.cor, border: `1px solid ${badge.bd}` }}>{badge.txt}</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-[11px] flex-wrap" style={{ color: 'var(--muted-color)' }}>
+                              <span>cliente pagou <b style={{ color: 'var(--text2)' }}>{v.parcelas_garantidas}</b></span>
+                              <span>· veio no borderô <b style={{ color: 'var(--text2)' }}>{v.parcelas_vindas}</b></span>
+                              <span>· recebido <b style={{ color: '#22c55e' }}>{v.parcelas_recebidas}</b></span>
+                              <span>· A RECEBER <b style={{ color: 'var(--accent)' }}>{v.parcelas_pendentes}</b> ({fmtMoeda(v.valor_pendente)})</span>
+                              <span>· a vencer <b style={{ color: '#3b82f6' }}>{fmtMoeda(v.valor_a_vencer)}</b></span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+
+                  {/* Mini-modal lançar recebimento */}
+                  {mModalAberto && (
+                    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+                      <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }} onClick={() => setMModalAberto(false)} />
+                      <div className="relative w-full max-w-sm rounded-xl p-6" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+                        <h3 className="text-base font-semibold mb-4" style={{ color: 'var(--text)' }}>Lançar recebimento</h3>
+                        <div className="flex flex-col gap-3">
+                          <div>
+                            <label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>Data do pagamento</label>
+                            <input type="date" value={mData} onChange={(e) => setMData(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>Valor (R$)</label>
+                            <input value={mValor} onChange={(e) => setMValor(e.target.value)} inputMode="decimal" placeholder="0,00" className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>Observação (opcional)</label>
+                            <input value={mObs} onChange={(e) => setMObs(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
+                          </div>
+                          <div className="flex gap-2 justify-end mt-1">
+                            <button onClick={() => setMModalAberto(false)} className="rounded-lg px-4 py-2 text-xs font-medium" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>Cancelar</button>
+                            <button onClick={lancarRecebimentoMaster} disabled={mSalvando} className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold disabled:opacity-50" style={{ background: 'var(--accent)', color: '#0a0a0a' }}>{mSalvando ? <Loader2 size={13} className="animate-spin" /> : 'Lançar'}</button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )
+            })()
           ) : aba === 'config' ? (
             <>
             {meuRole === 'master' && (
