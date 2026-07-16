@@ -318,7 +318,7 @@ O boleto está em anexo.`
     <div className="relative min-h-screen font-sans">
       <Sidebar />
       <div className="relative lg:ml-60" style={{ zIndex: 1 }}>
-        <Header title="Boletos" />
+        <Header title="Pagamentos" />
         <main className="mx-auto max-w-[1400px] px-6 py-8 lg:px-8">
           <div className="flex items-end gap-2 mb-4 flex-wrap">
             {filtrosOpc.empresas.length > 0 && (
