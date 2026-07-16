@@ -329,18 +329,6 @@ export default function ComissoesPage() {
   const totalSupervisorPropria = vendasFiltradas.reduce((s, v: any) => s + (v.comissao_supervisor_propria || 0), 0)
   // Master: 0,25% sobre toda a produção (crédito) do filtro atual
   const producaoTotal = vendasFiltradas.reduce((s, v) => s + (v.credito || 0), 0)
-  // Master (minha metade = 0,25%): só o GARANTIDO conforme parcelas pagas até o estorno
-  const calcMasterGarantido = (credito: number, parcelasPagas: number, estornoAte: number) => {
-    if (!credito || !parcelasPagas || parcelasPagas <= 0) return 0
-    const limite = estornoAte || 8
-    const pagas = Math.min(parcelasPagas, limite)
-    const demais = limite - 1
-    const porPrimeira = credito * 0.0010
-    const porDemais = demais > 0 ? (credito * 0.0015) / demais : 0
-    return porPrimeira + Math.max(0, pagas - 1) * porDemais
-  }
-  const comissaoMasterGarantido = vendasFiltradas.reduce((s: number, v: any) => s + calcMasterGarantido(v.credito, v.parcelas_pagas, v.pgto_seguranca), 0)
-  const comissaoMaster = producaoTotal * 0.0025
   const liquidoRep = totalLR - totalVendedores - totalSupervisores - totalSupervisorPropria
   // helpers de papel
   const ehGestao = ['master', 'representante'].includes(meuRole)
@@ -496,14 +484,7 @@ export default function ComissoesPage() {
               <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>vendas do próprio supervisor</p>
             </div>
             )}
-            {meuRole === 'master' && (
-              <div className="rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, rgba(212,175,55,0.16), rgba(17,18,22,0.94))', border: '1px solid rgba(212,175,55,0.35)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
-                <p className="text-xs mb-1.5" style={{ color: 'var(--muted-color)' }}>Comissão Master — Garantido</p>
-                <p className="text-2xl font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(comissaoMasterGarantido)}</p>
-                <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>Potencial total: {fmtMoeda(comissaoMaster)} (0,25% se todos pagarem até o estorno)</p>
-                <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>sobre {fmtMoeda(producaoTotal)} de produção</p>
-              </div>
-            )}
+
             {ehGestao && (<div className="rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.12), rgba(17,18,22,0.94))', border: '1px solid rgba(34,197,94,0.28)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
               <p className="text-xs mb-1.5" style={{ color: 'var(--muted-color)' }}>Líquido Representante</p>
               <p className="text-2xl font-bold" style={{ color: '#22c55e' }}>{fmtMoeda(liquidoRep)}</p>
@@ -587,7 +568,7 @@ export default function ComissoesPage() {
             <button onClick={() => setAba('seguro')} className={`tab-btn ${aba === 'seguro' ? 'ativo' : ''}`}><Shield size={14} />Seguro</button>
             </>)}
             {meuRole === 'master' && (
-              <button onClick={() => setAba('master')} className={`tab-btn ${aba === 'master' ? 'ativo' : ''}`}><Lock size={14} />Master 0,25%</button>
+              <button onClick={() => setAba('master')} className={`tab-btn ${aba === 'master' ? 'ativo' : ''}`}><Lock size={14} />Master</button>
             )}
           </div>
 
