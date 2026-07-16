@@ -38,6 +38,37 @@ function descTipo(c?: { tipo: string; valor_percentual: number }): string {
 }
 const fmtData = (d: string | null) => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '-'
 
+const DIAS_SEMANA = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb']
+// cabeçalho compacto do grupo de assembleia: "Assembleia 21/07 · ter · faltam 5 dias"
+function labelAssembleia(dataStr: string | null): string {
+  if (!dataStr) return 'Sem data de assembleia'
+  const d = new Date(dataStr + 'T00:00:00')
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0)
+  const diff = Math.round((d.getTime() - hoje.getTime()) / 86400000)
+  let quando = ''
+  if (diff === 0) quando = 'é HOJE'
+  else if (diff > 0) quando = `faltam ${diff} dia${diff === 1 ? '' : 's'}`
+  else quando = `foi há ${Math.abs(diff)} dia${Math.abs(diff) === 1 ? '' : 's'}`
+  return `Assembleia ${dd}/${mm} · ${DIAS_SEMANA[d.getDay()]} · ${quando}`
+}
+// agrupa por data_assembleia (mais próxima → distante, null por último) e ordena cards por nome
+function agruparPorAssembleia(lista: Lance[]) {
+  const grupos: Record<string, Lance[]> = {}
+  lista.forEach(l => {
+    const k = l.data_assembleia || '__sem__'
+    ;(grupos[k] ||= []).push(l)
+  })
+  const chaves = Object.keys(grupos).sort((a, b) => {
+    if (a === '__sem__') return 1
+    if (b === '__sem__') return -1
+    return a.localeCompare(b)
+  })
+  chaves.forEach(k => grupos[k].sort((x, y) => (x.clientes?.nome || '').localeCompare(y.clientes?.nome || '')))
+  return chaves.map(k => ({ chave: k, data: k === '__sem__' ? null : k, lances: grupos[k] }))
+}
+
 export default function LancesPage() {
   const [lances, setLances] = useState<Lance[]>([])
   const [contemplados, setContemplados] = useState<any[]>([])
@@ -60,6 +91,8 @@ export default function LancesPage() {
   const [justificativa, setJustificativa] = useState('')
   const [fGrupo, setFGrupo] = useState('')
   const [busca, setBusca] = useState('')
+  const [confirmarContemplado, setConfirmarContemplado] = useState<Lance | null>(null)
+  const [mobileCol, setMobileCol] = useState<'pendente' | 'solicitado' | 'ofertado'>('pendente')
   const [filtroMes, setFiltroMes] = useState<'atual' | 'todos'>('atual')
   const [filtrosOpc, setFiltrosOpc] = useState<{ empresas: any[]; equipes: any[]; vendedores: any[] }>({ empresas: [], equipes: [], vendedores: [] })
   const [fEmpresa, setFEmpresa] = useState('')
@@ -113,7 +146,7 @@ export default function LancesPage() {
     }
     if (busca) {
       const b = busca.toLowerCase()
-      const bate = (l.clientes?.nome || '').toLowerCase().includes(b) || String(l.grupo || '').includes(b) || String(l.numero_proposta || '').includes(b)
+      const bate = (l.clientes?.nome || '').toLowerCase().includes(b) || String(l.grupo || '').toLowerCase().includes(b) || String(l.cota || '').toLowerCase().includes(b) || String(l.numero_proposta || '').includes(b)
       if (!bate) return false
     }
     return true
@@ -127,6 +160,9 @@ export default function LancesPage() {
   const hojeStr = new Date().toISOString().slice(0, 10)
   const em7dias = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
   const assembleiaEstaSemana = lancesFiltrados.filter(l => l.data_assembleia && l.data_assembleia >= hojeStr && l.data_assembleia <= em7dias && !l.contemplado).length
+  // lances pendentes cuja assembleia já passou = não ofertados a tempo
+  const perdidos = lancesFiltrados.filter(l => l.status === 'pendente' && l.data_assembleia && l.data_assembleia < hojeStr && !l.contemplado).length
+  const mostrarPerdidos = ['master', 'adm'].includes(role)
 
   function handlePdf(file: File) {
     if (file.type !== 'application/pdf' && !file.type.startsWith('image/')) { alert('Anexe PDF ou imagem'); return }
@@ -209,16 +245,28 @@ export default function LancesPage() {
   async function marcarContemplado(lance: Lance) {
     setProcessando(lance.id)
     await fetch('/api/lances/acao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'contemplado', lance_id: lance.id, config_id: lance.lance_config_id }) })
+    setConfirmarContemplado(null)
     await loadData()
     setProcessando(null)
   }
 
-  function CardLance({ lance, piscar }: { lance: Lance; piscar: boolean }) {
+  function CardLance({ lance }: { lance: Lance }) {
     const hojeStr = new Date().toISOString().slice(0, 10)
     const em7diasStr = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
     const estaSemana = !!lance.data_assembleia && !lance.contemplado && lance.data_assembleia >= hojeStr && lance.data_assembleia <= em7diasStr
+    // não ofertado a tempo: pendente com assembleia já passada
+    const naoOfertado = lance.status === 'pendente' && !lance.contemplado && !!lance.data_assembleia && lance.data_assembleia < hojeStr
+    // pisca apenas quando pendente E a assembleia é dentro de 7 dias
+    const piscar = lance.status === 'pendente' && estaSemana
+    const bg = lance.contemplado ? 'rgba(34,197,94,0.08)' : naoOfertado ? 'rgba(239,68,68,0.04)' : estaSemana ? 'rgba(239,68,68,0.06)' : 'rgba(0,0,0,0.12)'
+    const bd = lance.contemplado ? '1px solid rgba(34,197,94,0.4)' : naoOfertado ? '1px solid rgba(239,68,68,0.35)' : estaSemana ? '1px solid rgba(239,68,68,0.4)' : '1px solid var(--border)'
     return (
-      <div className="rounded-xl p-4" style={{ background: lance.contemplado ? 'rgba(34,197,94,0.08)' : (estaSemana ? 'rgba(239,68,68,0.06)' : 'rgba(0,0,0,0.12)'), backdropFilter: 'blur(4px)', border: lance.contemplado ? '1px solid rgba(34,197,94,0.4)' : (estaSemana ? '1px solid rgba(239,68,68,0.4)' : '1px solid var(--border)'), animation: piscar ? 'piscaLance 1.5s ease-in-out infinite' : 'none' }}>
+      <div className="rounded-xl p-4" style={{ background: bg, backdropFilter: 'blur(4px)', border: bd, opacity: naoOfertado ? 0.75 : 1, animation: piscar ? 'piscaLance 1.5s ease-in-out infinite' : 'none' }}>
+        {naoOfertado && (
+          <div className="flex items-center gap-1 mb-2 text-[11px] font-semibold px-2 py-1 rounded" style={{ background: 'rgba(239,68,68,0.12)', color: '#ef4444', width: 'fit-content' }}>
+            {'\u26a0\ufe0f'} Não ofertado a tempo
+          </div>
+        )}
         <div className="flex items-center justify-between mb-2">
           <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{lance.clientes?.nome}</span>
           <div className="flex items-center gap-2">
@@ -274,7 +322,7 @@ export default function LancesPage() {
             {lance.comprovante_baixado && <p className="text-[10px] text-center" style={{ color: '#22c55e' }}>{'\u2713'} comprovante baixado</p>}
             {!lance.contemplado && (
               <label className="flex items-center gap-2 text-xs cursor-pointer rounded-lg py-2 px-3" style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.2)', color: 'var(--text2)' }}>
-                <input type="checkbox" onChange={() => marcarContemplado(lance)} disabled={processando === lance.id} className="accent-green-500" />
+                <input type="checkbox" checked={false} onChange={() => setConfirmarContemplado(lance)} disabled={processando === lance.id} className="accent-green-500" />
                 Marcar como contemplado
               </label>
             )}
@@ -301,7 +349,7 @@ export default function LancesPage() {
 
           {/* resumo */}
           {!loading && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+            <div className={`grid grid-cols-2 gap-3 mb-6 ${mostrarPerdidos ? 'md:grid-cols-5' : 'md:grid-cols-4'}`}>
               <div className="rounded-xl p-4" style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.25)' }}>
                 <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Pendentes</p>
                 <p className="text-2xl font-bold" style={{ color: '#eab308' }}>{pendentes.length}</p>
@@ -318,6 +366,12 @@ export default function LancesPage() {
                 <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Contemplados</p>
                 <p className="text-2xl font-bold" style={{ color: '#22c55e' }}>{totalContemplados}</p>
               </div>
+              {mostrarPerdidos && (
+                <div className="rounded-xl p-4" style={{ background: perdidos > 0 ? 'rgba(239,68,68,0.1)' : 'rgba(0,0,0,0.12)', border: `1px solid ${perdidos > 0 ? 'rgba(239,68,68,0.35)' : 'var(--border)'}` }}>
+                  <p className="text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Perdidos</p>
+                  <p className="text-2xl font-bold" style={{ color: perdidos > 0 ? '#ef4444' : 'var(--text)' }}>{perdidos}</p>
+                </div>
+              )}
             </div>
           )}
 
@@ -365,7 +419,7 @@ export default function LancesPage() {
               </div>
               <div className="relative">
                 <Search size={15} style={{ color: 'var(--muted-color)', position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
-                <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar cliente, grupo, proposta..." className="rounded-lg pl-8 pr-3 py-2 text-sm outline-none w-64" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+                <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar cliente, grupo ou cota..." className="rounded-lg pl-8 pr-3 py-2 text-sm outline-none w-64" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }} />
               </div>
               {filtrosOpc.empresas.length > 0 && (
                 <select value={fEmpresa} onChange={(e) => { setFEmpresa(e.target.value); setFEquipe(''); setFVendedor('') }} className="rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }}>
@@ -392,35 +446,72 @@ export default function LancesPage() {
               {(fGrupo || busca || fEmpresa || fEquipe || fVendedor) && <button onClick={() => { setFGrupo(''); setBusca(''); setFEmpresa(''); setFEquipe(''); setFVendedor('') }} className="rounded-lg px-3 py-1.5 text-xs" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>Limpar</button>}
             </div>
 
+            {/* Switcher de colunas (mobile) */}
+            <div className="flex md:hidden gap-2 mb-4">
+              <button onClick={() => setMobileCol('pendente')} className="flex-1 rounded-full px-3 py-2 text-xs font-semibold transition-colors" style={{ background: mobileCol === 'pendente' ? 'rgba(234,179,8,0.18)' : 'rgba(255,255,255,0.04)', color: mobileCol === 'pendente' ? '#eab308' : 'var(--muted-color)', border: `1px solid ${mobileCol === 'pendente' ? 'rgba(234,179,8,0.5)' : 'var(--border)'}` }}>
+                {'\u{1F7E1}'} Pendentes ({pendentes.length})
+              </button>
+              <button onClick={() => setMobileCol('solicitado')} className="flex-1 rounded-full px-3 py-2 text-xs font-semibold transition-colors" style={{ background: mobileCol === 'solicitado' ? 'rgba(249,115,22,0.18)' : 'rgba(255,255,255,0.04)', color: mobileCol === 'solicitado' ? '#f97316' : 'var(--muted-color)', border: `1px solid ${mobileCol === 'solicitado' ? 'rgba(249,115,22,0.5)' : 'var(--border)'}` }}>
+                {'\u{1F7E0}'} Solicitados ({solicitados.length})
+              </button>
+              <button onClick={() => setMobileCol('ofertado')} className="flex-1 rounded-full px-3 py-2 text-xs font-semibold transition-colors" style={{ background: mobileCol === 'ofertado' ? 'rgba(249,115,22,0.18)' : 'rgba(255,255,255,0.04)', color: mobileCol === 'ofertado' ? '#f97316' : 'var(--muted-color)', border: `1px solid ${mobileCol === 'ofertado' ? 'rgba(249,115,22,0.5)' : 'var(--border)'}` }}>
+                {'\u{1F7E0}'} Ofertados ({ofertados.length})
+              </button>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
               {/* Coluna Pendente */}
-              <div>
+              <div className={`${mobileCol === 'pendente' ? 'block' : 'hidden'} md:block`}>
                 <div className="flex items-center gap-2 mb-3">
                   <span className="h-2.5 w-2.5 rounded-full" style={{ background: '#eab308' }} />
                   <h3 className="text-sm font-semibold" style={{ color: '#eab308' }}>Pendentes ({pendentes.length})</h3>
                 </div>
-                <div className="space-y-3">
-                  {pendentes.length === 0 ? <p className="text-xs py-8 text-center" style={{ color: 'var(--muted-color)' }}>Nenhum lance pendente</p> : pendentes.map(l => <CardLance key={l.id} lance={l} piscar={true} />)}
+                <div className="space-y-5">
+                  {pendentes.length === 0 ? <p className="text-xs py-8 text-center" style={{ color: 'var(--muted-color)' }}>Nenhum lance pendente</p> : agruparPorAssembleia(pendentes).map(g => (
+                    <div key={g.chave} className="space-y-3">
+                      <div className="flex items-center justify-between pb-1" style={{ borderBottom: '1px solid var(--border)' }}>
+                        <span className="text-[11px] font-medium" style={{ color: 'var(--muted-color)' }}>{'\u{1F5D3}\uFE0F'} {labelAssembleia(g.data)}</span>
+                        <span className="text-[11px]" style={{ color: 'var(--muted-color)' }}>({g.lances.length})</span>
+                      </div>
+                      {g.lances.map(l => <CardLance key={l.id} lance={l} />)}
+                    </div>
+                  ))}
                 </div>
               </div>
               {/* Coluna Solicitado */}
-              <div>
+              <div className={`${mobileCol === 'solicitado' ? 'block' : 'hidden'} md:block`}>
                 <div className="flex items-center gap-2 mb-3">
                   <span className="h-2.5 w-2.5 rounded-full" style={{ background: '#f97316' }} />
                   <h3 className="text-sm font-semibold" style={{ color: '#f97316' }}>Solicitados ({solicitados.length})</h3>
                 </div>
-                <div className="space-y-3">
-                  {solicitados.length === 0 ? <p className="text-xs py-8 text-center" style={{ color: 'var(--muted-color)' }}>Nenhum lance solicitado</p> : solicitados.map(l => <CardLance key={l.id} lance={l} piscar={true} />)}
+                <div className="space-y-5">
+                  {solicitados.length === 0 ? <p className="text-xs py-8 text-center" style={{ color: 'var(--muted-color)' }}>Nenhum lance solicitado</p> : agruparPorAssembleia(solicitados).map(g => (
+                    <div key={g.chave} className="space-y-3">
+                      <div className="flex items-center justify-between pb-1" style={{ borderBottom: '1px solid var(--border)' }}>
+                        <span className="text-[11px] font-medium" style={{ color: 'var(--muted-color)' }}>{'\u{1F5D3}\uFE0F'} {labelAssembleia(g.data)}</span>
+                        <span className="text-[11px]" style={{ color: 'var(--muted-color)' }}>({g.lances.length})</span>
+                      </div>
+                      {g.lances.map(l => <CardLance key={l.id} lance={l} />)}
+                    </div>
+                  ))}
                 </div>
               </div>
               {/* Coluna Ofertado */}
-              <div>
+              <div className={`${mobileCol === 'ofertado' ? 'block' : 'hidden'} md:block`}>
                 <div className="flex items-center gap-2 mb-3">
                   <span className="h-2.5 w-2.5 rounded-full" style={{ background: '#f97316' }} />
                   <h3 className="text-sm font-semibold" style={{ color: '#f97316' }}>Ofertados ({ofertados.length})</h3>
                 </div>
-                <div className="space-y-3">
-                  {ofertados.length === 0 ? <p className="text-xs py-8 text-center" style={{ color: 'var(--muted-color)' }}>Nenhum lance ofertado</p> : ofertados.map(l => <CardLance key={l.id} lance={l} piscar={false} />)}
+                <div className="space-y-5">
+                  {ofertados.length === 0 ? <p className="text-xs py-8 text-center" style={{ color: 'var(--muted-color)' }}>Nenhum lance ofertado</p> : agruparPorAssembleia(ofertados).map(g => (
+                    <div key={g.chave} className="space-y-3">
+                      <div className="flex items-center justify-between pb-1" style={{ borderBottom: '1px solid var(--border)' }}>
+                        <span className="text-[11px] font-medium" style={{ color: 'var(--muted-color)' }}>{'\u{1F5D3}\uFE0F'} {labelAssembleia(g.data)}</span>
+                        <span className="text-[11px]" style={{ color: 'var(--muted-color)' }}>({g.lances.length})</span>
+                      </div>
+                      {g.lances.map(l => <CardLance key={l.id} lance={l} />)}
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -430,6 +521,25 @@ export default function LancesPage() {
           )}
         </main>
       </div>
+
+      {/* Modal confirmar contemplação manual */}
+      {confirmarContemplado && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }} onClick={() => setConfirmarContemplado(null)} />
+          <div className="relative w-full max-w-md rounded-xl p-6" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+            <h3 className="text-base font-semibold mb-2 flex items-center gap-2" style={{ color: 'var(--text)' }}><Trophy size={16} style={{ color: '#22c55e' }} />Confirmar contemplação</h3>
+            <p className="text-sm mb-5" style={{ color: 'var(--muted-color)' }}>
+              Confirma que <span style={{ color: 'var(--text)', fontWeight: 600 }}>{confirmarContemplado.clientes?.nome}</span> foi contemplado na assembleia de {fmtData(confirmarContemplado.data_assembleia)}? Isso encerra o lance (o recorrente para de gerar novos meses).
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setConfirmarContemplado(null)} className="rounded-lg px-4 py-2 text-xs font-medium" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>Cancelar</button>
+              <button onClick={() => marcarContemplado(confirmarContemplado)} disabled={processando === confirmarContemplado.id} className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold" style={{ background: '#22c55e', color: '#0a0a0a' }}>
+                {processando === confirmarContemplado.id ? <Loader2 size={13} className="animate-spin" /> : <Trophy size={13} />} Confirmar contemplação
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal definir lance */}
       {definirModal && (
