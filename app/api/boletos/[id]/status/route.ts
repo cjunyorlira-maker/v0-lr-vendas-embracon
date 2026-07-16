@@ -50,18 +50,67 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     const statusAtual = boleto.status
 
-    // Caso especial: pagou via TED (do pendente vai direto pra aguardando_baixa)
+    // Caso especial: CLIENTE VAI PAGAR VIA TED (aguardando comprovante) — não é pagamento ainda
+    if (body.acao === 'aguardar_ted') {
+      if (!['pendente', 'solicitado', 'aguardando_pagamento'].includes(statusAtual)) {
+        return NextResponse.json({ error: "Só pode marcar 'vai pagar por TED' antes da baixa" }, { status: 400 })
+      }
+      if (!['master', 'representante', 'adm'].includes(usuario.role)) {
+        return NextResponse.json({ error: "Seu cargo não pode fazer essa ação" }, { status: 403 })
+      }
+      const { error: tedErr } = await supabaseAdmin.from('boletos').update({
+        status: 'aguardando_ted',
+        data_aguardando_ted: new Date().toISOString(),
+        atualizado_em: new Date().toISOString(),
+      }).eq('id', boleto.id)
+      if (tedErr) return NextResponse.json({ error: tedErr.message }, { status: 500 })
+      try {
+        await supabaseAdmin.from('status_log').insert({
+          empresa_id: boleto.empresa_id, boleto_id: boletoId,
+          status_anterior: statusAtual, status_novo: 'aguardando_ted',
+          alterado_por: usuario.id, observacao: 'Cliente vai pagar por TED (aguardando comprovante)',
+        })
+      } catch {}
+      return NextResponse.json({ success: true, novo_status: 'aguardando_ted' })
+    }
+
+    // Caso especial: cliente desistiu do TED e vai pagar por boleto → volta pra solicitado (fila de anexo)
+    if (body.acao === 'voltar_para_boleto') {
+      if (statusAtual !== 'aguardando_ted') {
+        return NextResponse.json({ error: "Só disponível em 'Aguardando TED'" }, { status: 400 })
+      }
+      if (!['master', 'representante', 'adm'].includes(usuario.role)) {
+        return NextResponse.json({ error: "Seu cargo não pode fazer essa ação" }, { status: 403 })
+      }
+      const { error: vbErr } = await supabaseAdmin.from('boletos').update({
+        status: 'solicitado',
+        atualizado_em: new Date().toISOString(),
+      }).eq('id', boleto.id)
+      if (vbErr) return NextResponse.json({ error: vbErr.message }, { status: 500 })
+      try {
+        await supabaseAdmin.from('status_log').insert({
+          empresa_id: boleto.empresa_id, boleto_id: boletoId,
+          status_anterior: statusAtual, status_novo: 'solicitado',
+          alterado_por: usuario.id, observacao: 'Cliente mudou de TED para boleto',
+        })
+      } catch {}
+      return NextResponse.json({ success: true, novo_status: 'solicitado' })
+    }
+
+    // Caso especial: pagou via TED (vai direto pra aguardando_baixa)
     if (body.acao === 'pagou_ted') {
-      if (statusAtual !== 'pendente' && statusAtual !== 'solicitado' && statusAtual !== 'aguardando_pagamento') {
+      if (!['pendente', 'solicitado', 'aguardando_pagamento', 'aguardando_ted'].includes(statusAtual)) {
         return NextResponse.json({ error: "Só pode marcar TED antes da baixa" }, { status: 400 })
       }
-      await supabaseAdmin.from('boletos').update({
+      const updTed: any = {
         status: 'aguardando_baixa',
         pago_via_ted: true,
         data_ted: new Date().toISOString().slice(0, 10),
         data_pagamento: new Date().toISOString(),
         atualizado_em: new Date().toISOString(),
-      }).eq('id', boleto.id)
+      }
+      if (boleto_pdf_url) { updTed.boleto_pdf_url = boleto_pdf_url; updTed.boleto_pdf_nome = boleto_pdf_nome }
+      await supabaseAdmin.from('boletos').update(updTed).eq('id', boleto.id)
       try {
         await supabaseAdmin.from('status_log').insert({
           empresa_id: boleto.empresa_id, boleto_id: boletoId,
@@ -84,6 +133,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       const ANTERIOR: Record<string, string> = {
         solicitado: 'pendente',
         aguardando_pagamento: 'solicitado',
+        aguardando_ted: 'pendente',
         aguardando_baixa: 'aguardando_pagamento',
         efetivado: 'aguardando_baixa',
       }

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { FileText, Copy, Check, ArrowRight, Loader2, Clock, Send, DollarSign, Upload, CheckCircle2, Paperclip } from 'lucide-react'
+import { FileText, Copy, Check, ArrowRight, Loader2, Clock, Send, DollarSign, Upload, CheckCircle2, Paperclip, Landmark, Download } from 'lucide-react'
 
 interface Boleto {
   id: string
@@ -12,6 +12,17 @@ interface Boleto {
   valor_boleto: number
   status: string
   boleto_pdf_url: string | null
+  data_solicitacao?: string | null
+  data_anexo_boleto?: string | null
+  data_pagamento?: string | null
+  criado_em?: string | null
+  pago_via_ted?: boolean | null
+  data_aguardando_ted?: string | null
+  extrato_url?: string | null
+  extrato_nome?: string | null
+  extrato_baixado?: boolean | null
+  extrato_baixado_por?: string | null
+  extrato_baixado_em?: string | null
   clientes?: { nome: string }
   vendas?: { numero_proposta: string; numero_contrato: string; grupo: string; cota: string; valor_credito: number; observacoes?: string | null }
   empresas?: { nome: string }
@@ -23,6 +34,7 @@ const STATUS = [
   { key: 'pendente', label: 'Pendentes', cor: '#eab308', icon: Clock, proxLabel: 'Solicitar' },
   { key: 'solicitado', label: 'Solicitados', cor: '#f97316', icon: Send, proxLabel: 'Anexar boleto' },
   { key: 'aguardando_pagamento', label: 'Aguardando pagamento', cor: '#3b82f6', icon: DollarSign, proxLabel: 'Pagou' },
+  { key: 'aguardando_ted', label: 'Aguardando TED', cor: '#06b6d4', icon: Landmark, proxLabel: 'Comprovante chegou' },
   { key: 'aguardando_baixa', label: 'Aguardando baixa', cor: '#a855f7', icon: Upload, proxLabel: 'Efetivar' },
   { key: 'efetivado', label: 'Efetivados', cor: '#22c55e', icon: CheckCircle2, proxLabel: null },
 ]
@@ -44,10 +56,13 @@ export default function BoletosPage() {
   const [dataAte, setDataAte] = useState('')
   const [processando, setProcessando] = useState<string | null>(null)
   const [msgModal, setMsgModal] = useState<{ texto: string; boletoId: string } | null>(null)
-  const [anexoModal, setAnexoModal] = useState<{ boleto: Boleto } | null>(null)
+  const [anexoModal, setAnexoModal] = useState<{ boleto: Boleto; modoTed?: boolean } | null>(null)
   const [copiado, setCopiado] = useState(false)
   const [pdfAnexo, setPdfAnexo] = useState<{ base64: string; nome: string } | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const [extratoModal, setExtratoModal] = useState<{ boleto: Boleto } | null>(null)
+  const [extratoPdf, setExtratoPdf] = useState<{ base64: string; nome: string } | null>(null)
+  const extratoRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { loadData() }, [])
 
@@ -153,6 +168,87 @@ O boleto está em anexo.`
     reader.readAsDataURL(file)
   }
 
+  // "Vai pagar por TED": marca aguardando_ted (aguardando comprovante)
+  async function vaiPagarTed(boletoId: string) {
+    if (!confirm('Marcar que o cliente vai pagar por TED? O boleto vai para a fila "Aguardando TED".')) return
+    setProcessando(boletoId)
+    try {
+      const res = await fetch(`/api/boletos/${boletoId}/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'aguardar_ted' }) })
+      const data = await res.json()
+      if (!res.ok) { alert(data.error || 'Erro'); setProcessando(null); return }
+      await loadData()
+    } catch { alert('Erro de conexão') }
+    setProcessando(null)
+  }
+
+  // "Comprovante chegou": anexa o comprovante do TED e vai para aguardando_baixa
+  async function anexarComprovanteTed(b: Boleto) {
+    setProcessando(b.id)
+    try {
+      const extra: any = { acao: 'pagou_ted' }
+      if (pdfAnexo) {
+        const supabase = createClient()
+        const matches = pdfAnexo.base64.match(/^data:(.+);base64,(.+)$/)
+        if (!matches) { alert('PDF inválido'); setProcessando(null); return }
+        const buffer = Uint8Array.from(atob(matches[2]), c => c.charCodeAt(0))
+        const fileName = `${b.id}-ted-${Date.now()}-${pdfAnexo.nome.replace(/[^a-zA-Z0-9.\-]/g, '_')}`
+        const { error: upErr } = await supabase.storage.from('boletos-pdf').upload(fileName, buffer, { contentType: 'application/pdf' })
+        if (upErr) { alert('Erro ao subir comprovante: ' + upErr.message); setProcessando(null); return }
+        extra.boleto_pdf_url = fileName; extra.boleto_pdf_nome = pdfAnexo.nome
+      }
+      const res = await fetch(`/api/boletos/${b.id}/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(extra) })
+      const data = await res.json()
+      if (!res.ok) { alert(data.error || 'Erro'); setProcessando(null); return }
+      setAnexoModal(null); setPdfAnexo(null)
+      await loadData()
+    } catch { alert('Erro ao anexar comprovante') }
+    setProcessando(null)
+  }
+
+  // "Mudou pra boleto": volta para solicitado e já abre o template de solicitação
+  async function mudouPraBoleto(b: Boleto) {
+    if (!confirm('O cliente mudou de ideia e vai pagar por boleto? O item volta para a fila de anexar o boleto.')) return
+    setProcessando(b.id)
+    try {
+      const res = await fetch(`/api/boletos/${b.id}/status`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'voltar_para_boleto' }) })
+      const data = await res.json()
+      if (!res.ok) { alert(data.error || 'Erro'); setProcessando(null); return }
+      await loadData()
+      setMsgModal({ texto: gerarMsgSolicitacao(b), boletoId: b.id })
+    } catch { alert('Erro de conexão') }
+    setProcessando(null)
+  }
+
+  function handleExtratoFile(file: File) {
+    if (file.type !== 'application/pdf') { alert('O arquivo deve ser PDF'); return }
+    const reader = new FileReader()
+    reader.onload = (e) => setExtratoPdf({ base64: e.target?.result as string, nome: file.name })
+    reader.readAsDataURL(file)
+  }
+
+  async function anexarExtrato(b: Boleto) {
+    if (!extratoPdf) { alert('Anexe o PDF do extrato'); return }
+    setProcessando(b.id)
+    try {
+      const res = await fetch(`/api/boletos/${b.id}/extrato`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ base64: extratoPdf.base64, nome: extratoPdf.nome }) })
+      const data = await res.json()
+      if (!res.ok) { alert(data.error || 'Erro ao anexar extrato'); setProcessando(null); return }
+      setExtratoModal(null); setExtratoPdf(null)
+      await loadData()
+    } catch { alert('Erro ao anexar extrato') }
+    setProcessando(null)
+  }
+
+  async function baixarExtrato(b: Boleto) {
+    try {
+      const res = await fetch(`/api/boletos/${b.id}/extrato`)
+      const data = await res.json()
+      if (!res.ok || !data.url) { alert(data.error || 'Erro ao baixar extrato'); return }
+      window.open(data.url, '_blank')
+      await loadData()
+    } catch { alert('Erro ao baixar extrato') }
+  }
+
   async function copiar(texto: string) {
     try { await navigator.clipboard.writeText(texto) } catch {
       const ta = document.createElement('textarea'); ta.value = texto; ta.style.position = 'fixed'; ta.style.opacity = '0'
@@ -163,17 +259,17 @@ O boleto está em anexo.`
 
   const podeOperar = ['master', 'representante', 'adm'].includes(role)
   const podePagar = ['master', 'representante', 'adm', 'supervisor', 'vendedor'].includes(role)
-  function diasDesde(dataStr: string | null): number | null {
+  function diasDesde(dataStr: string | null | undefined): number | null {
     if (!dataStr) return null
     const d = new Date(dataStr); const hoje = new Date()
     return Math.floor((hoje.getTime() - d.getTime()) / (1000 * 60 * 60 * 24))
   }
-  function horasDesde(dataStr: string | null): number | null {
+  function horasDesde(dataStr: string | null | undefined): number | null {
     if (!dataStr) return null
     const d = new Date(dataStr); const hoje = new Date()
     return Math.floor((hoje.getTime() - d.getTime()) / (1000 * 60 * 60))
   }
-  function tempoDecorrido(dataStr: string | null): string {
+  function tempoDecorrido(dataStr: string | null | undefined): string {
     const h = horasDesde(dataStr)
     if (h === null) return ''
     if (h < 1) return 'há menos de 1h'
@@ -299,7 +395,12 @@ O boleto está em anexo.`
                       {b.status === 'solicitado' && <span style={{ color: (horasDesde(b.data_solicitacao) || 0) >= 72 ? '#ef4444' : '#f97316' }}>solicitado {tempoDecorrido(b.data_solicitacao)}</span>}
                       {b.status === 'aguardando_pagamento' && <span style={{ color: (horasDesde((b as any).data_anexo_boleto) || 0) >= 72 ? '#ef4444' : '#3b82f6' }}>aguardando pagamento {tempoDecorrido((b as any).data_anexo_boleto)}</span>}
                       {b.status === 'aguardando_baixa' && <span style={{ color: (horasDesde(b.data_pagamento) || 0) >= 24 ? '#ef4444' : '#a855f7' }}>aguardando baixa {tempoDecorrido(b.data_pagamento)}{(horasDesde(b.data_pagamento) || 0) >= 24 ? ' — verificar' : ''}</span>}
+                      {b.status === 'aguardando_ted' && <span style={{ color: (horasDesde(b.data_aguardando_ted || null) || 0) >= 48 ? '#ef4444' : '#06b6d4' }}>aguardando TED {tempoDecorrido(b.data_aguardando_ted || null)}</span>}
                       {b.pago_via_ted && <span style={{ color: '#a855f7' }}>via TED</span>}
+                      {b.status === 'efetivado' && b.extrato_url && (b.extrato_baixado
+                        ? <span className="flex items-center gap-1" style={{ color: '#22c55e' }}><Check size={11} />extrato baixado{b.extrato_baixado_em ? ` em ${new Date(b.extrato_baixado_em).toLocaleDateString('pt-BR')}` : ''}</span>
+                        : <span className="flex items-center gap-1" style={{ color: '#eab308' }}><Clock size={11} />aguardando representação baixar</span>
+                      )}
                     </div>
                     <div className="flex gap-3 mt-1.5 text-[11px] flex-wrap" style={{ color: 'var(--muted-color)' }}>
                       {b.usuarios?.nome && <span>👤 {b.usuarios.nome}</span>}
@@ -307,14 +408,37 @@ O boleto está em anexo.`
                       {b.empresas?.nome && <span style={{ color: 'var(--accent)' }}>🏢 {b.empresas.nome}</span>}
                     </div>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 flex-wrap justify-end">
                     {['pendente', 'solicitado', 'aguardando_pagamento'].includes(b.status) && podeOperar && (
-                      <button onClick={() => pagouViaTed(b.id)} className="rounded-lg px-3 py-2 text-xs font-medium" style={{ background: 'rgba(168,85,247,0.15)', color: '#a855f7', border: '1px solid rgba(168,85,247,0.3)' }}>Pagou via TED</button>
+                      <>
+                        <button onClick={() => vaiPagarTed(b.id)} disabled={processando === b.id} className="rounded-lg px-3 py-2 text-xs font-medium disabled:opacity-50" style={{ background: 'rgba(6,182,212,0.12)', color: '#06b6d4', border: '1px solid rgba(6,182,212,0.4)' }}>Vai pagar por TED</button>
+                        <button onClick={() => pagouViaTed(b.id)} className="rounded-lg px-3 py-2 text-xs font-medium" style={{ background: 'rgba(168,85,247,0.15)', color: '#a855f7', border: '1px solid rgba(168,85,247,0.3)' }}>Pagou via TED</button>
+                      </>
+                    )}
+                    {/* Ações da fila Aguardando TED */}
+                    {b.status === 'aguardando_ted' && podeOperar && (
+                      <>
+                        <button onClick={() => { setAnexoModal({ boleto: b, modoTed: true }); setPdfAnexo(null) }} disabled={processando === b.id} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50 transition-transform hover:scale-105 active:scale-95" style={{ background: 'rgba(6,182,212,0.2)', color: '#06b6d4', border: '1px solid #06b6d4' }}>
+                          {processando === b.id ? <Loader2 size={12} className="animate-spin" /> : <>Comprovante chegou<ArrowRight size={12} /></>}
+                        </button>
+                        <button onClick={() => mudouPraBoleto(b)} disabled={processando === b.id} className="rounded-lg px-3 py-2 text-xs font-medium disabled:opacity-50" style={{ background: 'rgba(234,179,8,0.1)', color: '#eab308', border: '1px solid rgba(234,179,8,0.4)' }}>Mudou pra boleto</button>
+                      </>
+                    )}
+                    {/* Extrato da cota nos efetivados */}
+                    {b.status === 'efetivado' && (
+                      <>
+                        {['master', 'adm'].includes(role) && !b.extrato_url && (
+                          <button onClick={() => { setExtratoModal({ boleto: b }); setExtratoPdf(null) }} disabled={processando === b.id} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium disabled:opacity-50" style={{ background: 'rgba(59,130,246,0.12)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.4)' }}><Paperclip size={12} />Anexar extrato da cota</button>
+                        )}
+                        {b.extrato_url && (
+                          <button onClick={() => baixarExtrato(b)} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: 'rgba(34,197,94,0.12)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.4)' }}><Download size={12} />Baixar extrato</button>
+                        )}
+                      </>
                     )}
                     {['master','representante','adm'].includes(role) && b.status !== 'pendente' && (
                       <button onClick={() => voltarStatus(b)} disabled={processando === b.id} title="Voltar etapa (correção)" className="flex items-center gap-1 rounded-lg px-2.5 py-2 text-xs font-medium disabled:opacity-50" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>{'\u21A9 Voltar'}</button>
                     )}
-                    {statusAtual?.proxLabel && podeAvancar(b.status) && (
+                    {statusAtual?.proxLabel && b.status !== 'aguardando_ted' && podeAvancar(b.status) && (
                       <button onClick={() => avancarStatus(b)} disabled={processando === b.id} className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold disabled:opacity-50 transition-transform hover:scale-105 active:scale-95" style={{ background: `${statusAtual.cor}20`, color: statusAtual.cor, border: `1px solid ${statusAtual.cor}` }}>
                         {processando === b.id ? <Loader2 size={12} className="animate-spin" /> : <>{statusAtual.proxLabel}<ArrowRight size={12} /></>}
                       </button>
@@ -344,22 +468,50 @@ O boleto está em anexo.`
         </div>
       )}
 
-      {/* Modal anexar boleto */}
+      {/* Modal anexar boleto / comprovante TED */}
       {anexoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }} onClick={() => { setAnexoModal(null); setPdfAnexo(null) }} />
           <div className="relative w-full max-w-md rounded-xl p-6" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-            <h3 className="text-base font-semibold mb-1" style={{ color: 'var(--text)' }}>Anexar boleto</h3>
-            <p className="text-xs mb-4" style={{ color: 'var(--muted-color)' }}>Anexe o PDF do boleto que a Embracon mandou. Ao confirmar, vai pra "Aguardando pagamento".</p>
+            <h3 className="text-base font-semibold mb-1" style={{ color: 'var(--text)' }}>{anexoModal.modoTed ? 'Comprovante do TED' : 'Anexar boleto'}</h3>
+            <p className="text-xs mb-4" style={{ color: 'var(--muted-color)' }}>{anexoModal.modoTed ? 'Anexe o comprovante do TED enviado pelo cliente. Ao confirmar, vai pra "Aguardando baixa".' : 'Anexe o PDF do boleto que a Embracon mandou. Ao confirmar, vai pra "Aguardando pagamento".'}</p>
             <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handlePdfFile(f) }} />
             <div onClick={() => fileRef.current?.click()} className="flex flex-col items-center justify-center gap-2 py-6 rounded-lg cursor-pointer mb-4" style={{ border: '2px dashed var(--border)', background: 'rgba(22,23,28,0.9)' }}>
-              {pdfAnexo ? (<><Paperclip size={20} style={{ color: '#22c55e' }} /><span className="text-xs" style={{ color: '#22c55e' }}>{pdfAnexo.nome}</span><span className="text-[10px]" style={{ color: 'var(--muted-color)' }}>clique para trocar</span></>) : (<><Upload size={20} style={{ color: 'var(--accent)' }} /><span className="text-xs" style={{ color: 'var(--muted-color)' }}>Clique para selecionar o PDF do boleto</span></>)}
+              {pdfAnexo ? (<><Paperclip size={20} style={{ color: '#22c55e' }} /><span className="text-xs" style={{ color: '#22c55e' }}>{pdfAnexo.nome}</span><span className="text-[10px]" style={{ color: 'var(--muted-color)' }}>clique para trocar</span></>) : (<><Upload size={20} style={{ color: 'var(--accent)' }} /><span className="text-xs" style={{ color: 'var(--muted-color)' }}>{anexoModal.modoTed ? 'Clique para selecionar o comprovante (PDF)' : 'Clique para selecionar o PDF do boleto'}</span></>)}
             </div>
-            <div className="rounded-lg p-3 mb-4 text-xs" style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', color: '#3b82f6' }}>Em breve: envio automático via WhatsApp (Evolution). Por enquanto, anexe e mande manual.</div>
+            {anexoModal.modoTed ? (
+              <div className="flex flex-col gap-2">
+                <button onClick={() => anexarComprovanteTed(anexoModal.boleto)} disabled={processando === anexoModal.boleto.id} className="w-full flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50" style={{ background: 'rgba(6,182,212,0.9)', color: '#04222b' }}>{processando === anexoModal.boleto.id ? <Loader2 size={14} className="animate-spin" /> : 'Confirmar comprovante'}</button>
+                <button onClick={() => { setAnexoModal(null); setPdfAnexo(null) }} className="w-full rounded-lg py-2 text-xs" style={{ color: 'var(--muted-color)' }}>Cancelar</button>
+              </div>
+            ) : (
+              <>
+                <div className="rounded-lg p-3 mb-4 text-xs" style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)', color: '#3b82f6' }}>Em breve: envio automático via WhatsApp (Evolution). Por enquanto, anexe e mande manual.</div>
+                <div className="flex flex-col gap-2">
+                  <button onClick={() => anexarEAvancar(anexoModal.boleto)} disabled={processando === anexoModal.boleto.id || !pdfAnexo} className="w-full flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #d4af37 0%, #c9a227 50%, #b8941f 100%)', color: '#0a0a0a' }}>{processando === anexoModal.boleto.id ? <Loader2 size={14} className="animate-spin" /> : 'Anexar e avançar'}</button>
+                  <button onClick={() => confirmarAvanco(anexoModal.boleto.id, {})} disabled={processando === anexoModal.boleto.id} className="w-full rounded-lg py-2.5 text-sm font-medium disabled:opacity-50" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text2)' }}>Avançar sem anexar</button>
+                  <button onClick={() => { setAnexoModal(null); setPdfAnexo(null) }} className="w-full rounded-lg py-2 text-xs" style={{ color: 'var(--muted-color)' }}>Cancelar</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Modal anexar extrato da cota */}
+      {extratoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }} onClick={() => { setExtratoModal(null); setExtratoPdf(null) }} />
+          <div className="relative w-full max-w-md rounded-xl p-6" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+            <h3 className="text-base font-semibold mb-1" style={{ color: 'var(--text)' }}>Anexar extrato da cota</h3>
+            <p className="text-xs mb-4" style={{ color: 'var(--muted-color)' }}>Anexe o PDF do extrato da cota de {extratoModal.boleto.clientes?.nome}. A representação será notificada para baixar.</p>
+            <input ref={extratoRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleExtratoFile(f) }} />
+            <div onClick={() => extratoRef.current?.click()} className="flex flex-col items-center justify-center gap-2 py-6 rounded-lg cursor-pointer mb-4" style={{ border: '2px dashed var(--border)', background: 'rgba(22,23,28,0.9)' }}>
+              {extratoPdf ? (<><Paperclip size={20} style={{ color: '#22c55e' }} /><span className="text-xs" style={{ color: '#22c55e' }}>{extratoPdf.nome}</span><span className="text-[10px]" style={{ color: 'var(--muted-color)' }}>clique para trocar</span></>) : (<><Upload size={20} style={{ color: '#3b82f6' }} /><span className="text-xs" style={{ color: 'var(--muted-color)' }}>Clique para selecionar o PDF do extrato</span></>)}
+            </div>
             <div className="flex flex-col gap-2">
-              <button onClick={() => anexarEAvancar(anexoModal.boleto)} disabled={processando === anexoModal.boleto.id || !pdfAnexo} className="w-full flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #d4af37 0%, #c9a227 50%, #b8941f 100%)', color: '#0a0a0a' }}>{processando === anexoModal.boleto.id ? <Loader2 size={14} className="animate-spin" /> : 'Anexar e avançar'}</button>
-              <button onClick={() => confirmarAvanco(anexoModal.boleto.id, {})} disabled={processando === anexoModal.boleto.id} className="w-full rounded-lg py-2.5 text-sm font-medium disabled:opacity-50" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text2)' }}>Avançar sem anexar</button>
-              <button onClick={() => { setAnexoModal(null); setPdfAnexo(null) }} className="w-full rounded-lg py-2 text-xs" style={{ color: 'var(--muted-color)' }}>Cancelar</button>
+              <button onClick={() => anexarExtrato(extratoModal.boleto)} disabled={processando === extratoModal.boleto.id || !extratoPdf} className="w-full flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50" style={{ background: 'rgba(59,130,246,0.9)', color: '#02132b' }}>{processando === extratoModal.boleto.id ? <Loader2 size={14} className="animate-spin" /> : 'Anexar extrato'}</button>
+              <button onClick={() => { setExtratoModal(null); setExtratoPdf(null) }} className="w-full rounded-lg py-2 text-xs" style={{ color: 'var(--muted-color)' }}>Cancelar</button>
             </div>
           </div>
         </div>
