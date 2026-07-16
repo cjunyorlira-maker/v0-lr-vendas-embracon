@@ -63,7 +63,7 @@ export async function GET() {
       const PAGE = 1000
       while (true) {
         const { data: pg } = await supabaseAdmin.from('mapa_linhas')
-          .select('contrato, valor_comissao, calc_comis, mapa_id')
+          .select('contrato, valor_comissao, calc_comis, mapa_id, parcela_de, parcela_ate')
           .gte('valor_comissao', 0)
           .order('id', { ascending: true })
           .range(from, from + PAGE - 1)
@@ -82,17 +82,27 @@ export async function GET() {
       qtdEfetivadoPorVenda.set(b.venda_id, Math.max(atual, b.qtd_parcelas || 0))
     }
 
-    // 5. Monta por contrato NOSSO: crédito e lista de parcelas vindas (cada linha = 1 parcela)
-    const contratos = new Map<string, { contrato: string; venda: any; maxCalc: number; parcelas: { data: string | null }[] }>()
+    // 5. Monta por contrato NOSSO: crédito e parcelas vindas.
+    //    Cada linha do borderô pode representar um INTERVALO (ex.: "5-8" = parcelas 5,6,7,8).
+    //    Expandimos o intervalo, deduplicamos por número da parcela (Set por contrato,
+    //    mantendo a data do PRIMEIRO borderô em que veio) e limitamos a 8 parcelas.
+    const contratos = new Map<string, { contrato: string; venda: any; maxCalc: number; parcelasMap: Map<number, string | null> }>()
     for (const l of linhasAll as any[]) {
       const c = String(l.contrato || '').trim()
       if (!c) continue
       const venda = contratoToVenda.get(c)
       if (!venda) continue // contrato sem venda no sistema (antigo/pré-parceria) → não é devido
-      if (!contratos.has(c)) contratos.set(c, { contrato: c, venda, maxCalc: 0, parcelas: [] })
+      if (!contratos.has(c)) contratos.set(c, { contrato: c, venda, maxCalc: 0, parcelasMap: new Map() })
       const item = contratos.get(c)!
       item.maxCalc = Math.max(item.maxCalc, l.calc_comis || 0)
-      item.parcelas.push({ data: mapaData.get(l.mapa_id) || null })
+      // ignora linhas cujo início já passa de 8 (são ajustes, não parcelas do acordo)
+      if ((l.parcela_de || 1) > 8) continue
+      const de = Math.max(1, Math.min(8, l.parcela_de || 1))
+      const ate = Math.max(de, Math.min(8, l.parcela_ate || de))
+      const data = mapaData.get(l.mapa_id) || null
+      for (let n = de; n <= ate; n++) {
+        if (!item.parcelasMap.has(n)) item.parcelasMap.set(n, data) // 1ª vez vence: mantém a data do primeiro borderô
+      }
     }
 
     // 6. Expande em parcelas com valor_devido = credito * 0,25% / 8; crédito = venda (real) ou maior calc_comis
@@ -103,7 +113,7 @@ export async function GET() {
       const credito = item.venda.credito_venda > 0 ? item.venda.credito_venda : item.maxCalc
       const valorParcela = (credito * 0.0025) / 8
       infoContrato.set(c, { credito, valorParcela, venda: item.venda })
-      for (const p of item.parcelas) parcelasFlat.push({ contrato: c, venda_id: item.venda.venda_id, valor: valorParcela, data: p.data })
+      for (const [, data] of item.parcelasMap) parcelasFlat.push({ contrato: c, venda_id: item.venda.venda_id, valor: valorParcela, data })
     }
 
     // 7. Recebimentos lançados → total e alocação FIFO por data do borderô
