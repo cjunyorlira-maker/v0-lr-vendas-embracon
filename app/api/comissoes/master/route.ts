@@ -63,7 +63,7 @@ export async function GET() {
       const PAGE = 1000
       while (true) {
         const { data: pg } = await supabaseAdmin.from('mapa_linhas')
-          .select('contrato, valor_comissao, calc_comis, mapa_id')
+          .select('contrato, valor_comissao, calc_comis, mapa_id, parcela_de, parcela_ate')
           .gte('valor_comissao', 0)
           .order('id', { ascending: true })
           .range(from, from + PAGE - 1)
@@ -82,28 +82,39 @@ export async function GET() {
       qtdEfetivadoPorVenda.set(b.venda_id, Math.max(atual, b.qtd_parcelas || 0))
     }
 
-    // 5. Monta por contrato NOSSO: crédito e lista de parcelas vindas (cada linha = 1 parcela)
-    const contratos = new Map<string, { contrato: string; venda: any; maxCalc: number; parcelas: { data: string | null }[] }>()
+    // 5. Monta por contrato NOSSO: crédito e parcelas vindas.
+    //    Cada linha do borderô pode representar um INTERVALO (ex.: "5-8" = parcelas 5,6,7,8).
+    //    Expandimos o intervalo, deduplicamos por número da parcela (Set por contrato,
+    //    mantendo a data do PRIMEIRO borderô em que veio) e limitamos a 8 parcelas.
+    const contratos = new Map<string, { contrato: string; venda: any; maxCalc: number; parcelasMap: Map<number, string | null> }>()
     for (const l of linhasAll as any[]) {
       const c = String(l.contrato || '').trim()
       if (!c) continue
       const venda = contratoToVenda.get(c)
       if (!venda) continue // contrato sem venda no sistema (antigo/pré-parceria) → não é devido
-      if (!contratos.has(c)) contratos.set(c, { contrato: c, venda, maxCalc: 0, parcelas: [] })
-      const item = contratos.get(c)!
+      const key = venda.venda_id // chaveia por venda (contrato e proposta podem apontar pra mesma venda)
+      if (!contratos.has(key)) contratos.set(key, { contrato: c, venda, maxCalc: 0, parcelasMap: new Map() })
+      const item = contratos.get(key)!
       item.maxCalc = Math.max(item.maxCalc, l.calc_comis || 0)
-      item.parcelas.push({ data: mapaData.get(l.mapa_id) || null })
+      // ignora linhas cujo início já passa de 8 (são ajustes, não parcelas do acordo)
+      if ((l.parcela_de || 1) > 8) continue
+      const de = Math.max(1, Math.min(8, l.parcela_de || 1))
+      const ate = Math.max(de, Math.min(8, l.parcela_ate || de))
+      const data = mapaData.get(l.mapa_id) || null
+      for (let n = de; n <= ate; n++) {
+        if (!item.parcelasMap.has(n)) item.parcelasMap.set(n, data) // 1ª vez vence: mantém a data do primeiro borderô
+      }
     }
 
     // 6. Expande em parcelas com valor_devido = credito * 0,25% / 8; crédito = venda (real) ou maior calc_comis
     type Parcela = { contrato: string; venda_id: string; valor: number; data: string | null; status?: 'recebida' | 'pendente' }
     const parcelasFlat: Parcela[] = []
-    const infoContrato = new Map<string, { credito: number; valorParcela: number; venda: any }>()
-    for (const [c, item] of contratos) {
+    const infoVenda = new Map<string, { contrato: string; credito: number; valorParcela: number; venda: any }>()
+    for (const [vid, item] of contratos) {
       const credito = item.venda.credito_venda > 0 ? item.venda.credito_venda : item.maxCalc
       const valorParcela = (credito * 0.0025) / 8
-      infoContrato.set(c, { credito, valorParcela, venda: item.venda })
-      for (const p of item.parcelas) parcelasFlat.push({ contrato: c, venda_id: item.venda.venda_id, valor: valorParcela, data: p.data })
+      infoVenda.set(vid, { contrato: item.contrato, credito, valorParcela, venda: item.venda })
+      for (const [, data] of item.parcelasMap) parcelasFlat.push({ contrato: item.contrato, venda_id: vid, valor: valorParcela, data })
     }
 
     // 7. Recebimentos lançados → total e alocação FIFO por data do borderô
@@ -122,39 +133,43 @@ export async function GET() {
       else { p.status = 'pendente'; esgotou = true }
     }
 
-    // 8. Agrega por contrato/venda
-    const porContrato = new Map<string, any>()
+    // 8. Agrega o que veio no borderô por venda_id (parcelas vindas / recebidas / pendentes via FIFO)
+    const porVenda = new Map<string, any>()
     for (const p of parcelasOrdenadas) {
-      if (!porContrato.has(p.contrato)) {
-        const info = infoContrato.get(p.contrato)!
-        porContrato.set(p.contrato, {
-          contrato: p.contrato, venda_id: p.venda_id, cliente: info.venda.cliente, empresa: info.venda.empresa,
-          empresa_id: info.venda.empresa_id, credito: info.credito, valor_parcela: info.valorParcela,
-          parcelas_vindas: 0, parcelas_recebidas: 0, parcelas_pendentes: 0,
-        })
-      }
-      const agg = porContrato.get(p.contrato)
+      if (!porVenda.has(p.venda_id)) porVenda.set(p.venda_id, { parcelas_vindas: 0, parcelas_recebidas: 0, parcelas_pendentes: 0 })
+      const agg = porVenda.get(p.venda_id)
       agg.parcelas_vindas += 1
       if (p.status === 'recebida') agg.parcelas_recebidas += 1
       else agg.parcelas_pendentes += 1
     }
 
-    const vendasOut = Array.from(porContrato.values()).map((agg: any) => {
-      const qtdEf = qtdEfetivadoPorVenda.get(agg.venda_id) || 0
-      const parcelasGarantidas = Math.min(8, 1 + qtdEf) // 1ª parcela + boleto único, cap em 8
-      const valorAVencer = Math.max(0, parcelasGarantidas - agg.parcelas_vindas) * agg.valor_parcela
-      return {
-        contrato: agg.contrato, cliente: agg.cliente, empresa: agg.empresa, empresa_id: agg.empresa_id,
-        credito: agg.credito,
-        parcelas_vindas: agg.parcelas_vindas,
-        valor_devido_venda: agg.parcelas_vindas * agg.valor_parcela,
-        parcelas_recebidas: agg.parcelas_recebidas,
-        parcelas_pendentes: agg.parcelas_pendentes,
-        valor_pendente: agg.parcelas_pendentes * agg.valor_parcela,
-        parcelas_garantidas: parcelasGarantidas,
-        valor_a_vencer: valorAVencer,
-      }
-    })
+    // 9. Base = TODAS as vendas com contrato ou proposta (mesmo sem boleto/borderô: garantem a 1ª parcela)
+    const vendasOut = (vendas || [])
+      .filter((v: any) => String(v.numero_contrato || '').trim() || String(v.numero_proposta || '').trim())
+      .map((v: any) => {
+        const cliente = Array.isArray(v.clientes) ? v.clientes[0] : v.clientes
+        const empresa = Array.isArray(v.empresas) ? v.empresas[0] : v.empresas
+        const info = infoVenda.get(v.id)           // dados do borderô (se veio)
+        const agg = porVenda.get(v.id) || { parcelas_vindas: 0, parcelas_recebidas: 0, parcelas_pendentes: 0 }
+        // crédito: da própria venda; cai pro maior calc_comis do borderô só se a venda não tiver crédito
+        const credito = (v.valor_credito || 0) > 0 ? (v.valor_credito || 0) : (info?.credito || 0)
+        const valorParcela = (credito * 0.0025) / 8
+        const qtdEf = qtdEfetivadoPorVenda.get(v.id) || 0
+        const parcelasGarantidas = Math.min(8, 1 + qtdEf) // 1ª parcela sempre + parcelas do boleto único efetivado, cap 8
+        const valorAVencer = Math.max(0, parcelasGarantidas - agg.parcelas_vindas) * valorParcela
+        return {
+          contrato: info?.contrato || String(v.numero_contrato || v.numero_proposta || '').trim(),
+          cliente: cliente?.nome || '-', empresa: empresa?.nome || '-', empresa_id: v.empresa_id,
+          credito,
+          parcelas_vindas: agg.parcelas_vindas,
+          valor_devido_venda: agg.parcelas_vindas * valorParcela,
+          parcelas_recebidas: agg.parcelas_recebidas,
+          parcelas_pendentes: agg.parcelas_pendentes,
+          valor_pendente: agg.parcelas_pendentes * valorParcela,
+          parcelas_garantidas: parcelasGarantidas,
+          valor_a_vencer: valorAVencer,
+        }
+      })
 
     const devido_total = vendasOut.reduce((s, v) => s + v.valor_devido_venda, 0)
     const a_receber = vendasOut.reduce((s, v) => s + v.valor_pendente, 0)
