@@ -50,6 +50,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "A data da assembleia de entrada é obrigatória. Digite o grupo e aguarde o preenchimento automático, ou informe manualmente." }, { status: 400 })
     }
 
+    const numeroChk = String(numero_contrato || numero_proposta || '').trim()
+    if (numeroChk) {
+      const { data: jaExiste } = await supabaseAdmin.from('vendas')
+        .select('id').or(`numero_contrato.eq.${numeroChk},numero_proposta.eq.${numeroChk}`).limit(1)
+      if (jaExiste && jaExiste.length > 0) {
+        return NextResponse.json({ error: 'Já existe uma venda com este contrato/proposta no sistema. Para corrigir dados (vendedor, equipe, etc.), edite a venda existente em vez de cadastrar novamente.' }, { status: 409 })
+      }
+    }
+
     // Determina empresa/equipe/vendedor da venda
     let empresa_id = criador.empresa_id
     let equipe_id = criador.equipe_id
