@@ -135,6 +135,31 @@ export async function GET() {
       return new Date(a.data_assembleia).getTime() - new Date(b.data_assembleia).getTime()
     })
 
+    // ── CONTEMPLADOS (histórico/vitrine): mesma lógica de escopo e enriquecimento ──
+    let qc = supabaseAdmin
+      .from('lances_mensais')
+      .select('*, lances_config!inner(id, tipo, valor_percentual, observacao, venda_id, cliente_id, empresa_id, vendedor_id, equipe_id), clientes(nome), usuarios:vendedor_id(nome), equipes(nome)')
+      .eq('contemplado', true)
+      .order('data_assembleia', { ascending: false })
+
+    if (escopoGlobal) { /* vê tudo */ }
+    else if (['representante', 'adm'].includes(me.role)) qc = qc.eq('empresa_id', me.empresa_id)
+    else if (me.role === 'supervisor') qc = qc.eq('equipe_id', me.equipe_id)
+    else qc = qc.eq('vendedor_id', me.id)
+
+    const { data: contempladosRaw } = await qc
+
+    const vendaIdsC = (contempladosRaw || []).map((l: any) => l.lances_config?.venda_id).filter(Boolean)
+    let vendasMapC: Record<string, any> = {}
+    if (vendaIdsC.length > 0) {
+      const { data: vendasC } = await supabaseAdmin.from('vendas').select('id, grupo, cota, numero_proposta, numero_contrato').in('id', vendaIdsC)
+      for (const v of (vendasC || [])) vendasMapC[v.id] = v
+    }
+    const contemplados = (contempladosRaw || []).map((l: any) => {
+      const venda = l.lances_config?.venda_id ? vendasMapC[l.lances_config.venda_id] : null
+      return { ...l, grupo: venda?.grupo || null, cota: venda?.cota || null, numero_proposta: venda?.numero_proposta || venda?.numero_contrato || null }
+    })
+
     // opções de filtro conforme o role
     let empresasOpc: any[] = [], equipesOpc: any[] = [], vendedoresOpc: any[] = []
     if (escopoGlobal) {
@@ -149,7 +174,7 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      mes_referencia: mesRef, lances: lancesEnriq, meu_role: me.role,
+      mes_referencia: mesRef, lances: lancesEnriq, contemplados, meu_role: me.role,
       filtros: { empresas: empresasOpc, equipes: equipesOpc, vendedores: vendedoresOpc },
     })
   } catch (err) {

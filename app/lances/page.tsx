@@ -40,6 +40,8 @@ const fmtData = (d: string | null) => d ? new Date(d + 'T00:00:00').toLocaleDate
 
 export default function LancesPage() {
   const [lances, setLances] = useState<Lance[]>([])
+  const [contemplados, setContemplados] = useState<any[]>([])
+  const [visao, setVisao] = useState<'andamento' | 'contemplados'>('andamento')
   const [loading, setLoading] = useState(true)
   const [role, setRole] = useState('')
   const [mesRef, setMesRef] = useState('')
@@ -86,6 +88,7 @@ export default function LancesPage() {
     const res = await fetch('/api/lances')
     const data = await res.json()
     if (data.lances) { setLances(data.lances); setMesRef(data.mes_referencia); setRole(data.meu_role) }
+    if (data.contemplados) setContemplados(data.contemplados)
     if (data.filtros) setFiltrosOpc(data.filtros)
     setLoading(false)
   }
@@ -322,6 +325,39 @@ export default function LancesPage() {
             <div className="flex items-center justify-center py-12"><Loader2 size={20} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
           ) : (
             <>
+            {/* Seletor de visão */}
+            <div className="flex gap-2 mb-5">
+              <button onClick={() => setVisao('andamento')} className="rounded-full px-4 py-2 text-xs font-semibold transition-colors" style={{ background: visao === 'andamento' ? 'var(--accent)' : 'rgba(255,255,255,0.04)', color: visao === 'andamento' ? '#0a0a0a' : 'var(--muted-color)', border: `1px solid ${visao === 'andamento' ? 'var(--accent)' : 'var(--border)'}` }}>
+                Em andamento
+              </button>
+              <button onClick={() => setVisao('contemplados')} className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition-colors" style={{ background: visao === 'contemplados' ? 'rgba(34,197,94,0.18)' : 'rgba(255,255,255,0.04)', color: visao === 'contemplados' ? '#22c55e' : 'var(--muted-color)', border: `1px solid ${visao === 'contemplados' ? 'rgba(34,197,94,0.5)' : 'var(--border)'}` }}>
+                <Trophy size={13} /> Contemplados ({contemplados.length})
+              </button>
+            </div>
+
+            {visao === 'contemplados' ? (
+              contemplados.length === 0 ? (
+                <p className="text-sm text-center py-16" style={{ color: 'var(--muted-color)' }}>Nenhum contemplado ainda.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {contemplados.map((c: any) => (
+                    <div key={c.id} className="rounded-xl p-4" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.4)' }}>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{c.clientes?.nome || 'Cliente'}</span>
+                        <span className="flex items-center gap-1 text-xs font-bold" style={{ color: '#22c55e' }}><Trophy size={12} />Contemplado</span>
+                      </div>
+                      <div className="flex flex-wrap gap-2 text-xs" style={{ color: 'var(--muted-color)' }}>
+                        <span className="px-2 py-0.5 rounded" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)' }}>{descTipo(c.lances_config)}</span>
+                        {c.grupo && <span>Grupo {c.grupo}/{c.cota}</span>}
+                        {c.data_assembleia && <span className="flex items-center gap-1"><Clock size={11} />{fmtData(c.data_assembleia)}</span>}
+                        {c.usuarios?.nome && <span>Vend: {c.usuarios.nome}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            ) : (
+            <>
             <div className="flex items-center gap-2 mb-5 flex-wrap">
               <div className="flex gap-1 rounded-lg p-0.5" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)' }}>
                 <button onClick={() => setFiltroMes('atual')} className="rounded-md px-3 py-1.5 text-xs font-medium transition-colors" style={{ background: filtroMes === 'atual' ? 'var(--accent)' : 'transparent', color: filtroMes === 'atual' ? '#0a0a0a' : 'var(--muted-color)' }}>Mês Atual</button>
@@ -388,6 +424,8 @@ export default function LancesPage() {
                 </div>
               </div>
             </div>
+            </>
+            )}
             </>
           )}
         </main>
