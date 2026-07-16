@@ -117,10 +117,46 @@ export async function POST(req: Request) {
       }, { onConflict: 'grupo' })
     }
 
+    // ── Cruzamento com NOSSAS vendas: marca contemplado SÓ por grupo+cota do resultado oficial ──
+    const contempladosMarcados: any[] = []
+    for (const item of cotasContempladas) {
+      const cotaBase = item.cota.slice(0, 4) // "3625-00" → "3625"
+      const modalidade = item.modalidade
+      // vendas nossas deste grupo com esta cota (formatos variam: 3625, 3625-0, 3625-00)
+      const { data: vendasCota } = await supabaseAdmin.from('vendas')
+        .select('id, cliente_id, empresa_id, clientes(nome)')
+        .eq('grupo', grupo)
+        .like('cota', cotaBase + '%')
+      for (const vd of (vendasCota || []) as any[]) {
+        // marca o lance do mês desta assembleia (se existir) e encerra a config
+        const { data: cfgs } = await supabaseAdmin.from('lances_config')
+          .select('id').eq('venda_id', vd.id).eq('ativo', true)
+        for (const cfg of (cfgs || []) as any[]) {
+          await supabaseAdmin.from('lances_mensais')
+            .update({ contemplado: true })
+            .eq('lance_config_id', cfg.id)
+            .eq('mes_referencia', mesRef)
+          await supabaseAdmin.from('lances_config')
+            .update({ ativo: false, status_final: 'contemplado', atualizado_em: new Date().toISOString() })
+            .eq('id', cfg.id)
+        }
+        const nome = vd.clientes?.nome || 'Cliente'
+        contempladosMarcados.push({ cliente: nome, cota: cotaBase, modalidade })
+        // notificação no sininho (mesmo padrão do sistema)
+        try {
+          await supabaseAdmin.from('notificacoes').insert([
+            { empresa_id: vd.empresa_id, destinatario_role: 'adm', titulo: '🏆 Contemplado!', mensagem: `${nome} — grupo ${grupo} cota ${cotaBase} (${modalidade})`, tipo: 'generico', venda_id: vd.id, link_url: '/lances' },
+            { empresa_id: vd.empresa_id, destinatario_role: 'representante', titulo: '🏆 Contemplado!', mensagem: `${nome} — grupo ${grupo} cota ${cotaBase} (${modalidade})`, tipo: 'generico', venda_id: vd.id, link_url: '/lances' },
+          ])
+        } catch {}
+      }
+    }
+
     return NextResponse.json({
       success: true, grupo, mes_label: mesLabel, numero_assembleia: numeroAssembleia,
       resumo: { sorteio: sorteioQt, fixo50: fixo50Qt, fixo25: fixo25Qt, livre: livreQt, total: totalContemplados },
       cotas_nossas: cotasContempladas,
+      contemplados_marcados: contempladosMarcados,
     })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })

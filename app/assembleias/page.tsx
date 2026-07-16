@@ -258,6 +258,21 @@ export default function AssembleiasPage() {
             </div>
           )}
 
+          {resultadoUpload?.contemplados_marcados?.length > 0 && (
+            <div className="mb-6 rounded-xl p-4" style={{ background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.4)' }}>
+              <div className="flex items-center gap-2 mb-2 text-sm font-bold" style={{ color: '#22c55e' }}>
+                <PartyPopper size={16} /> {resultadoUpload.contemplados_marcados.length} cliente(s) nosso(s) contemplado(s) nesta assembleia!
+              </div>
+              <div className="flex flex-col gap-1">
+                {resultadoUpload.contemplados_marcados.map((c: any, i: number) => (
+                  <p key={i} className="text-xs" style={{ color: 'var(--text)' }}>
+                    <span className="font-semibold">{c.cliente}</span> <span style={{ color: 'var(--muted-color)' }}>· cota {c.cota} · {c.modalidade}</span>
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* abas mês atual / histórico */}
           <div className="flex gap-2 mb-4">
             <button onClick={() => { setVisao('atual'); setAberto(null) }} className="rounded-lg px-4 py-2 text-sm font-medium transition-colors" style={{ background: visao === 'atual' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${visao === 'atual' ? 'var(--accent)' : 'var(--border)'}`, color: visao === 'atual' ? 'var(--accent)' : 'var(--muted-color)' }}>Mês Atual</button>
