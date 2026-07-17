@@ -46,7 +46,21 @@ export async function GET(req: NextRequest) {
     const precisaRecalcular = !escopoGlobal || !!empresaFiltro
     if (precisaRecalcular && mapas.length > 0) {
       const idsMapas = mapas.map((m: any) => m.id)
-      const { data: todasLinhas } = await supabaseAdmin.from('mapa_linhas').select('mapa_id, contrato, valor_comissao').in('mapa_id', idsMapas)
+      // Paginado: o Supabase corta em 1000 linhas por padrão e a tabela já passa disso,
+      // o que escondia os mapas mais novos do caminho do representante.
+      let todasLinhas: any[] = []
+      { let from = 0; const PAGE = 1000
+        while (true) {
+          const { data: pg } = await supabaseAdmin.from('mapa_linhas')
+            .select('mapa_id, contrato, valor_comissao')
+            .in('mapa_id', idsMapas)
+            .order('id', { ascending: true })
+            .range(from, from + PAGE - 1)
+          todasLinhas = todasLinhas.concat(pg || [])
+          if (!pg || pg.length < PAGE) break
+          from += PAGE
+        }
+      }
       const contratosSet = [...new Set((todasLinhas || []).map((l: any) => String(l.contrato)))]
       const empresaPorContratoAll: Record<string, string> = {}
       if (contratosSet.length > 0) {
@@ -82,7 +96,20 @@ export async function GET(req: NextRequest) {
     // se pediu um mapa específico, traz as linhas organizadas por cliente
     let detalhe = null
     if (mapaId) {
-      const { data: linhas } = await supabaseAdmin.from('mapa_linhas').select('contrato, consorciado, percentual_comis, parcela_de, parcela_ate, valor_comissao').eq('mapa_id', mapaId)
+      // Paginado pelo mesmo motivo: um mapa grande pode ter mais de 1000 linhas.
+      let linhas: any[] = []
+      { let from = 0; const PAGE = 1000
+        while (true) {
+          const { data: pg } = await supabaseAdmin.from('mapa_linhas')
+            .select('contrato, consorciado, percentual_comis, parcela_de, parcela_ate, valor_comissao')
+            .eq('mapa_id', mapaId)
+            .order('id', { ascending: true })
+            .range(from, from + PAGE - 1)
+          linhas = linhas.concat(pg || [])
+          if (!pg || pg.length < PAGE) break
+          from += PAGE
+        }
+      }
       // cruza os contratos com as vendas pra pegar nome do cliente e a empresa de cada contrato
       const contratos = [...new Set((linhas || []).map((l: any) => String(l.contrato)))]
       const nomePorContrato: Record<string, string> = {}

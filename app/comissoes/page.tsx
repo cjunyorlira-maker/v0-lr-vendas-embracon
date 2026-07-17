@@ -389,8 +389,11 @@ export default function ComissoesPage() {
   const diasAtePag = (iso: string) => Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000))
   const proximaDataPag = filaPagamentos.length > 0 ? filaPagamentos[0].data : null
   const temFiltro = !!(fEmpresa || fEquipe || fVendedor || dataDe || dataAte)
+  // Fila global (filaPagamentos) soma TODAS as empresas: só serve para o master sem filtro.
+  // Representante (e master com filtro) deriva da própria carteira já escopada pelo servidor.
+  const usaFilaGlobal = meuRole === 'master' && !temFiltro
   const filaExibida = useMemo(() => {
-    if (!temFiltro) return filaPagamentos
+    if (usaFilaGlobal) return filaPagamentos
     const porData: Record<string, number> = {}
     vendasFiltradas.forEach((v: any) => {
       Object.entries(v.a_receber_por_data || {}).forEach(([data, val]) => {
@@ -398,7 +401,7 @@ export default function ComissoesPage() {
       })
     })
     return Object.entries(porData).map(([data, total]) => ({ data, total })).sort((a, b) => a.data.localeCompare(b.data))
-  }, [temFiltro, filaPagamentos, vendasFiltradas])
+  }, [usaFilaGlobal, filaPagamentos, vendasFiltradas])
   // (b) prévia: efetivadas cuja comissão garantida ainda supera o que já veio nos borderôs
   const previaProximoBordero = useMemo(() => {
     const lista = vendasFiltradas.filter((v: any) =>
