@@ -149,7 +149,7 @@ export default function ComissoesPage() {
     } catch {}
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-  useEffect(() => { if (aba === 'mapa') carregarMapas() }, [aba])
+  useEffect(() => { if (aba === 'mapa') { setMapaSel(null); setMapaDetalhe(null); carregarMapas() } }, [aba, fEmpresa])
   useEffect(() => { if (aba === 'calculo' && planosCalc.length === 0) {
     fetch('/api/planos').then(r => r.json()).then(d => { if (d.planos) setPlanosCalc(d.planos.filter((p: any) => p.ativo)) })
   } }, [aba])
@@ -300,7 +300,7 @@ export default function ComissoesPage() {
   }
 
   async function carregarMapas() {
-    const res = await fetch('/api/comissoes/mapas')
+    const res = await fetch(`/api/comissoes/mapas?empresa=${fEmpresa || ''}`)
     const data = await res.json()
     if (data.mapas) setMapas(data.mapas)
     if (data.logo_url) setLogoEmpresa(data.logo_url)
@@ -308,7 +308,7 @@ export default function ComissoesPage() {
   }
   async function abrirMapa(mapaId: string) {
     setCarregandoMapa(true); setMapaSel(mapaId)
-    const res = await fetch(`/api/comissoes/mapas?mapa_id=${mapaId}`)
+    const res = await fetch(`/api/comissoes/mapas?mapa_id=${mapaId}&empresa=${fEmpresa || ''}`)
     const data = await res.json()
     if (data.detalhe) setMapaDetalhe(data.detalhe)
     if (data.logo_url) setLogoEmpresa(data.logo_url)
@@ -468,8 +468,9 @@ export default function ComissoesPage() {
   const mapaNaoCasadasTotal = mapaNaoCasadas.reduce((s: number, c: any) => s + (c.total || 0), 0)
   const mapaEstornosTotal = mapaClientesFiltrados.reduce((s: number, c: any) => s + ((c.total || 0) < 0 ? c.total : 0), 0)
 
-  // Prévia Próxima Semana: vendas com boleto efetivado até a quinta desta semana,
-  // contando o que ainda falta receber (comissão total do plano − já recebido no mapa)
+  // Prévia Próxima Semana: vendas com boleto efetivado ATÉ a quinta desta semana (corte da Embracon),
+  // somando apenas a comissão GARANTIDA (1ª + antecipadas que o cliente já cobriu) ainda não mapeada em borderô.
+  // Base: comissao_lr (garantida) − comissao_mapeada_rs — mesma régua da prévia do próximo borderô.
   const previaProximaSemana = (() => {
     const hoje = new Date()
     const diaSemana = hoje.getDay()
@@ -479,7 +480,7 @@ export default function ComissoesPage() {
     return vendasFiltradas.reduce((soma: number, v: any) => {
       if (v.boleto_status !== 'efetivado' || !v.boleto_data_efetivado) return soma
       if (new Date(v.boleto_data_efetivado) > limite) return soma
-      const falta = (v.comissao_lr_total || 0) - (v.comissao_mapeada_rs ?? v.comissao_recebida_rs ?? 0)
+      const falta = (v.comissao_lr || 0) - (v.comissao_mapeada_rs || 0)
       return soma + (falta > 0 ? falta : 0)
     }, 0)
   })()
@@ -1048,7 +1049,7 @@ export default function ComissoesPage() {
                 <div className="rounded-2xl p-5 mb-4" style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.1), rgba(17,18,22,0.94))', border: '1px solid rgba(34,197,94,0.25)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
                   <div className="flex items-center gap-2 mb-1.5"><TrendingUp size={14} style={{ color: '#22c55e' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Prévia Próxima Semana</p></div>
                   <p className="text-2xl font-bold tabular-nums" style={{ color: '#22c55e' }}>{fmtMoeda(previaProximaSemana)}</p>
-                  <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>Vendas efetivadas até quinta que ainda não foram 100% recebidas</p>
+                  <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>efetivadas até quinta · garantido ainda não pago</p>
                 </div>
               )}
 
