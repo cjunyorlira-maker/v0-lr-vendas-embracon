@@ -83,7 +83,8 @@ export async function GET(req: NextRequest) {
       if (me.role === 'master') return qb                          // tudo
       if (esc.escopoGlobal) return qb                              // adm matriz vê tudo
       if (['representante', 'adm'].includes(me.role)) return qb.eq('empresa_id', me.empresa_id)
-      if (me.role === 'supervisor') return qb.eq('equipe_id', me.equipe_id)
+      // supervisor e vendedor veem a EMPRESA TODA em "Minha Operação" (equipe é papel dos filtros/modos, não do escopo)
+      if (me.role === 'supervisor') return qb.eq('empresa_id', me.empresa_id)
       if (me.role === 'vendedor') return qb.eq('empresa_id', me.empresa_id)
       return qb
     }
@@ -110,10 +111,13 @@ export async function GET(req: NextRequest) {
       } else {
         chave = v.empresa_id || 'sem'; nome = emp?.nome || 'Sem empresa'
       }
-      if (!mapa.has(chave)) mapa.set(chave, { nome, foto, valor: 0, qtd: 0, maior_venda: 0, equipe_nome: e?.nome, empresa_nome: emp?.nome, empresa_id: v.empresa_id, logo: emp?.logo_url, vendedor_id: modo === 'vendedor' ? v.vendedor_id : undefined })
+      // sublinha por modo: vendedor → equipe + empresa | equipe → só empresa | empresa/representante → nada
+      const subEquipe = modo === 'vendedor' ? e?.nome : undefined
+      const subEmpresa = (modo === 'vendedor' || modo === 'equipe') ? emp?.nome : undefined
+      if (!mapa.has(chave)) mapa.set(chave, { nome, foto, valor: 0, qtd: 0, maior_venda: 0, equipe_nome: subEquipe, empresa_nome: subEmpresa, empresa_id: v.empresa_id, logo: emp?.logo_url, vendedor_id: modo === 'vendedor' ? v.vendedor_id : undefined })
       const item = mapa.get(chave)!
       item.valor += cred; item.qtd += 1; item.maior_venda = Math.max(item.maior_venda, cred)
-      if (!item.equipe_nome && e?.nome) item.equipe_nome = e.nome
+      if (modo === 'vendedor' && !item.equipe_nome && e?.nome) item.equipe_nome = e.nome
     }
 
     // modo representante: cada item é a EMPRESA (nome + logo de empresas), nunca o dono/representante

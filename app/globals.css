@@ -209,6 +209,39 @@
 }
 .raio-pisca { animation: raioPisca 1.4s ease-in-out infinite; }
 
+/* ── Cards de destaque do ranking: traço fino e curto circulando o contorno, na cor do card ── */
+.card-borda-viva {
+  position: relative;
+  border-radius: 0.75rem;
+  padding: 1.5px;
+  background: conic-gradient(from var(--ang, 0deg),
+    transparent 0%, transparent 78%,
+    color-mix(in srgb, var(--cor-card, #d4af37) 85%, transparent) 88%,
+    var(--cor-card, #d4af37) 92%,
+    color-mix(in srgb, var(--cor-card, #d4af37) 85%, transparent) 96%,
+    transparent 100%);
+  animation: giraBorda var(--dur, 4.5s) linear infinite;
+  animation-delay: var(--delay, 0s);
+}
+/* fallback sem @property: pseudo-elemento com o gradiente girando via transform */
+@supports not (background: conic-gradient(from var(--ang), red, red)) {
+  .card-borda-viva { background: transparent; overflow: hidden; animation: none; }
+  .card-borda-viva::before {
+    content: "";
+    position: absolute;
+    inset: -1.5px;
+    background: conic-gradient(
+      transparent 0%, transparent 78%,
+      color-mix(in srgb, var(--cor-card, #d4af37) 85%, transparent) 88%,
+      var(--cor-card, #d4af37) 92%,
+      color-mix(in srgb, var(--cor-card, #d4af37) 85%, transparent) 96%,
+      transparent 100%);
+    animation: giraBordaFallback var(--dur, 4.5s) linear infinite;
+    animation-delay: var(--delay, 0s);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .globo-gira, .borda-viva, .borda-viva::before, .glow-pulse, .raio-pisca { animation: none; }
+  .globo-gira, .borda-viva, .borda-viva::before, .glow-pulse, .raio-pisca,
+  .card-borda-viva, .card-borda-viva::before { animation: none; }
 }

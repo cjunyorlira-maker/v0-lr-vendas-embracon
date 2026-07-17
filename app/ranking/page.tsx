@@ -118,17 +118,19 @@ const Ticker = memo(function Ticker({ frases }: { frases: string[] }) {
 })
 
 // card de destaque compacto (foto/escudo à esquerda, borda esquerda grossa + brilho no hover)
-function CardDestaque({ cor, icon: Icon, foto, avatarNome, label, nome, valor, sub, animCls }: { cor: string; icon?: any; foto?: string; avatarNome?: string; label: string; nome: string; valor: string; sub?: string | null; animCls: string }) {
+function CardDestaque({ cor, icon: Icon, foto, avatarNome, label, nome, valor, sub, animCls, dur = '4.5s', delay = '0s' }: { cor: string; icon?: any; foto?: string; avatarNome?: string; label: string; nome: string; valor: string; sub?: string | null; animCls: string; dur?: string; delay?: string }) {
   return (
-    <div className={`card-glow relative rounded-xl px-3 py-2.5 flex items-center gap-3 ${animCls}`} style={{ minHeight: 72, background: `${cor}14`, border: `1px solid ${cor}40`, borderLeft: `3px solid ${cor}`, ['--glow' as any]: `${cor}44` }}>
-      {avatarNome !== undefined
-        ? <Avatar nome={avatarNome} foto={foto} size={44} borderColor={cor} />
-        : <div className="flex items-center justify-center rounded-lg shrink-0" style={{ width: 44, height: 44, background: `${cor}1f`, border: `1px solid ${cor}55` }}>{Icon && <Icon size={22} style={{ color: cor }} />}</div>}
-      <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-semibold uppercase tracking-wide truncate" style={{ color: 'var(--muted-color)' }}>{label}</p>
-        <p className="font-bold leading-tight truncate" style={{ color: 'var(--text)', fontSize: 16 }}>{nome}</p>
-        <p className="font-bold font-mono leading-tight" style={{ color: cor, fontSize: 18 }}>{valor}</p>
-        {sub && <p className="text-[10px] truncate" style={{ color: 'var(--muted-color)' }}>{sub}</p>}
+    <div className={`card-borda-viva ${animCls}`} style={{ ['--cor-card' as any]: cor, ['--dur' as any]: dur, ['--delay' as any]: delay }}>
+      <div className="card-glow relative rounded-[calc(0.75rem-1.5px)] px-3 py-2.5 flex items-center gap-3 h-full" style={{ minHeight: 76, background: 'var(--surface, #131313)', border: `1px solid ${cor}40`, borderLeft: `3px solid ${cor}`, ['--glow' as any]: `${cor}44` }}>
+        {avatarNome !== undefined
+          ? <Avatar nome={avatarNome} foto={foto} size={44} borderColor={cor} />
+          : <div className="flex items-center justify-center rounded-lg shrink-0" style={{ width: 44, height: 44, background: `${cor}1f`, border: `1px solid ${cor}55` }}>{Icon && <Icon size={22} style={{ color: cor }} />}</div>}
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-semibold uppercase tracking-wide truncate" style={{ color: 'var(--muted-color)' }}>{label}</p>
+          <p className="font-bold leading-tight truncate" style={{ color: 'var(--text)', fontSize: 16 }}>{nome}</p>
+          <p className="font-bold font-mono leading-tight" style={{ color: cor, fontSize: 18 }}>{valor}</p>
+          {sub && <p className="text-[10px] truncate" style={{ color: 'var(--muted-color)' }}>{sub}</p>}
+        </div>
       </div>
     </div>
   )
@@ -358,13 +360,66 @@ export default function RankingPage() {
           <Variacao delta={variacao[item.nome] ?? null} />
         </div>
         {modo === 'vendedor' && (item.streak_semanas || 0) >= 3 && <div className="mt-1"><StreakBadge n={item.streak_semanas || 0} /></div>}
-        {modo === 'vendedor' && <div className="mt-0.5 max-w-full"><SubLinha item={item} center /></div>}
+            {(modo === 'vendedor' || modo === 'equipe') && <div className="mt-0.5 max-w-full"><SubLinha item={item} center /></div>}
         <p className="text-[11px] mt-0.5 mb-2" style={{ color: 'var(--muted-color)' }}>{fmtMoeda(item.maior_venda)} maior venda</p>
         <p className="font-bold font-mono" style={{ color: cor, fontSize: primeiro ? 24 : 19 }}>{fmtMoeda(item.valor)}</p>
         <p className="text-[11px] mt-1" style={{ color: 'var(--muted-color)' }}>{item.qtd} cota{item.qtd !== 1 ? 's' : ''} · ticket {fmtMoeda(item.ticket_medio)}</p>
       </div>
     )
   }
+
+  {/* Vitrine de abertura: 4 cards de destaque. Desktop = grade de 4 colunas; mobile = carrossel horizontal com snap */}
+  const cardsDestaque = (
+    <div className="flex gap-3 overflow-x-auto snap-x pb-1 mb-6 lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0 [&>*]:min-w-[240px] [&>*]:snap-start [&>*]:shrink-0 lg:[&>*]:min-w-0 lg:[&>*]:shrink">
+      <CardDestaque
+        cor="#d4af37" icon={Shield}
+        dur="4.2s" delay="0s"
+        label={`🛡️ Melhor Equipe ${fixos?.periodo_label || 'do Mês'}`}
+        nome={fixos?.melhor_equipe?.nome || '—'}
+        valor={fixos?.melhor_equipe ? fmtMoeda(fixos.melhor_equipe.valor) : '—'}
+        sub={fixos?.melhor_equipe?.empresa || null}
+        animCls={animCls}
+      />
+      <CardDestaque
+        cor="#3b82f6"
+        dur="4.8s" delay="-1.2s"
+        icon={fixos?.melhor_representacao?.logo ? undefined : Building2}
+        foto={fixos?.melhor_representacao?.logo}
+        avatarNome={fixos?.melhor_representacao?.logo ? (fixos?.melhor_representacao?.nome || '—') : undefined}
+        label={`🏢 Melhor Representação ${fixos?.periodo_label || 'do Mês'}`}
+        nome={fixos?.melhor_representacao?.nome || '—'}
+        valor={fixos?.melhor_representacao ? fmtMoeda(fixos.melhor_representacao.valor) : '—'}
+        sub={fixos?.melhor_representacao ? 'representação' : 'sem vendas no período'}
+        animCls={animCls}
+      />
+      <CardDestaque
+        cor="#22c55e"
+        dur="4.5s" delay="-2.4s"
+        avatarNome={fixos?.melhor_vendedor?.nome || '—'}
+        foto={fixos?.melhor_vendedor?.foto}
+        label={`🥇 Melhor Vendedor ${fixos?.periodo_label || 'do Mês'}`}
+        nome={fixos?.melhor_vendedor?.nome || '—'}
+        valor={fixos?.melhor_vendedor ? fmtMoeda(fixos.melhor_vendedor.valor) : '—'}
+        sub={fixos?.melhor_vendedor
+          ? ([fixos.melhor_vendedor.equipe, fixos.melhor_vendedor.empresa].filter(Boolean).join(' · ') || null)
+          : 'sem vendas no período'}
+        animCls={animCls}
+      />
+      <CardDestaque
+        cor="#a855f7"
+        dur="5.1s" delay="-3.6s"
+        avatarNome={fixos?.recordista?.vendedor || '—'}
+        foto={fixos?.recordista?.foto}
+        label="🏅 Recordista"
+        nome={fixos?.recordista?.vendedor || '—'}
+        valor={fixos?.recordista ? fmtMoeda(fixos.recordista.valor) : '—'}
+        sub={fixos?.recordista
+          ? [fixos.recordista.producao, fixos.recordista.empresa].filter(Boolean).join(' · ')
+          : 'sem histórico'}
+        animCls={animCls}
+      />
+    </div>
+  )
 
   const conteudo = (
     <>
@@ -391,53 +446,6 @@ export default function RankingPage() {
             <CardPodio item={top3[2]} rank={2} />
           </div>
 
-          {/* Cards de destaque: Equipe/Representação/Vendedor ACOMPANHAM o período (Mês/Semana/Ano); Recordista é histórico fixo */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-            <CardDestaque
-              cor="#d4af37" icon={Shield}
-              label={`🛡️ Melhor Equipe ${fixos?.periodo_label || 'do Mês'}`}
-              nome={fixos?.melhor_equipe?.nome || '—'}
-              valor={fixos?.melhor_equipe ? fmtMoeda(fixos.melhor_equipe.valor) : '—'}
-              sub={fixos?.melhor_equipe?.empresa || null}
-              animCls={animCls}
-            />
-            <CardDestaque
-              cor="#3b82f6"
-              icon={fixos?.melhor_representacao?.logo ? undefined : Building2}
-              foto={fixos?.melhor_representacao?.logo}
-              avatarNome={fixos?.melhor_representacao?.logo ? (fixos?.melhor_representacao?.nome || '—') : undefined}
-              label={`🏢 Melhor Representação ${fixos?.periodo_label || 'do Mês'}`}
-              nome={fixos?.melhor_representacao?.nome || '—'}
-              valor={fixos?.melhor_representacao ? fmtMoeda(fixos.melhor_representacao.valor) : '—'}
-              sub={fixos?.melhor_representacao ? 'representação' : 'sem vendas no período'}
-              animCls={animCls}
-            />
-            <CardDestaque
-              cor="#22c55e"
-              avatarNome={fixos?.melhor_vendedor?.nome || '—'}
-              foto={fixos?.melhor_vendedor?.foto}
-              label={`🥇 Melhor Vendedor ${fixos?.periodo_label || 'do Mês'}`}
-              nome={fixos?.melhor_vendedor?.nome || '—'}
-              valor={fixos?.melhor_vendedor ? fmtMoeda(fixos.melhor_vendedor.valor) : '—'}
-              sub={fixos?.melhor_vendedor
-                ? ([fixos.melhor_vendedor.equipe, fixos.melhor_vendedor.empresa].filter(Boolean).join(' · ') || null)
-                : 'sem vendas no período'}
-              animCls={animCls}
-            />
-            <CardDestaque
-              cor="#a855f7"
-              avatarNome={fixos?.recordista?.vendedor || '—'}
-              foto={fixos?.recordista?.foto}
-              label="🏅 Recordista"
-              nome={fixos?.recordista?.vendedor || '—'}
-              valor={fixos?.recordista ? fmtMoeda(fixos.recordista.valor) : '—'}
-              sub={fixos?.recordista
-                ? [fixos.recordista.producao, fixos.recordista.empresa].filter(Boolean).join(' · ')
-                : 'sem histórico'}
-              animCls={animCls}
-            />
-          </div>
-
           {resto.length > 0 && (
             <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
               {resto.map((r) => {
@@ -461,7 +469,7 @@ export default function RankingPage() {
                         <Variacao delta={variacao[r.nome] ?? null} />
                         {modo === 'vendedor' && <StreakBadge n={r.streak_semanas || 0} />}
                       </div>
-                      {modo === 'vendedor' && <SubLinha item={r} />}
+                        {(modo === 'vendedor' || modo === 'equipe') && <SubLinha item={r} />}
                       <div className="mt-1 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
                         <div className="h-full rounded-full anim-bar-grow" style={{ width: `${pct}%`, background: barra }} />
                       </div>
@@ -596,6 +604,7 @@ export default function RankingPage() {
             {escopo === 'geral' && <span className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold" style={{ background: 'rgba(212,175,55,0.15)', color: 'var(--accent)', border: '1px solid rgba(212,175,55,0.3)' }}><Globe size={13} />Geral</span>}
             <button onClick={toggleTelao} className="ml-auto flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium" style={{ background: 'var(--accent)', color: '#0a0a0a' }}><Tv size={13} />Sair</button>
           </div>
+          {cardsDestaque}
           {conteudo}
         </div>
       </div>
@@ -616,6 +625,7 @@ export default function RankingPage() {
             </div>
             <div className="ml-auto">{escopoToggle}</div>
           </div>
+          {cardsDestaque}
           {filtros}
           {conteudo}
         </main>
