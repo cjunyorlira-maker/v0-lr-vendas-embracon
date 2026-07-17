@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { DollarSign, Loader2, AlertTriangle, Settings, Check, TrendingUp, Lock, Upload, FileText, Calculator, ChevronRight, Download, ChevronUp, ChevronDown, Shield, Clock } from 'lucide-react'
+import { DollarSign, Loader2, AlertTriangle, Settings, Check, TrendingUp, Lock, Upload, FileText, Calculator, ChevronRight, Download, ChevronUp, ChevronDown, Shield, Clock, Search, BarChart3, CalendarDays } from 'lucide-react'
 
 interface VendaComissao {
   id: string; cliente: string; vendedor: string; plano: string; adesao: number | null; bem: string; credito: number
@@ -15,6 +15,61 @@ interface VendaComissao {
 
 const fmtMoeda = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 
+// Contador animado (count-up 600ms) — anima só na primeira montagem; depois atualiza direto
+function ValorContado({ valor, className, style }: { valor: number; className?: string; style?: React.CSSProperties }) {
+  const [display, setDisplay] = useState(0)
+  const animar = useRef(true)
+  useEffect(() => {
+    if (!animar.current) { setDisplay(valor); return }
+    animar.current = false
+    let raf = 0
+    const inicio = performance.now(), de = 0, ate = valor, dur = 600
+    const tick = (t: number) => {
+      const p = Math.min(1, (t - inicio) / dur)
+      const eased = 1 - Math.pow(1 - p, 3)
+      setDisplay(de + (ate - de) * eased)
+      if (p < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [valor])
+  return <span className={`tabular-nums ${className || ''}`} style={style}>{fmtMoeda(display)}</span>
+}
+
+// KPI compacto da faixa de resumo fixo (altura ~76px) com borda viva opcional
+function KpiResumo({ label, valor, cor, icon: Icon, dur, delay, bordaViva }: { label: string; valor: number; cor?: string; icon?: any; dur?: string; delay?: string; bordaViva?: boolean }) {
+  const corReal = cor || 'var(--accent)'
+  const inner = (
+    <div className="rounded-[calc(0.9rem-1.5px)] px-4 py-2.5 flex items-center gap-3 h-full" style={{ minHeight: 76, background: 'rgba(17,18,22,0.94)' }}>
+      {Icon && <div className="flex items-center justify-center rounded-lg shrink-0" style={{ width: 36, height: 36, background: `${cor || '#d4af37'}1f`, border: `1px solid ${cor || '#d4af37'}44` }}><Icon size={17} style={{ color: corReal }} /></div>}
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] font-semibold uppercase tracking-wide truncate" style={{ color: 'var(--muted-color)' }}>{label}</p>
+        <ValorContado valor={valor} className="font-bold leading-tight" style={{ color: corReal, fontSize: 20 }} />
+      </div>
+    </div>
+  )
+  if (bordaViva && cor) {
+    return <div className="card-borda-viva" style={{ borderRadius: '0.9rem', ['--cor-card' as any]: cor, ['--dur' as any]: dur || '5s', ['--delay' as any]: delay || '0s' }}>{inner}</div>
+  }
+  return <div className="rounded-[0.9rem]" style={{ border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>{inner}</div>
+}
+
+// Skeleton de blocos pulsando
+function SkeletonComissoes() {
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        {Array.from({ length: 6 }).map((_, i) => <div key={i} className="skeleton" style={{ height: 96 }} />)}
+      </div>
+      <div className="skeleton" style={{ height: 40, width: 320 }} />
+      <div className="space-y-2">
+        {Array.from({ length: 6 }).map((_, i) => <div key={i} className="skeleton" style={{ height: 52 }} />)}
+      </div>
+    </div>
+  )
+}
+
 export default function ComissoesPage() {
   const [vendas, setVendas] = useState<VendaComissao[]>([])
   const [loading, setLoading] = useState(true)
@@ -22,6 +77,8 @@ export default function ComissoesPage() {
   const [selecionadas, setSelecionadas] = useState<Set<string>>(new Set())
   const [rankModo, setRankModo] = useState<'pessoa' | 'equipe' | 'empresa'>('pessoa')
   const [aba, setAba] = useState<'vendas' | 'config' | 'mapa' | 'calculo' | 'ranking' | 'seguro' | 'master'>('vendas')
+  const [buscaVendas, setBuscaVendas] = useState('')
+  const [farolAberto, setFarolAberto] = useState(false)
   const [masterData, setMasterData] = useState<{ cards: any; vendas: any[]; recebimentos: any[] } | null>(null)
   const [loadingMaster, setLoadingMaster] = useState(false)
   const [mFiltroEmpresa, setMFiltroEmpresa] = useState('')
@@ -74,8 +131,25 @@ export default function ComissoesPage() {
   const [resultImport, setResultImport] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
+  const abasValidas = ['vendas', 'config', 'mapa', 'calculo', 'ranking', 'seguro', 'master']
+  function mudarAba(nova: typeof aba) {
+    setAba(nova)
+    try {
+      const url = new URL(window.location.href)
+      url.searchParams.set('aba', nova)
+      window.history.replaceState(null, '', url.toString())
+    } catch {}
+  }
+
   useEffect(() => { loadData() }, [])
-  useEffect(() => { if (aba === 'mapa') carregarMapas() }, [aba])
+  useEffect(() => {
+    try {
+      const p = new URLSearchParams(window.location.search).get('aba')
+      if (p && abasValidas.includes(p)) setAba(p as typeof aba)
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  useEffect(() => { if (aba === 'mapa') { setMapaSel(null); setMapaDetalhe(null); carregarMapas() } }, [aba, fEmpresa])
   useEffect(() => { if (aba === 'calculo' && planosCalc.length === 0) {
     fetch('/api/planos').then(r => r.json()).then(d => { if (d.planos) setPlanosCalc(d.planos.filter((p: any) => p.ativo)) })
   } }, [aba])
@@ -112,8 +186,8 @@ export default function ComissoesPage() {
     await carregarMaster()
   }
 
-  async function loadData() {
-    setLoading(true)
+  async function loadData(silent = false) {
+    if (!silent) setLoading(true)
     try { const rp = await fetch('/api/config-producao'); const dp = await rp.json(); if (dp.data_inicio) setProdInicio(dp.data_inicio); if (dp.data_fim) setProdFim(dp.data_fim) } catch {}
     const res = await fetch('/api/comissoes')
     if (res.status === 403) { setSemAcesso(true); setLoading(false); return }
@@ -158,7 +232,7 @@ export default function ComissoesPage() {
     if (!pctVend && !pctSup && !pctSupProprio) { alert('Informe ao menos um percentual'); return }
     setAplicando(true)
     await fetch('/api/comissoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'aplicar', venda_ids: Array.from(selecionadas), percentual_vendedor: pctVend || undefined, percentual_supervisor: pctSup || undefined, percentual_supervisor_proprio: pctSupProprio || undefined }) })
-    setSelecionadas(new Set()); setPctVend(''); setPctSup(''); setPctSupProprio(''); await loadData(); setAplicando(false)
+    setSelecionadas(new Set()); setPctVend(''); setPctSup(''); setPctSupProprio(''); await loadData(true); setAplicando(false)
   }
 
   async function salvarConfig() {
@@ -170,7 +244,7 @@ export default function ComissoesPage() {
       percentual_supervisor_proprio: parseFloat((catConfig[c.key]?.supProprio || '0').replace(',', '.')) || 0,
     }))
     await fetch('/api/comissoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'salvar_config_categoria', categorias, empresa_id: fEmpresa || undefined }) })
-    await loadData(); setSalvandoConfig(false)
+    await loadData(true); setSalvandoConfig(false)
   }
 
   async function baixarMapaPdf() {
@@ -226,7 +300,7 @@ export default function ComissoesPage() {
   }
 
   async function carregarMapas() {
-    const res = await fetch('/api/comissoes/mapas')
+    const res = await fetch(`/api/comissoes/mapas?empresa=${fEmpresa || ''}`)
     const data = await res.json()
     if (data.mapas) setMapas(data.mapas)
     if (data.logo_url) setLogoEmpresa(data.logo_url)
@@ -234,7 +308,7 @@ export default function ComissoesPage() {
   }
   async function abrirMapa(mapaId: string) {
     setCarregandoMapa(true); setMapaSel(mapaId)
-    const res = await fetch(`/api/comissoes/mapas?mapa_id=${mapaId}`)
+    const res = await fetch(`/api/comissoes/mapas?mapa_id=${mapaId}&empresa=${fEmpresa || ''}`)
     const data = await res.json()
     if (data.detalhe) setMapaDetalhe(data.detalhe)
     if (data.logo_url) setLogoEmpresa(data.logo_url)
@@ -251,7 +325,8 @@ export default function ComissoesPage() {
       if (!res.ok) { setResultImport('Erro: ' + (data.error || 'falhou')); setImportando(false); return }
       const naoEnc = data.contratos_nao_encontrados?.length || 0
       setResultImport(`Mapa importado! ${data.total_contratos} contratos, ${fmtMoeda(data.total_comissao)} em comissão.${naoEnc > 0 ? ` ${naoEnc} contrato(s) não encontrado(s) nas vendas.` : ''}`)
-      await loadData()
+      await loadData(true)
+      if (aba === 'mapa') await carregarMapas()
     } catch { setResultImport('Erro de conexão') }
     setImportando(false)
   }
@@ -295,6 +370,17 @@ export default function ComissoesPage() {
     }
     return true
   })
+  // Busca rápida (cliente ou contrato/proposta) — filtra SÓ a tabela, sem mexer nos KPIs/fila
+  const vendasVisiveis = useMemo(() => {
+    const q = buscaVendas.trim().toLowerCase()
+    if (!q) return vendasFiltradas
+    return vendasFiltradas.filter((v: any) =>
+      (v.cliente || '').toLowerCase().includes(q) ||
+      String(v.numero_contrato || '').toLowerCase().includes(q) ||
+      String(v.numero_proposta || '').toLowerCase().includes(q)
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vendasFiltradas, buscaVendas])
   const totalLR = vendasFiltradas.reduce((s, v) => s + v.comissao_lr, 0)
   const totalRecebido = vendasFiltradas.reduce((s, v) => s + (v.comissao_recebida_rs || 0), 0)
   const totalFalta = totalLR - totalRecebido
@@ -324,12 +410,38 @@ export default function ComissoesPage() {
     }
   }, [vendasFiltradas])
   const emRisco = vendasFiltradas.filter(v => v.em_risco).length
+  // Farol de estornos: vendas em risco ordenadas das mais próximas de estornar (menos parcelas faltando)
+  const listaEmRisco = [...vendasFiltradas]
+    .filter(v => v.em_risco)
+    .sort((a, b) => (a.faltam - b.faltam) || (b.valor_estorno - a.valor_estorno))
   const totalVendedores = vendasFiltradas.reduce((s, v: any) => s + (v.venda_propria_supervisor ? 0 : (v.comissao_vendedor || 0)), 0)
   const totalSupervisores = vendasFiltradas.reduce((s, v) => s + (v.comissao_supervisor || 0), 0)
   const totalSupervisorPropria = vendasFiltradas.reduce((s, v: any) => s + (v.comissao_supervisor_propria || 0), 0)
   // Master: 0,25% sobre toda a produção (crédito) do filtro atual
   const producaoTotal = vendasFiltradas.reduce((s, v) => s + (v.credito || 0), 0)
   const liquidoRep = totalLR - totalVendedores - totalSupervisores - totalSupervisorPropria
+  // Recebido por semana (últimas 8): agrupa os mapas pela sexta de pagamento (Embracon paga sexta da semana seguinte ao encerramento)
+  const recebidoPorSemana = useMemo(() => {
+    const sextaPag = (dataEnc: string) => {
+      const d = new Date(dataEnc + 'T00:00:00')
+      const dow = d.getDay() === 0 ? 7 : d.getDay()
+      const proxSeg = new Date(d); proxSeg.setDate(d.getDate() + (8 - dow))
+      const sexta = new Date(proxSeg); sexta.setDate(proxSeg.getDate() + 4)
+      return sexta
+    }
+    const porSemana = new Map<string, number>()
+    for (const m of mapas as any[]) {
+      if (!m.data_encerramento) continue
+      const s = sextaPag(m.data_encerramento)
+      const chave = s.toISOString().slice(0, 10)
+      porSemana.set(chave, (porSemana.get(chave) || 0) + (m.total_comissao || 0))
+    }
+    return Array.from(porSemana.entries())
+      .map(([data, total]) => ({ data, total }))
+      .sort((a, b) => a.data.localeCompare(b.data))
+      .slice(-8)
+  }, [mapas])
+  const maxSemana = Math.max(1, ...recebidoPorSemana.map(s => s.total))
   // helpers de papel
   const ehGestao = ['master', 'representante'].includes(meuRole)
   const ehAdm = meuRole === 'adm'
@@ -356,8 +468,9 @@ export default function ComissoesPage() {
   const mapaNaoCasadasTotal = mapaNaoCasadas.reduce((s: number, c: any) => s + (c.total || 0), 0)
   const mapaEstornosTotal = mapaClientesFiltrados.reduce((s: number, c: any) => s + ((c.total || 0) < 0 ? c.total : 0), 0)
 
-  // Prévia Próxima Semana: vendas com boleto efetivado até a quinta desta semana,
-  // contando o que ainda falta receber (comissão total do plano − já recebido no mapa)
+  // Prévia Próxima Semana: vendas com boleto efetivado ATÉ a quinta desta semana (corte da Embracon),
+  // somando apenas a comissão GARANTIDA (1ª + antecipadas que o cliente já cobriu) ainda não mapeada em borderô.
+  // Base: comissao_lr (garantida) − comissao_mapeada_rs — mesma régua da prévia do próximo borderô.
   const previaProximaSemana = (() => {
     const hoje = new Date()
     const diaSemana = hoje.getDay()
@@ -367,7 +480,7 @@ export default function ComissoesPage() {
     return vendasFiltradas.reduce((soma: number, v: any) => {
       if (v.boleto_status !== 'efetivado' || !v.boleto_data_efetivado) return soma
       if (new Date(v.boleto_data_efetivado) > limite) return soma
-      const falta = (v.comissao_lr_total || 0) - (v.comissao_mapeada_rs ?? v.comissao_recebida_rs ?? 0)
+      const falta = (v.comissao_lr || 0) - (v.comissao_mapeada_rs || 0)
       return soma + (falta > 0 ? falta : 0)
     }, 0)
   })()
@@ -401,101 +514,15 @@ export default function ComissoesPage() {
       <div className="relative lg:ml-60" style={{ zIndex: 1 }}>
         <Header title="Comissões" />
         <main className="mx-auto max-w-[1400px] px-6 py-8 lg:px-8">
-          {/* Resumo: LR total, Recebido, A receber, Risco */}
-          {ehGestao && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="rounded-2xl p-5" style={{ background: 'rgba(17,18,22,0.92)', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
-              <div className="flex items-center gap-2 mb-1.5"><TrendingUp size={14} style={{ color: 'var(--accent)' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Comissão Rep. (total)</p></div>
-              <p className="text-2xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(totalLR)}</p>
-            </div>
-            <div className="rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.14), rgba(17,18,22,0.94))', border: '1px solid rgba(34,197,94,0.3)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
-              <p className="text-xs mb-1.5" style={{ color: 'var(--muted-color)' }}>Já recebido</p>
-              <p className="text-2xl font-bold" style={{ color: '#22c55e' }}>{fmtMoeda(totalRecebido)}</p>
-            </div>
-            <div className="rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.14), rgba(17,18,22,0.94))', border: '1px solid rgba(245,158,11,0.3)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
-              <p className="text-xs mb-1.5" style={{ color: 'var(--muted-color)' }}>A receber</p>
-              <p className="text-2xl font-bold" style={{ color: '#f59e0b' }}>{fmtMoeda(totalFalta)}</p>
-            </div>
-            <div className="rounded-2xl p-5" style={{ background: emRisco > 0 ? 'linear-gradient(135deg, rgba(239,68,68,0.14), rgba(17,18,22,0.94))' : 'rgba(17,18,22,0.92)', border: `1px solid ${emRisco > 0 ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.08)'}`, boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
-              <div className="flex items-center gap-2 mb-1.5"><AlertTriangle size={14} style={{ color: emRisco > 0 ? '#ef4444' : 'var(--muted-color)' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Em risco de estorno</p></div>
-              <p className="text-2xl font-bold" style={{ color: emRisco > 0 ? '#ef4444' : 'var(--text)' }}>{emRisco}</p>
-            </div>
+          {/* RESUMO FIXO — sempre visível acima das abas (faixa compacta ~76px) */}
+          {ehGestao && !loading && (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+            <KpiResumo label="Comissão Rep. (total)" valor={totalLR} cor="#d4af37" icon={TrendingUp} bordaViva dur="5.2s" delay="0s" />
+            <KpiResumo label="Já recebido" valor={totalRecebido} cor="#22c55e" icon={Check} bordaViva dur="4.6s" delay="-1.3s" />
+            <KpiResumo label="A receber" valor={totalFalta} cor="#3b82f6" icon={Clock} bordaViva dur="5s" delay="-2.6s" />
+            <KpiResumo label="Total em Vendas" valor={producaoTotal} icon={DollarSign} />
           </div>
           )}
-
-          {ehGestao && previaProximaSemana > 0 && (
-            <div className="rounded-2xl p-5 mb-6" style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.1), rgba(17,18,22,0.94))', border: '1px solid rgba(34,197,94,0.25)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
-              <div className="flex items-center gap-2 mb-1.5"><TrendingUp size={14} style={{ color: '#22c55e' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Prévia Próxima Semana</p></div>
-              <p className="text-2xl font-bold" style={{ color: '#22c55e' }}>{fmtMoeda(previaProximaSemana)}</p>
-              <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>Vendas efetivadas até quinta que ainda não foram 100% recebidas</p>
-            </div>
-          )}
-
-          {ehGestao && (filaExibida.length > 0 || previaProximoBordero.qtd > 0) && (
-            <div className="rounded-2xl p-5 mb-6" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.14), rgba(17,18,22,0.94))', border: '1px solid rgba(59,130,246,0.3)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
-              <div className="flex items-center gap-2 mb-1.5"><Clock size={14} style={{ color: '#3b82f6' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Próximo Pagamento</p></div>
-              {filaExibida.length > 0 ? (
-                <>
-                  <p className="text-2xl font-bold" style={{ color: '#3b82f6' }}>{fmtMoeda(filaExibida[0].total)}</p>
-                  <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>Embracon paga {fmtDataPag(filaExibida[0].data)} (sexta) · faltam {diasAtePag(filaExibida[0].data)} dia(s)</p>
-                  {temFiltro && <p className="text-[9px]" style={{ color: '#60a5fa' }}>somente vendas do filtro atual</p>}
-                  {filaExibida.length > 1 && (
-                    <div className="mt-2 pt-2 space-y-1" style={{ borderTop: '1px solid rgba(59,130,246,0.2)' }}>
-                      {filaExibida.slice(1).map((f, i) => (
-                        <div key={i} className="flex items-center justify-between">
-                          <p className="text-[10px]" style={{ color: 'var(--muted-color)' }}>Aguardando · {fmtDataPag(f.data)} (sexta)</p>
-                          <p className="text-xs font-semibold" style={{ color: '#60a5fa' }}>{fmtMoeda(f.total)}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <p className="text-sm" style={{ color: 'var(--muted-color)' }}>Nenhum borderô aguardando pagamento</p>
-              )}
-              {/* PRÉVIA do próximo borderô */}
-              <div className="mt-2 pt-2" style={{ borderTop: '1px solid rgba(59,130,246,0.2)' }}>
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px]" style={{ color: 'var(--muted-color)' }}>Prévia do próximo borderô ({previaProximoBordero.qtd} venda{previaProximoBordero.qtd === 1 ? '' : 's'} efetivada{previaProximoBordero.qtd === 1 ? '' : 's'} aguardando)</p>
-                  <p className="text-sm font-bold" style={{ color: '#60a5fa' }}>{fmtMoeda(previaProximoBordero.total)}</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Cards de comissão de equipe */}
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-            {(ehGestao || ehAdm) && (
-            <div className="rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.12), rgba(17,18,22,0.94))', border: '1px solid rgba(59,130,246,0.28)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
-              <p className="text-xs mb-1.5" style={{ color: 'var(--muted-color)' }}>Comissão Vendedores</p>
-              <p className="text-2xl font-bold" style={{ color: '#3b82f6' }}>{fmtMoeda(totalVendedores)}</p>
-            </div>
-            )}
-            {(ehGestao || ehAdm) && (
-            <div className="rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.12), rgba(17,18,22,0.94))', border: '1px solid rgba(168,85,247,0.28)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
-              <p className="text-xs mb-1.5" style={{ color: 'var(--muted-color)' }}>Comissão Supervisores</p>
-              <p className="text-2xl font-bold" style={{ color: '#a855f7' }}>{fmtMoeda(totalSupervisores)}</p>
-            </div>
-            )}
-            {(ehGestao || ehAdm) && totalSupervisorPropria > 0 && (
-            <div className="rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, rgba(236,72,153,0.12), rgba(17,18,22,0.94))', border: '1px solid rgba(236,72,153,0.28)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
-              <p className="text-xs mb-1.5" style={{ color: 'var(--muted-color)' }}>Superv. Venda Própria</p>
-              <p className="text-2xl font-bold" style={{ color: '#ec4899' }}>{fmtMoeda(totalSupervisorPropria)}</p>
-              <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>vendas do próprio supervisor</p>
-            </div>
-            )}
-
-            {ehGestao && (<div className="rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.12), rgba(17,18,22,0.94))', border: '1px solid rgba(34,197,94,0.28)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
-              <p className="text-xs mb-1.5" style={{ color: 'var(--muted-color)' }}>Líquido Representante</p>
-              <p className="text-2xl font-bold" style={{ color: '#22c55e' }}>{fmtMoeda(liquidoRep)}</p>
-              <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>após vendedor e supervisor</p>
-            </div>)}
-            {ehGestao && (<div className="rounded-2xl p-5" style={{ background: 'rgba(17,18,22,0.92)', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
-              <p className="text-xs mb-1.5" style={{ color: 'var(--muted-color)' }}>Total em Vendas</p>
-              <p className="text-2xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(producaoTotal)}</p>
-              <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>{vendasFiltradas.length} venda(s)</p>
-            </div>)}
-          </div>
 
           {/* Importar mapa */}
           <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) importarMapa(f) }} />
@@ -559,25 +586,46 @@ export default function ComissoesPage() {
 
           {/* Abas */}
           <div className="flex gap-2 mb-5 flex-wrap">
-            <button onClick={() => setAba('vendas')} className={`tab-btn ${aba === 'vendas' ? 'ativo' : ''}`}><DollarSign size={14} />Vendas</button>
+            <button onClick={() => mudarAba('vendas')} className={`tab-btn ${aba === 'vendas' ? 'ativo' : ''}`}><DollarSign size={14} />Vendas</button>
             {ehGestao && (<>
-            <button onClick={() => setAba('mapa')} className={`tab-btn ${aba === 'mapa' ? 'ativo' : ''}`}><FileText size={14} />Mapa de Comissão</button>
-            <button onClick={() => setAba('calculo')} className={`tab-btn ${aba === 'calculo' ? 'ativo' : ''}`}><Calculator size={14} />Cálculo de Comissão</button>
-            <button onClick={() => setAba('config')} className={`tab-btn ${aba === 'config' ? 'ativo' : ''}`}><Settings size={14} />Configurar padrão</button>
-            <button onClick={() => setAba('ranking')} className={`tab-btn ${aba === 'ranking' ? 'ativo' : ''}`}><TrendingUp size={14} />Ranking de Faturamento</button>
-            <button onClick={() => setAba('seguro')} className={`tab-btn ${aba === 'seguro' ? 'ativo' : ''}`}><Shield size={14} />Seguro</button>
+            <button onClick={() => mudarAba('mapa')} className={`tab-btn ${aba === 'mapa' ? 'ativo' : ''}`}><FileText size={14} />Mapa de Comissão</button>
+            <button onClick={() => mudarAba('calculo')} className={`tab-btn ${aba === 'calculo' ? 'ativo' : ''}`}><Calculator size={14} />Cálculo de Comissão</button>
+            <button onClick={() => mudarAba('config')} className={`tab-btn ${aba === 'config' ? 'ativo' : ''}`}><Settings size={14} />Configurar padrão</button>
+            <button onClick={() => mudarAba('ranking')} className={`tab-btn ${aba === 'ranking' ? 'ativo' : ''}`}><TrendingUp size={14} />Ranking de Faturamento</button>
+            <button onClick={() => mudarAba('seguro')} className={`tab-btn ${aba === 'seguro' ? 'ativo' : ''}`}><Shield size={14} />Seguro</button>
             </>)}
             {meuRole === 'master' && (
-              <button onClick={() => setAba('master')} className={`tab-btn ${aba === 'master' ? 'ativo' : ''}`}><Lock size={14} />Master</button>
+              <button onClick={() => mudarAba('master')} className={`tab-btn ${aba === 'master' ? 'ativo' : ''}`}><Lock size={14} />Master</button>
             )}
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center py-12"><Loader2 size={20} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
-          ) : aba === 'mapa' ? (
+            <SkeletonComissoes />
+          ) : (
+          <div key={aba} className="tab-fade">
+          {aba === 'mapa' ? (
             <div>
               {!mapaSel ? (
                 <div className="space-y-2">
+                  {/* (e) MINIGRÁFICO: recebido por semana (últimas 8 sextas de pagamento) */}
+                  {recebidoPorSemana.length > 0 && (
+                    <div className="rounded-2xl p-5 mb-4" style={{ background: 'rgba(17,18,22,0.92)', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
+                      <div className="flex items-center gap-2 mb-4"><BarChart3 size={15} style={{ color: 'var(--accent)' }} /><p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted-color)' }}>Recebido por semana</p></div>
+                      <div className="flex items-end justify-between gap-2" style={{ height: 120 }}>
+                        {recebidoPorSemana.map((s, i) => {
+                          const pct = Math.max(6, (s.total / maxSemana) * 100)
+                          const ultimo = i === recebidoPorSemana.length - 1
+                          return (
+                            <div key={s.data} className="flex-1 flex flex-col items-center justify-end gap-1.5 h-full">
+                              <span className="text-[9px] tabular-nums whitespace-nowrap" style={{ color: ultimo ? 'var(--accent)' : 'var(--muted-color)' }}>{fmtMoeda(s.total)}</span>
+                              <div className="w-full rounded-t-md anim-bar-grow" style={{ height: `${pct}%`, background: ultimo ? 'linear-gradient(180deg, #d4af37, #b8941f)' : 'rgba(212,175,55,0.35)', animationDelay: `${i * 60}ms` }} />
+                              <span className="text-[9px] tabular-nums" style={{ color: 'var(--muted-color)' }}>{new Date(s.data + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
                   <p className="text-sm mb-3" style={{ color: 'var(--muted-color)' }}>Mapas de comissão importados. Clique para ver e baixar.</p>
                   {mapas.length === 0 ? <p className="text-xs py-8 text-center" style={{ color: 'var(--muted-color)' }}>Nenhum mapa importado ainda. Importe no botão acima.</p> : mapas.map(m => (
                     <div key={m.id} onClick={() => abrirMapa(m.id)} className="flex items-center justify-between rounded-xl p-4 cursor-pointer" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
@@ -739,15 +787,20 @@ export default function ComissoesPage() {
                 {rankingFaturamento.length === 0 && <p className="text-sm text-center py-8" style={{ color: 'var(--muted-color)' }}>Nenhuma venda no período.</p>}
               </div>
             </div>
-          ) : aba === 'seguro' ? (
+          ) : aba === 'seguro' ? (() => {
+            // Filtro de empresa da tela atua só para master (escopo global). Representante já vem limitado do servidor.
+            const seguroFiltrado = (meuRole === 'master' && fEmpresa)
+              ? vendasSeguro.filter(v => v.empresa_id === fEmpresa)
+              : vendasSeguro
+            return (
             <div className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                 <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Comissão de Seguro (0,30%)</h3>
                 <div className="text-xs" style={{ color: 'var(--muted-color)' }}>
-                  Recebido: {fmtMoeda(vendasSeguro.filter(v => v.comissao_seguro_recebida).reduce((s, v) => s + (v.valor_credito * 0.003), 0))} / Total: {fmtMoeda(vendasSeguro.reduce((s, v) => s + (v.valor_credito * 0.003), 0))}
+                  Recebido: {fmtMoeda(seguroFiltrado.filter(v => v.comissao_seguro_recebida).reduce((s, v) => s + (v.valor_credito * 0.003), 0))} / Total: {fmtMoeda(seguroFiltrado.reduce((s, v) => s + (v.valor_credito * 0.003), 0))}
                 </div>
               </div>
-              {loadingSeguro ? <p className="text-sm" style={{ color: 'var(--muted-color)' }}>Carregando...</p> : vendasSeguro.length === 0 ? <p className="text-sm" style={{ color: 'var(--muted-color)' }}>Nenhuma venda com seguro.</p> : (
+              {loadingSeguro ? <p className="text-sm" style={{ color: 'var(--muted-color)' }}>Carregando...</p> : seguroFiltrado.length === 0 ? <p className="text-sm" style={{ color: 'var(--muted-color)' }}>Nenhuma venda com seguro.</p> : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead><tr style={{ borderBottom: '1px solid var(--border)' }}>
@@ -758,9 +811,12 @@ export default function ComissoesPage() {
                       <th className="p-2 text-center" style={{ color: 'var(--muted-color)' }}>Recebido</th>
                     </tr></thead>
                     <tbody>
-                      {vendasSeguro.map(v => (
+                      {seguroFiltrado.map(v => (
                         <tr key={v.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                          <td className="p-2" style={{ color: 'var(--text)' }}>{v.cliente_nome || '-'}</td>
+                          <td className="p-2">
+                            <span style={{ color: 'var(--text)' }}>{v.cliente_nome || '-'}</span>
+                            {v.empresa_nome && <span className="ml-1.5 text-[11px]" style={{ color: 'rgba(212,175,55,0.7)' }}>· {v.empresa_nome}</span>}
+                          </td>
                           <td className="p-2" style={{ color: 'var(--text2)' }}>{v.grupo}/{v.cota}</td>
                           <td className="p-2 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda(v.valor_credito)}</td>
                           <td className="p-2 text-right font-semibold" style={{ color: 'var(--accent)' }}>{fmtMoeda(v.valor_credito * 0.003)}</td>
@@ -774,7 +830,8 @@ export default function ComissoesPage() {
                 </div>
               )}
             </div>
-          ) : aba === 'master' ? (
+            )
+          })() : aba === 'master' ? (
             meuRole !== 'master' ? null : loadingMaster ? (
               <div className="flex items-center justify-center py-12"><Loader2 size={20} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
             ) : !masterData ? (
@@ -838,6 +895,25 @@ export default function ComissoesPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* Subtotal do filtro (só aparece com filtro ativo) — os 4 cards acima seguem GLOBAIS */}
+                  {(mFiltroEmpresa || mBusca.trim()) && vendasMaster.length > 0 && (() => {
+                    const sub = vendasMaster.reduce((a: any, v: any) => ({
+                      devido: a.devido + (v.valor_devido_venda || 0),
+                      aReceber: a.aReceber + (v.valor_pendente || 0),
+                      aVencer: a.aVencer + (v.valor_a_vencer || 0),
+                    }), { devido: 0, aReceber: 0, aVencer: 0 })
+                    const nomeEmpresa = mFiltroEmpresa ? ((empresasMaster.find(([id]) => id === mFiltroEmpresa)?.[1] as string) || 'empresa') : 'Todas as empresas'
+                    return (
+                      <div className="rounded-lg px-4 py-2.5 mb-3 flex items-center gap-x-4 gap-y-1 flex-wrap text-xs" style={{ background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.25)' }}>
+                        <span className="font-semibold" style={{ color: 'var(--accent)' }}>Filtro: {nomeEmpresa}{mBusca.trim() ? ` · "${mBusca.trim()}"` : ''}</span>
+                        <span style={{ color: 'var(--muted-color)' }}>{vendasMaster.length} venda{vendasMaster.length === 1 ? '' : 's'}</span>
+                        <span style={{ color: 'var(--text2)' }}>devido <b style={{ color: 'var(--text)' }}>{fmtMoeda(sub.devido)}</b></span>
+                        <span style={{ color: 'var(--text2)' }}>a receber <b style={{ color: 'var(--accent)' }}>{fmtMoeda(sub.aReceber)}</b></span>
+                        <span style={{ color: 'var(--text2)' }}>a vencer <b style={{ color: '#3b82f6' }}>{fmtMoeda(sub.aVencer)}</b></span>
+                      </div>
+                    )
+                  })()}
 
                   {/* Lista por venda */}
                   {vendasMaster.length === 0 ? (
@@ -953,6 +1029,129 @@ export default function ComissoesPage() {
             </>
           ) : (
             <>
+              {/* Próximo Pagamento + PRÉVIA do próximo borderô + (a) TIMELINE DE SEXTAS */}
+              {ehGestao && (filaExibida.length > 0 || previaProximoBordero.qtd > 0) && (
+                <div className="rounded-2xl p-5 mb-4" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.14), rgba(17,18,22,0.94))', border: '1px solid rgba(59,130,246,0.3)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
+                  <div className="flex items-center gap-2 mb-1.5"><Clock size={14} style={{ color: '#3b82f6' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Próximo Pagamento</p></div>
+                  {filaExibida.length > 0 ? (
+                    <>
+                      <p className="text-2xl font-bold tabular-nums" style={{ color: '#3b82f6' }}>{fmtMoeda(filaExibida[0].total)}</p>
+                      <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>Embracon paga {fmtDataPag(filaExibida[0].data)} (sexta) · faltam {diasAtePag(filaExibida[0].data)} dia(s)</p>
+                      {temFiltro && <p className="text-[9px]" style={{ color: '#60a5fa' }}>somente vendas do filtro atual</p>}
+                    </>
+                  ) : (
+                    <p className="text-sm" style={{ color: 'var(--muted-color)' }}>Nenhum borderô aguardando pagamento</p>
+                  )}
+                  {/* (a) TIMELINE DE SEXTAS — próximas sextas com valor previsto e barra proporcional */}
+                  {filaExibida.length > 0 && (
+                    <div className="mt-3 pt-3" style={{ borderTop: '1px solid rgba(59,130,246,0.2)' }}>
+                      <div className="flex items-center gap-1.5 mb-2"><CalendarDays size={12} style={{ color: '#60a5fa' }} /><p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted-color)' }}>Próximas sextas de pagamento</p></div>
+                      <div className="flex flex-col gap-2">
+                        {(() => { const maxFila = Math.max(1, ...filaExibida.map(x => x.total)); return filaExibida.map((f, i) => {
+                          const pct = Math.max(4, (f.total / maxFila) * 100)
+                          return (
+                            <div key={i} className="flex items-center gap-3">
+                              <span className="text-[10px] tabular-nums shrink-0" style={{ color: 'var(--muted-color)', width: 78 }}>{fmtDataPag(f.data)}</span>
+                              <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                                <div className="h-full anim-bar-grow" style={{ width: `${pct}%`, background: i === 0 ? 'var(--accent)' : 'rgba(212,175,55,0.5)' }} />
+                              </div>
+                              <span className="text-[11px] font-semibold tabular-nums shrink-0" style={{ color: i === 0 ? 'var(--accent)' : '#c9a227', width: 84, textAlign: 'right' }}>{fmtMoeda(f.total)}</span>
+                            </div>
+                          )
+                        }) })()}
+                      </div>
+                    </div>
+                  )}
+                  {/* PRÉVIA do próximo borderô */}
+                  <div className="mt-2 pt-2" style={{ borderTop: '1px solid rgba(59,130,246,0.2)' }}>
+                    <div className="flex items-center justify-between">
+                      <p className="text-[10px]" style={{ color: 'var(--muted-color)' }}>Prévia do próximo borderô ({previaProximoBordero.qtd} venda{previaProximoBordero.qtd === 1 ? '' : 's'} efetivada{previaProximoBordero.qtd === 1 ? '' : 's'} aguardando)</p>
+                      <p className="text-sm font-bold tabular-nums" style={{ color: '#60a5fa' }}>{fmtMoeda(previaProximoBordero.total)}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Prévia Próxima Semana */}
+              {ehGestao && previaProximaSemana > 0 && (
+                <div className="rounded-2xl p-5 mb-4" style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.1), rgba(17,18,22,0.94))', border: '1px solid rgba(34,197,94,0.25)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
+                  <div className="flex items-center gap-2 mb-1.5"><TrendingUp size={14} style={{ color: '#22c55e' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Prévia Próxima Semana</p></div>
+                  <p className="text-2xl font-bold tabular-nums" style={{ color: '#22c55e' }}>{fmtMoeda(previaProximaSemana)}</p>
+                  <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>efetivadas até quinta · garantido ainda não pago</p>
+                </div>
+              )}
+
+              {/* (b) FAROL DE ESTORNOS — card clicável que abre a lista de vendas em risco */}
+              {ehGestao && (
+                <div className="mb-4">
+                  <button onClick={() => setFarolAberto(v => !v)} disabled={emRisco === 0} className="w-full text-left rounded-2xl p-5 flex items-center justify-between gap-3 disabled:cursor-default transition-transform enabled:hover:scale-[1.005]" style={{ background: emRisco > 0 ? 'linear-gradient(135deg, rgba(239,68,68,0.14), rgba(17,18,22,0.94))' : 'rgba(17,18,22,0.92)', border: `1px solid ${emRisco > 0 ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.08)'}`, boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1.5"><AlertTriangle size={14} style={{ color: emRisco > 0 ? '#ef4444' : 'var(--muted-color)' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Em risco de estorno</p></div>
+                      <p className="text-2xl font-bold tabular-nums" style={{ color: emRisco > 0 ? '#ef4444' : 'var(--text)' }}>{emRisco}</p>
+                    </div>
+                    {emRisco > 0 && (
+                      <div className="flex items-center gap-2 text-xs" style={{ color: '#ef4444' }}>
+                        <span>{farolAberto ? 'ocultar' : 'ver detalhes'}</span>
+                        {farolAberto ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      </div>
+                    )}
+                  </button>
+                  {farolAberto && emRisco > 0 && (
+                    <div className="mt-2 rounded-2xl p-4 flex flex-col gap-2" style={{ background: 'rgba(0,0,0,0.18)', border: '1px solid rgba(239,68,68,0.25)' }}>
+                      <p className="text-[10px] uppercase tracking-wide mb-1" style={{ color: 'var(--muted-color)' }}>Vendas mais próximas de estornar primeiro</p>
+                      {listaEmRisco.map(v => {
+                        const urgente = v.faltam === 1
+                        return (
+                          <div key={v.id} className="flex items-center justify-between gap-3 rounded-xl px-3 py-2.5 flex-wrap" style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${urgente ? 'rgba(239,68,68,0.45)' : 'var(--border)'}` }}>
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{v.cliente}</p>
+                              <p className="text-[11px]" style={{ color: 'var(--muted-color)' }}>{v.bem} · plano {v.plano} · reversão até {v.pgto_seguranca}ª parcela</p>
+                            </div>
+                            <div className="flex items-center gap-3 shrink-0">
+                              <div className="text-right">
+                                <p className="text-[11px] tabular-nums" style={{ color: 'var(--text2)' }}>{v.parcelas_pagas}/{v.pgto_seguranca} pagas</p>
+                                <p className="text-[10px] tabular-nums" style={{ color: '#f59e0b' }}>estorno {fmtMoeda(v.valor_estorno)}</p>
+                              </div>
+                              <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full shrink-0 ${urgente ? 'pulse-vermelho' : ''}`} style={{ background: 'rgba(239,68,68,0.16)', color: '#ef4444' }}>
+                                {urgente ? 'falta 1!' : `faltam ${v.faltam}`}
+                              </span>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Cards de comissão de equipe */}
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+                {(ehGestao || ehAdm) && (
+                <div className="rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, rgba(59,130,246,0.12), rgba(17,18,22,0.94))', border: '1px solid rgba(59,130,246,0.28)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
+                  <p className="text-xs mb-1.5" style={{ color: 'var(--muted-color)' }}>Comissão Vendedores</p>
+                  <p className="text-2xl font-bold tabular-nums" style={{ color: '#3b82f6' }}>{fmtMoeda(totalVendedores)}</p>
+                </div>
+                )}
+                {(ehGestao || ehAdm) && (
+                <div className="rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, rgba(168,85,247,0.12), rgba(17,18,22,0.94))', border: '1px solid rgba(168,85,247,0.28)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
+                  <p className="text-xs mb-1.5" style={{ color: 'var(--muted-color)' }}>Comissão Supervisores</p>
+                  <p className="text-2xl font-bold tabular-nums" style={{ color: '#a855f7' }}>{fmtMoeda(totalSupervisores)}</p>
+                </div>
+                )}
+                {(ehGestao || ehAdm) && totalSupervisorPropria > 0 && (
+                <div className="rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, rgba(236,72,153,0.12), rgba(17,18,22,0.94))', border: '1px solid rgba(236,72,153,0.28)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
+                  <p className="text-xs mb-1.5" style={{ color: 'var(--muted-color)' }}>Superv. Venda Própria</p>
+                  <p className="text-2xl font-bold tabular-nums" style={{ color: '#ec4899' }}>{fmtMoeda(totalSupervisorPropria)}</p>
+                  <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>vendas do próprio supervisor</p>
+                </div>
+                )}
+                {ehGestao && (<div className="rounded-2xl p-5" style={{ background: 'linear-gradient(135deg, rgba(34,197,94,0.12), rgba(17,18,22,0.94))', border: '1px solid rgba(34,197,94,0.28)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
+                  <p className="text-xs mb-1.5" style={{ color: 'var(--muted-color)' }}>Líquido Representante</p>
+                  <p className="text-2xl font-bold tabular-nums" style={{ color: '#22c55e' }}>{fmtMoeda(liquidoRep)}</p>
+                  <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>após vendedor e supervisor</p>
+                </div>)}
+              </div>
+
               {selecionadas.size > 0 && (
                 <div className="rounded-xl p-4 mb-4 flex items-end gap-3 flex-wrap" style={{ background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.25)' }}>
                   <span className="text-sm font-medium self-center" style={{ color: 'var(--accent)' }}>{selecionadas.size} selecionada{selecionadas.size !== 1 ? 's' : ''}</span>
@@ -960,6 +1159,21 @@ export default function ComissoesPage() {
                   <div><label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>% Supervisor</label><input value={pctSup} onChange={(e) => setPctSup(e.target.value)} placeholder="0,2" className="rounded-lg px-2 py-1.5 text-xs outline-none w-20" style={inputStyle} /></div>
                   <div><label className="block text-[10px] mb-1" style={{ color: '#ec4899' }}>% Superv. própria</label><input value={pctSupProprio} onChange={(e) => setPctSupProprio(e.target.value)} placeholder="1,0" className="rounded-lg px-2 py-1.5 text-xs outline-none w-20" style={inputStyle} /></div>
                   <button onClick={aplicar} disabled={aplicando} className="rounded-lg px-4 py-1.5 text-xs font-semibold disabled:opacity-50" style={{ background: 'var(--accent)', color: '#0a0a0a' }}>{aplicando ? 'Aplicando...' : 'Aplicar nas selecionadas'}</button>
+                </div>
+              )}
+
+              {/* (d) Busca rápida: filtra a tabela na hora por cliente ou contrato/proposta */}
+              {vendas.length > 0 && (
+                <div className="mb-3 flex items-center gap-2 rounded-lg px-3 py-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', maxWidth: 380 }}>
+                  <Search size={15} style={{ color: 'var(--muted-color)' }} />
+                  <input
+                    value={buscaVendas}
+                    onChange={(e) => setBuscaVendas(e.target.value)}
+                    placeholder="Buscar por cliente ou contrato..."
+                    className="flex-1 bg-transparent text-sm outline-none"
+                    style={{ color: 'var(--text)' }}
+                  />
+                  {buscaVendas && <button onClick={() => setBuscaVendas('')} className="text-[11px] shrink-0" style={{ color: 'var(--muted-color)' }}>limpar</button>}
                 </div>
               )}
 
@@ -984,7 +1198,7 @@ export default function ComissoesPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {[...vendasFiltradas].sort((a, b) => {
+                        {[...vendasVisiveis].sort((a, b) => {
                           const va = valorColuna(a, ordenarPor), vb = valorColuna(b, ordenarPor)
                           let cmp = 0
                           if (typeof va === 'string' && typeof vb === 'string') cmp = va.localeCompare(vb)
@@ -1020,9 +1234,17 @@ export default function ComissoesPage() {
                       </tbody>
                     </table>
                   </div>
+                  {vendasVisiveis.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-10 gap-1.5">
+                      <Search size={22} style={{ color: 'var(--muted-color)' }} />
+                      <p className="text-sm" style={{ color: 'var(--muted-color)' }}>Nenhuma venda para &quot;{buscaVendas}&quot;</p>
+                    </div>
+                  )}
                 </div>
               )}
             </>
+          )}
+          </div>
           )}
         </main>
       </div>

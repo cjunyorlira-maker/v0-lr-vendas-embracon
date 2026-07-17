@@ -167,7 +167,7 @@ export async function GET() {
       const emRisco = semEstorno ? false : pgtosCobertos < pgtoSeg
       const estorno = semEstorno ? 0 : (plano?.estorno_percent ? credito * (plano.estorno_percent / 100) : 0)
       return {
-        id: v.id, criado_em: v.criado_em, data_venda: v.data_venda || v.criado_em, empresa_id: v.empresa_id, equipe_id: v.equipe_id, vendedor_id: v.vendedor_id, cliente: cliente?.nome || '-', vendedor: vendedor?.nome || '-',
+        id: v.id, criado_em: v.criado_em, data_venda: v.data_venda || v.criado_em, empresa_id: v.empresa_id, equipe_id: v.equipe_id, vendedor_id: v.vendedor_id, numero_contrato: v.numero_contrato || null, numero_proposta: v.numero_proposta || null, cliente: cliente?.nome || '-', vendedor: vendedor?.nome || '-',
         plano: plano?.sigla || '-', adesao: plano?.adesao_percent ?? null, bem: plano?.bem || '-', credito,
         comissao_lr: comLR, comissao_lr_total: comLRTotal, parcelas_pagas: parcelasPagas, total_parcelas_comissao: parcelasComissao.length,
         percentual_vendedor: pVend, comissao_vendedor: comVend,

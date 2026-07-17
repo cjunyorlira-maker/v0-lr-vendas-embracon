@@ -24,6 +24,11 @@ export async function GET(req: NextRequest) {
     if (!me || !['master', 'representante', 'adm'].includes(me.role)) return NextResponse.json({ error: "Sem permissão" }, { status: 403 })
 
     const mapaId = req.nextUrl.searchParams.get('mapa_id')
+    const { escopoGlobal } = await getEscopo(me)
+    // filtro de empresa: só aplicável a escopo global (master/adm matriz).
+    // Para representante o escopo é forçado à empresa dele — o parâmetro é ignorado (segurança inalterada).
+    const empresaParam = req.nextUrl.searchParams.get('empresa') || ''
+    const empresaFiltro = escopoGlobal ? (empresaParam || null) : null
 
     // logo da empresa
     let logoUrl: string | null = null, empresaNome = ''
@@ -33,14 +38,52 @@ export async function GET(req: NextRequest) {
     }
 
     // lista de mapas (histórico)
-    const { data: mapas } = await supabaseAdmin.from('mapas_comissao').select('*').order('data_encerramento', { ascending: false })
+    let { data: mapas } = await supabaseAdmin.from('mapas_comissao').select('*').order('data_encerramento', { ascending: false })
+    mapas = mapas || []
+
+    // Quando NÃO é escopo global (representante) OU há empresa filtrada, os totais gravados por mapa
+    // (que somam todas as empresas) precisam ser recalculados considerando só os contratos da(s) empresa(s) permitida(s).
+    const precisaRecalcular = !escopoGlobal || !!empresaFiltro
+    if (precisaRecalcular && mapas.length > 0) {
+      const idsMapas = mapas.map((m: any) => m.id)
+      const { data: todasLinhas } = await supabaseAdmin.from('mapa_linhas').select('mapa_id, contrato, valor_comissao').in('mapa_id', idsMapas)
+      const contratosSet = [...new Set((todasLinhas || []).map((l: any) => String(l.contrato)))]
+      const empresaPorContratoAll: Record<string, string> = {}
+      if (contratosSet.length > 0) {
+        const { data: vendasAll } = await supabaseAdmin.from('vendas').select('numero_contrato, numero_proposta, empresa_id').or(`numero_contrato.in.(${contratosSet.join(',')}),numero_proposta.in.(${contratosSet.join(',')})`)
+        for (const v of (vendasAll || [])) {
+          if (v.numero_contrato) empresaPorContratoAll[String(v.numero_contrato)] = v.empresa_id
+          if (v.numero_proposta) empresaPorContratoAll[String(v.numero_proposta)] = v.empresa_id
+        }
+      }
+      const empresaPermitida = (contrato: string) => {
+        const emp = empresaPorContratoAll[String(contrato)]
+        if (!escopoGlobal && emp !== me.empresa_id) return false      // representante: só a empresa dele
+        if (empresaFiltro && emp !== empresaFiltro) return false      // filtro ativo (escopo global)
+        return true
+      }
+      const agg: Record<string, { total: number; contratos: Set<string> }> = {}
+      for (const l of (todasLinhas || [])) {
+        if (!empresaPermitida(l.contrato)) continue
+        const k = String(l.mapa_id)
+        if (!agg[k]) agg[k] = { total: 0, contratos: new Set() }
+        agg[k].total += (l.valor_comissao || 0)
+        agg[k].contratos.add(String(l.contrato))
+      }
+      mapas = mapas
+        .map((m: any) => {
+          const a = agg[String(m.id)]
+          return { ...m, total_comissao: a ? a.total : 0, total_contratos: a ? a.contratos.size : 0 }
+        })
+        // esconde mapas que ficaram sem nenhum contrato da empresa filtrada/permitida
+        .filter((m: any) => m.total_contratos > 0)
+    }
 
     // se pediu um mapa específico, traz as linhas organizadas por cliente
     let detalhe = null
     if (mapaId) {
       const { data: linhas } = await supabaseAdmin.from('mapa_linhas').select('contrato, consorciado, percentual_comis, parcela_de, parcela_ate, valor_comissao').eq('mapa_id', mapaId)
-      const { escopoGlobal } = await getEscopo(me)
-      // cruza os contratos com as vendas pra pegar nome do cliente E a empresa de cada contrato
+      // cruza os contratos com as vendas pra pegar nome do cliente e a empresa de cada contrato
       const contratos = [...new Set((linhas || []).map((l: any) => String(l.contrato)))]
       const nomePorContrato: Record<string, string> = {}
       const empresaPorContrato: Record<string, string> = {}
@@ -52,10 +95,12 @@ export async function GET(req: NextRequest) {
           if (v.numero_proposta) { nomePorContrato[String(v.numero_proposta)] = nome || ''; empresaPorContrato[String(v.numero_proposta)] = v.empresa_id }
         }
       }
-      // filtra: se NÃO for escopo global, só mostra contratos cuja venda é da empresa do usuário
+      // filtra: representante só vê a própria empresa; escopo global respeita o filtro de empresa se houver
       const linhasFiltradas = (linhas || []).filter((l: any) => {
-        if (escopoGlobal) return true
-        return empresaPorContrato[String(l.contrato)] === me.empresa_id
+        const emp = empresaPorContrato[String(l.contrato)]
+        if (!escopoGlobal && emp !== me.empresa_id) return false
+        if (empresaFiltro && emp !== empresaFiltro) return false
+        return true
       })
       // agrupa por contrato, montando uma linha resumo por cliente (já filtrado por empresa)
       const porCliente: Record<string, any> = {}
