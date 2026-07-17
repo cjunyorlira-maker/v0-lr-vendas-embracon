@@ -3,8 +3,9 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { Trophy, Loader2, Users, Building2, User, Shield, Gem, Zap, CalendarRange, Tv, ChevronUp, ChevronDown, Minus, Home, Globe, Flame, Crown, Swords, ScrollText, ChevronRight, Medal, Timer, Award } from 'lucide-react'
+import { Trophy, Loader2, Users, Building2, User, Shield, Gem, Zap, CalendarRange, Tv, ChevronUp, ChevronDown, Minus, Home, Globe, Flame, Crown, Swords, ScrollText, ChevronRight, Medal, Timer, Award, Share2, Check } from 'lucide-react'
 import { dispararConfete } from '@/lib/confetti'
+import { compartilharPodio } from '@/lib/podio-share'
 
 interface RankItem { posicao: number; nome: string; foto?: string; valor: number; qtd: number; ticket_medio: number; maior_venda: number; equipe_nome?: string | null; empresa_nome?: string | null; empresa_id?: string | null; logo?: string | null; vendedor_id?: string | null; rei_semana?: boolean; streak_semanas?: number }
 
@@ -130,6 +131,9 @@ export default function RankingPage() {
   const [tickerIdx, setTickerIdx] = useState(0)
   const [tickerFade, setTickerFade] = useState(true)
   const [hallAberto, setHallAberto] = useState(false)
+  const [periodoDatas, setPeriodoDatas] = useState<{ inicio: string; fim: string } | null>(null)
+  const [gerandoImg, setGerandoImg] = useState(false)
+  const [toast, setToast] = useState<string | null>(null)
   const hallConfetou = useRef(false)
   const liderAnterior = useRef<string | null>(null)
 
@@ -152,7 +156,7 @@ export default function RankingPage() {
     fetch('/api/usuarios/listar').then(r => r.json()).then(d => { if (d.empresas) setEmpresas(d.empresas) }).catch(() => {})
   }, [])
 
-  // auto-refresh de 60s no modo telão OU no Ranking Geral (tempo real)
+  // auto-refresh de 60s no modo tel��o OU no Ranking Geral (tempo real)
   useEffect(() => {
     if (!telao && escopo !== 'geral') return
     const id = setInterval(() => loadData(), 60000)
@@ -231,6 +235,7 @@ export default function RankingPage() {
       setReiSemana(data.rei_semana || null)
       setSemanaLider(data.semana_atual_lider || null)
       setRecordes(data.recordes || null)
+      setPeriodoDatas(data.periodo || null)
       setRole(data.meu_role)
       if (data.producoes) setProducoes(data.producoes)
       if (data.producao_ativa && !producaoId && !periodo) setProducaoId(data.producao_ativa)
@@ -272,6 +277,34 @@ export default function RankingPage() {
     } else {
       try { if (document.fullscreenElement) await document.exitFullscreen() } catch {}
       setTelao(false)
+    }
+  }
+
+  const modoLabel = modo === 'vendedor' ? 'Vendedores' : modo === 'equipe' ? 'Equipes' : 'Representações'
+  const periodoTitulo = periodo === 'semana'
+    ? 'Melhores da Semana'
+    : periodo === 'ano'
+      ? 'Acumulado do Ano'
+      : (producoes.find(p => p.id === producaoId)?.nome || 'Ranking')
+
+  async function compartilharPodioArt() {
+    if (gerandoImg || ranking.length === 0) return
+    setGerandoImg(true)
+    try {
+      const itens = ranking.slice(0, 5).map(r => ({
+        posicao: r.posicao, nome: r.nome, foto: r.foto, valor: r.valor, qtd: r.qtd,
+        ticket_medio: r.ticket_medio, equipe_nome: r.equipe_nome, empresa_nome: r.empresa_nome, logo: r.logo,
+      }))
+      const slug = `${periodoTitulo}-${modoLabel}`.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+      const res = await compartilharPodio(itens, {
+        periodoTitulo, modoLabel, datas: periodoDatas,
+        usaLogo: escopo === 'geral' && modo === 'representante',
+      }, slug)
+      if (res === 'baixado') { setToast('Imagem salva — solta no grupo! 🔥'); setTimeout(() => setToast(null), 4000) }
+    } catch {
+      setToast('Não foi possível gerar a imagem.'); setTimeout(() => setToast(null), 4000)
+    } finally {
+      setGerandoImg(false)
     }
   }
 
@@ -496,7 +529,11 @@ export default function RankingPage() {
           {empresas.map(e => <option key={e.id} value={e.id} style={{ background: '#131313' }}>{e.nome}</option>)}
         </select>
       )}
-      <button onClick={toggleTelao} className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-all ml-auto" style={{ background: telao ? 'var(--accent)' : 'rgba(255,255,255,0.03)', border: `1px solid ${telao ? 'var(--accent)' : 'var(--border)'}`, color: telao ? '#0a0a0a' : 'var(--muted-color)' }}><Tv size={13} />Apresentar</button>
+      <button onClick={compartilharPodioArt} disabled={gerandoImg || ranking.length === 0} className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-all ml-auto disabled:opacity-50" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.3)', color: 'var(--accent)' }}>
+        {gerandoImg ? <Loader2 size={13} className="animate-spin" /> : <Share2 size={13} />}
+        {gerandoImg ? 'Gerando…' : 'Compartilhar pódio'}
+      </button>
+      <button onClick={toggleTelao} className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-all" style={{ background: telao ? 'var(--accent)' : 'rgba(255,255,255,0.03)', border: `1px solid ${telao ? 'var(--accent)' : 'var(--border)'}`, color: telao ? '#0a0a0a' : 'var(--muted-color)' }}><Tv size={13} />Apresentar</button>
     </div>
   )
 
@@ -535,6 +572,12 @@ export default function RankingPage() {
           {conteudo}
         </main>
       </div>
+      {toast && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-full px-5 py-3 anim-fade-up" style={{ background: 'var(--accent)', color: '#0a0a0a', boxShadow: '0 12px 40px rgba(212,175,55,0.35)' }}>
+          <Check size={16} />
+          <span className="text-sm font-semibold">{toast}</span>
+        </div>
+      )}
     </div>
   )
 }
