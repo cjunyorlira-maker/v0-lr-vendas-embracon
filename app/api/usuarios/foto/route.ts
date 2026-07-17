@@ -21,19 +21,38 @@ export async function POST(req: NextRequest) {
     const { data: { user: authUser } } = await supabaseUser.auth.getUser()
     if (!authUser) return NextResponse.json({ error: "Não autenticado" }, { status: 401 })
 
-    const { data: usuario } = await supabaseAdmin
+    const { data: me } = await supabaseAdmin
       .from('usuarios')
-      .select('id, foto_url')
+      .select('id, role, empresa_id, foto_url')
       .eq('auth_user_id', authUser.id)
       .single()
 
-    if (!usuario) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 })
+    if (!me) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 404 })
 
     const body = await req.json()
-    const { foto_base64 } = body
+    const { foto_base64, usuario_id } = body
 
     if (!foto_base64) {
       return NextResponse.json({ error: "Foto é obrigatória" }, { status: 400 })
+    }
+
+    // Alvo: por padrão o próprio usuário; se vier usuario_id, é uma foto de outro (gestor sobe pela equipe)
+    let usuario = me as { id: string; foto_url: string | null }
+    if (usuario_id && usuario_id !== me.id) {
+      if (!['master', 'representante', 'adm'].includes(me.role)) {
+        return NextResponse.json({ error: "Sem permissão para alterar a foto de outro usuário" }, { status: 403 })
+      }
+      const { data: alvo } = await supabaseAdmin
+        .from('usuarios')
+        .select('id, empresa_id, foto_url')
+        .eq('id', usuario_id)
+        .single()
+      if (!alvo) return NextResponse.json({ error: "Usuário alvo não encontrado" }, { status: 404 })
+      // representante/adm só podem alterar fotos de usuários da própria empresa
+      if (me.role !== 'master' && alvo.empresa_id !== me.empresa_id) {
+        return NextResponse.json({ error: "Esse usuário não é da sua empresa" }, { status: 403 })
+      }
+      usuario = { id: alvo.id, foto_url: alvo.foto_url }
     }
 
     const matches = String(foto_base64).match(/^data:(.+);base64,(.+)$/)
