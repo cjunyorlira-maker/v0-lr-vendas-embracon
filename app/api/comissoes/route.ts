@@ -65,8 +65,7 @@ export async function GET() {
       sexta.setHours(18, 0, 0, 0)
       return sexta
     }
-    const agora = new Date()
-    const { data: mapasAll } = await supabaseAdmin.from('mapas_comissao').select('id, data_encerramento')
+    const { data: mapasAll } = await supabaseAdmin.from('mapas_comissao').select('id, data_encerramento, pago')
     let linhasAll: any[] = []
     {
       let from = 0
@@ -81,13 +80,14 @@ export async function GET() {
         from += PAGE
       }
     }
+    // Status de pagamento CONFIRMADO manualmente pelo master (coluna mapas_comissao.pago).
+    // Não é mais inferido pela data: um borderô com a sexta já vencida mas ainda não confirmado
+    // continua na fila como devido (pagamento atrasado), que é o comportamento correto.
     const mapaPago = new Map<string, boolean>()
     const mapaDataPag = new Map<string, Date>()
     for (const mp of (mapasAll || []) as any[]) {
-      if (!mp.data_encerramento) { mapaPago.set(mp.id, true); continue }
-      const dp = dataPagamentoMapa(mp.data_encerramento)
-      mapaDataPag.set(mp.id, dp)
-      mapaPago.set(mp.id, agora >= dp)
+      mapaPago.set(mp.id, mp.pago === true)
+      if (mp.data_encerramento) mapaDataPag.set(mp.id, dataPagamentoMapa(mp.data_encerramento))
     }
     // por contrato: recebido pago, mapeado total, e a receber separado por data
     const recebidoPagoPorContrato = new Map<string, number>()
@@ -106,13 +106,16 @@ export async function GET() {
     }
     // fila de pagamentos pendentes agrupada por data (para o card Próximo Pagamento)
     const filaPorData = new Map<string, number>() // 'ISO' -> total do mapa
+    const mapaIdsPorData = new Map<string, string[]>() // 'ISO' -> ids dos mapas daquela sexta (para marcar pago)
     for (const mp of (mapasAll || []) as any[]) {
       if (mapaPago.get(mp.id)) continue
       const dp = mapaDataPag.get(mp.id); if (!dp) continue
+      const iso = dp.toISOString()
       const totalMapa = (linhasAll || []).filter((l: any) => l.mapa_id === mp.id).reduce((s: number, l: any) => s + (l.valor_comissao || 0), 0)
-      filaPorData.set(dp.toISOString(), (filaPorData.get(dp.toISOString()) || 0) + totalMapa)
+      filaPorData.set(iso, (filaPorData.get(iso) || 0) + totalMapa)
+      mapaIdsPorData.set(iso, [...(mapaIdsPorData.get(iso) || []), mp.id])
     }
-    const filaPagamentos = Array.from(filaPorData.entries()).map(([data, total]) => ({ data, total })).sort((a, b) => a.data.localeCompare(b.data))
+    const filaPagamentos = Array.from(filaPorData.entries()).map(([data, total]) => ({ data, total, mapa_ids: mapaIdsPorData.get(data) || [] })).sort((a, b) => a.data.localeCompare(b.data))
 
     // períodos de produção configurados
     const { data: producoes } = await supabaseAdmin.from('producoes').select('*').order('data_inicio', { ascending: false })
@@ -233,6 +236,19 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json()
+
+    // confirmar / reverter repasse de borderô (só master)
+    if (body.acao === 'marcar_pago' || body.acao === 'desmarcar_pago') {
+      if (me.role !== 'master') return NextResponse.json({ error: 'Sem permissão' }, { status: 403 })
+      const ids = Array.isArray(body.mapa_ids) ? body.mapa_ids.filter(Boolean) : []
+      if (ids.length === 0) return NextResponse.json({ error: 'Nenhum borderô informado' }, { status: 400 })
+      const patch = body.acao === 'marcar_pago'
+        ? { pago: true, pago_em: new Date().toISOString(), pago_por: me.id }
+        : { pago: false, pago_em: null, pago_por: null }
+      const { error } = await supabaseAdmin.from('mapas_comissao').update(patch).in('id', ids)
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ ok: true })
+    }
 
     // criar período de produção (só master)
     if (body.acao === 'criar_producao') {

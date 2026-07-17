@@ -89,7 +89,10 @@ export default function ComissoesPage() {
   const [mObs, setMObs] = useState('')
   const [mSalvando, setMSalvando] = useState(false)
   const [proximaSextaPag, setProximaSextaPag] = useState<string | null>(null)
-  const [filaPagamentos, setFilaPagamentos] = useState<{ data: string; total: number }[]>([])
+  const [filaPagamentos, setFilaPagamentos] = useState<{ data: string; total: number; mapa_ids?: string[] }[]>([])
+  // confirmação de repasse (só master)
+  const [confirmarPago, setConfirmarPago] = useState<{ data: string; total: number; mapa_ids: string[] } | null>(null)
+  const [marcandoPago, setMarcandoPago] = useState(false)
   const [vendasSeguro, setVendasSeguro] = useState<any[]>([])
   const [loadingSeguro, setLoadingSeguro] = useState(false)
   const [mapas, setMapas] = useState<any[]>([])
@@ -336,6 +339,21 @@ export default function ComissoesPage() {
     await fetch('/api/comissoes/seguro', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ venda_id: vendaId, recebida: !atual }) })
   }
 
+  // Confirmar/reverter repasse de borderô (só master). Recarrega tudo para a fila reagrupar.
+  async function alterarPagoMapas(mapaIds: string[], marcar: boolean) {
+    if (mapaIds.length === 0) return
+    setMarcandoPago(true)
+    try {
+      const res = await fetch('/api/comissoes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: marcar ? 'marcar_pago' : 'desmarcar_pago', mapa_ids: mapaIds }) })
+      if (res.ok) {
+        await loadData(true)
+        if (aba === 'mapa') await carregarMapas()
+      }
+    } catch {}
+    setMarcandoPago(false)
+    setConfirmarPago(null)
+  }
+
   const [ordenarPor, setOrdenarPor] = useState<string>('recebido')
   const [ordemAsc, setOrdemAsc] = useState(false)
   function clicarOrdenar(coluna: string) {
@@ -423,20 +441,20 @@ export default function ComissoesPage() {
   // Master: 0,25% sobre toda a produção (crédito) do filtro atual
   const producaoTotal = vendasFiltradas.reduce((s, v) => s + (v.credito || 0), 0)
   const liquidoRep = totalLR - totalVendedores - totalSupervisores - totalSupervisorPropria
-  // Recebido por semana (últimas 8): agrupa os mapas pela sexta de pagamento (Embracon paga sexta da semana seguinte ao encerramento)
+  // Sexta de pagamento da Embracon (sexta da semana seguinte ao encerramento) em ISO
+  const sextaPagIso = (dataEnc: string) => {
+    const d = new Date(dataEnc + 'T00:00:00')
+    const dow = d.getDay() === 0 ? 7 : d.getDay()
+    const proxSeg = new Date(d); proxSeg.setDate(d.getDate() + (8 - dow))
+    const sexta = new Date(proxSeg); sexta.setDate(proxSeg.getDate() + 4)
+    return sexta.toISOString()
+  }
+  // Recebido por semana (últimas 8): agrupa os mapas pela sexta de pagamento
   const recebidoPorSemana = useMemo(() => {
-    const sextaPag = (dataEnc: string) => {
-      const d = new Date(dataEnc + 'T00:00:00')
-      const dow = d.getDay() === 0 ? 7 : d.getDay()
-      const proxSeg = new Date(d); proxSeg.setDate(d.getDate() + (8 - dow))
-      const sexta = new Date(proxSeg); sexta.setDate(proxSeg.getDate() + 4)
-      return sexta
-    }
     const porSemana = new Map<string, number>()
     for (const m of mapas as any[]) {
       if (!m.data_encerramento) continue
-      const s = sextaPag(m.data_encerramento)
-      const chave = s.toISOString().slice(0, 10)
+      const chave = sextaPagIso(m.data_encerramento).slice(0, 10)
       porSemana.set(chave, (porSemana.get(chave) || 0) + (m.total_comissao || 0))
     }
     return Array.from(porSemana.entries())
@@ -631,12 +649,27 @@ export default function ComissoesPage() {
                   )}
                   <p className="text-sm mb-3" style={{ color: 'var(--muted-color)' }}>Mapas de comissão importados. Clique para ver e baixar.</p>
                   {mapas.length === 0 ? <p className="text-xs py-8 text-center" style={{ color: 'var(--muted-color)' }}>Nenhum mapa importado ainda. Importe no botão acima.</p> : mapas.map(m => (
-                    <div key={m.id} onClick={() => abrirMapa(m.id)} className="flex items-center justify-between rounded-xl p-4 cursor-pointer" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
-                      <div>
+                    <div key={m.id} onClick={() => abrirMapa(m.id)} className="flex items-center justify-between gap-3 rounded-xl p-4 cursor-pointer" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+                      <div className="min-w-0">
                         <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Mapa de {m.data_encerramento ? new Date(m.data_encerramento + 'T00:00:00').toLocaleDateString('pt-BR') : '-'}</p>
                         <p className="text-xs" style={{ color: 'var(--muted-color)' }}>{m.total_contratos} contratos · {fmtMoeda(m.total_comissao)}</p>
                       </div>
-                      <ChevronRight size={16} style={{ color: 'var(--muted-color)' }} />
+                      <div className="flex items-center gap-2 shrink-0">
+                        {m.pago ? (
+                          <span className="flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-full" style={{ background: 'rgba(34,197,94,0.15)', color: '#22c55e' }}><Check size={12} />Pago{m.pago_em ? ` em ${new Date(m.pago_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}` : ''}</span>
+                        ) : (
+                          <span className="flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-full" style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}><Clock size={12} />Aguardando repasse</span>
+                        )}
+                        {meuRole === 'master' && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); if (m.pago) alterarPagoMapas([m.id], false); else setConfirmarPago({ data: m.data_encerramento ? sextaPagIso(m.data_encerramento) : '', total: m.total_comissao || 0, mapa_ids: [m.id] }) }}
+                            disabled={marcandoPago}
+                            className="text-[11px] font-medium px-2.5 py-1 rounded-lg disabled:opacity-50"
+                            style={m.pago ? { background: 'rgba(255,255,255,0.04)', color: 'var(--muted-color)', border: '1px solid var(--border)' } : { background: 'rgba(34,197,94,0.12)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.4)' }}
+                          >{m.pago ? 'Desmarcar' : 'Marcar pago'}</button>
+                        )}
+                        <ChevronRight size={16} style={{ color: 'var(--muted-color)' }} />
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1038,7 +1071,18 @@ export default function ComissoesPage() {
                   <div className="flex items-center gap-2 mb-1.5"><Clock size={14} style={{ color: '#3b82f6' }} /><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Próximo Pagamento</p></div>
                   {filaExibida.length > 0 ? (
                     <>
-                      <p className="text-2xl font-bold tabular-nums" style={{ color: '#3b82f6' }}>{fmtMoeda(filaExibida[0].total)}</p>
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <p className="text-2xl font-bold tabular-nums" style={{ color: '#3b82f6' }}>{fmtMoeda(filaExibida[0].total)}</p>
+                        {meuRole === 'master' && !temFiltro && (filaExibida[0] as any).mapa_ids?.length > 0 && (
+                          <button
+                            onClick={() => setConfirmarPago({ data: filaExibida[0].data, total: filaExibida[0].total, mapa_ids: (filaExibida[0] as any).mapa_ids })}
+                            className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors"
+                            style={{ background: 'rgba(34,197,94,0.15)', border: '1px solid #22c55e', color: '#22c55e' }}
+                          >
+                            <Check size={14} />Marcar como pago
+                          </button>
+                        )}
+                      </div>
                       <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>Embracon paga {fmtDataPag(filaExibida[0].data)} (sexta) · faltam {diasAtePag(filaExibida[0].data)} dia(s)</p>
                       {temFiltro && <p className="text-[9px]" style={{ color: '#60a5fa' }}>somente vendas do filtro atual</p>}
                     </>
@@ -1251,6 +1295,23 @@ export default function ComissoesPage() {
           )}
         </main>
       </div>
+
+      {/* Modal de confirmação de repasse (só master) */}
+      {confirmarPago && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }} onClick={() => !marcandoPago && setConfirmarPago(null)} />
+          <div className="relative w-full max-w-sm rounded-xl p-6" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+            <div className="flex items-center gap-2 mb-3"><Check size={18} style={{ color: '#22c55e' }} /><h3 className="text-base font-semibold" style={{ color: 'var(--text)' }}>Confirmar repasse</h3></div>
+            <p className="text-sm leading-relaxed mb-5" style={{ color: 'var(--text2)' }}>
+              Confirma o repasse de <b style={{ color: '#22c55e' }}>{fmtMoeda(confirmarPago.total)}</b> referente ao borderô de <b style={{ color: 'var(--text)' }}>{fmtDataPag(confirmarPago.data)}</b>? Ele sai da fila e o próximo assume.
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setConfirmarPago(null)} disabled={marcandoPago} className="rounded-lg px-4 py-2 text-xs font-medium disabled:opacity-50" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>Cancelar</button>
+              <button onClick={() => alterarPagoMapas(confirmarPago.mapa_ids, true)} disabled={marcandoPago} className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold disabled:opacity-50" style={{ background: '#22c55e', color: '#0a0a0a' }}>{marcandoPago ? <Loader2 size={13} className="animate-spin" /> : <Check size={14} />}Confirmar pago</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
