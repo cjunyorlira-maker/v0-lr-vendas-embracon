@@ -46,6 +46,7 @@ export interface Gamificacao {
     maior_venda_unica: { vendedor: string; cliente: string; valor: number; data: string } | null
     melhor_semana_individual: { vendedor: string; valor: number; datas: { ini: string; fim: string } } | null
     melhor_producao_equipe: { equipe: string; producao: string; valor: number } | null
+    melhor_producao_individual: { vendedor: string; foto?: string; equipe?: string; empresa?: string; producao: string; valor: number } | null
     contemplacao_mais_rapida: { cliente: string; dias: number; data_venda: string; data_assembleia: string } | null
   }
 }
@@ -56,7 +57,7 @@ export async function calcularGamificacao(
 ): Promise<Gamificacao> {
   // Histórico completo de vendas (paginado)
   const historico = await fetchAll(admin, (q) =>
-    q.select('valor_credito, vendedor_id, equipe_id, empresa_id, data_venda, usuarios:vendedor_id(nome, foto_url, role), equipes(nome), clientes(nome)')
+    q.select('valor_credito, vendedor_id, equipe_id, empresa_id, data_venda, usuarios:vendedor_id(nome, foto_url, role), equipes(nome), empresas(nome), clientes(nome)')
   )
 
   const hojeIdx = weekIndex(new Date().toISOString().slice(0, 10))
@@ -69,6 +70,7 @@ export async function calcularGamificacao(
   const semanasPorVend = new Map<string, Set<number>>()          // streak
   const somaVendWeek = new Map<string, { vendedor: string; valor: number; idx: number }>()
   const prodEquipe = new Map<string, { equipe: string; producao: string; valor: number }>()
+  const vendProd = new Map<string, { vendedor: string; foto?: string; equipe?: string; empresa?: string; producao: string; valor: number }>() // recorde de melhor produção individual
   let maiorVenda: Gamificacao['recordes']['maior_venda_unica'] = null
 
   const achaProducao = (dataStr: string) => producoes.find(p => p.data_inicio <= dataStr && p.data_fim >= dataStr)
@@ -111,6 +113,15 @@ export async function calcularGamificacao(
       const wk = `${v.vendedor_id}|${idx}`
       const s = somaVendWeek.get(wk) || { vendedor: u?.nome || 'Vendedor', valor: 0, idx }
       s.valor += cred; somaVendWeek.set(wk, s)
+      // recorde de melhor produção individual (soma por vendedor+produção)
+      const prodV = achaProducao(v.data_venda)
+      if (prodV) {
+        const pk = `${v.vendedor_id}|${prodV.id}`
+        const vp = vendProd.get(pk) || { vendedor: u?.nome || 'Vendedor', foto: u?.foto_url, equipe: eq?.nome, empresa: firstOf<any>(v.empresas)?.nome, producao: prodV.nome, valor: 0 }
+        vp.valor += cred
+        if (eq?.nome) vp.equipe = eq.nome
+        vendProd.set(pk, vp)
+      }
     }
 
     // melhor produção de equipe (soma por produção+equipe)
@@ -154,6 +165,12 @@ export async function calcularGamificacao(
 
   const melhorProdEquipe = topMap(prodEquipe)
 
+  // melhor produção individual (maior soma de um vendedor em uma única produção)
+  let melhorProdIndiv: Gamificacao['recordes']['melhor_producao_individual'] = null
+  for (const vp of vendProd.values()) {
+    if (!melhorProdIndiv || vp.valor > melhorProdIndiv.valor) melhorProdIndiv = vp
+  }
+
   // contemplação mais rápida (lances_mensais.contemplado = true)
   let contemplacao: Gamificacao['recordes']['contemplacao_mais_rapida'] = null
   try {
@@ -193,6 +210,7 @@ export async function calcularGamificacao(
       maior_venda_unica: maiorVenda,
       melhor_semana_individual: melhorSemana,
       melhor_producao_equipe: melhorProdEquipe,
+      melhor_producao_individual: melhorProdIndiv,
       contemplacao_mais_rapida: contemplacao,
     },
   }

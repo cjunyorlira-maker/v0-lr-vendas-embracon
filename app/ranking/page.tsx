@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, memo } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { Trophy, Loader2, Users, Building2, User, Shield, Gem, Zap, CalendarRange, Tv, ChevronUp, ChevronDown, Minus, Home, Globe, Flame, Crown, Swords, ScrollText, ChevronRight, Medal, Timer, Award, Share2, Check } from 'lucide-react'
+import { Trophy, Loader2, Users, Building2, User, Shield, Zap, CalendarRange, Tv, ChevronUp, ChevronDown, Minus, Home, Globe, Flame, Crown, Swords, ScrollText, ChevronRight, Medal, Timer, Award, Share2, Check } from 'lucide-react'
 import { dispararConfete } from '@/lib/confetti'
 import { compartilharPodio } from '@/lib/podio-share'
 
@@ -18,6 +18,7 @@ interface Recordes {
   maior_venda_unica: { vendedor: string; cliente: string; valor: number; data: string } | null
   melhor_semana_individual: { vendedor: string; valor: number; datas: { ini: string; fim: string } } | null
   melhor_producao_equipe: { equipe: string; producao: string; valor: number } | null
+  melhor_producao_individual: { vendedor: string; foto?: string; equipe?: string; empresa?: string; producao: string; valor: number } | null
   contemplacao_mais_rapida: { cliente: string; dias: number; data_venda: string; data_assembleia: string } | null
 }
 
@@ -111,6 +112,47 @@ function PlacaRecorde({ icon: Icon, titulo, detentor, valor, sub, novo }: { icon
   )
 }
 
+// ticker da disputa: componente isolado e memoizado — a rotação a cada 6s NÃO re-renderiza o pódio
+const Ticker = memo(function Ticker({ frases }: { frases: string[] }) {
+  const [idx, setIdx] = useState(0)
+  const [fade, setFade] = useState(true)
+  useEffect(() => {
+    setIdx(0)
+    if (frases.length <= 1) return
+    const id = setInterval(() => {
+      setFade(false)
+      setTimeout(() => { setIdx(i => (i + 1) % frases.length); setFade(true) }, 400)
+    }, 6000)
+    return () => clearInterval(id)
+  }, [frases])
+  if (frases.length === 0) return null
+  return (
+    <div className="rounded-full px-4 py-2 mb-4 flex items-center gap-2 overflow-hidden" style={{ background: 'linear-gradient(90deg, rgba(212,175,55,0.14), rgba(0,0,0,0.15))', border: '1px solid rgba(212,175,55,0.25)' }}>
+      <Swords size={14} style={{ color: 'var(--accent)' }} className="shrink-0" />
+      <p className="text-xs sm:text-sm font-medium truncate transition-opacity duration-300 text-pretty" style={{ color: 'var(--text2)', opacity: fade ? 1 : 0 }}>
+        {frases[idx] || frases[0]}
+      </p>
+    </div>
+  )
+})
+
+// card de destaque impactante (foto/escudo à esquerda, nome pesado, valor grande, borda esquerda grossa + brilho no hover)
+function CardDestaque({ cor, icon: Icon, foto, avatarNome, label, nome, valor, sub, animCls }: { cor: string; icon?: any; foto?: string; avatarNome?: string; label: string; nome: string; valor: string; sub?: string | null; animCls: string }) {
+  return (
+    <div className={`card-glow relative rounded-xl p-4 flex items-center gap-4 ${animCls}`} style={{ minHeight: 96, background: `${cor}14`, border: `1px solid ${cor}40`, borderLeft: `3px solid ${cor}`, ['--glow' as any]: `${cor}44` }}>
+      {avatarNome !== undefined
+        ? <Avatar nome={avatarNome} foto={foto} size={56} borderColor={cor} />
+        : <div className="flex items-center justify-center rounded-xl shrink-0" style={{ width: 56, height: 56, background: `${cor}1f`, border: `1px solid ${cor}55` }}>{Icon && <Icon size={26} style={{ color: cor }} />}</div>}
+      <div className="min-w-0 flex-1">
+        <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--muted-color)' }}>{label}</p>
+        <p className="font-extrabold leading-tight truncate" style={{ color: 'var(--text)', fontSize: 18 }}>{nome}</p>
+        <p className="font-bold font-mono leading-tight" style={{ color: cor, fontSize: 22 }}>{valor}</p>
+        {sub && <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--muted-color)' }}>{sub}</p>}
+      </div>
+    </div>
+  )
+}
+
 export default function RankingPage() {
   const [ranking, setRanking] = useState<RankItem[]>([])
   const [destaques, setDestaques] = useState<Destaques | null>(null)
@@ -128,14 +170,15 @@ export default function RankingPage() {
   const [reiSemana, setReiSemana] = useState<ReiSemana | null>(null)
   const [semanaLider, setSemanaLider] = useState<{ nome: string; valor: number } | null>(null)
   const [recordes, setRecordes] = useState<Recordes | null>(null)
-  const [tickerIdx, setTickerIdx] = useState(0)
-  const [tickerFade, setTickerFade] = useState(true)
   const [hallAberto, setHallAberto] = useState(false)
   const [periodoDatas, setPeriodoDatas] = useState<{ inicio: string; fim: string } | null>(null)
   const [gerandoImg, setGerandoImg] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
+  const [jaAnimou, setJaAnimou] = useState(false) // anima entrada só na 1ª carga
   const hallConfetou = useRef(false)
   const liderAnterior = useRef<string | null>(null)
+  const primeiraCarga = useRef(true)
+  const animCls = jaAnimou ? '' : 'anim-fade-up'
 
   // ao voltar para "Minha operação", garante um modo permitido para o role
   useEffect(() => {
@@ -198,17 +241,6 @@ export default function RankingPage() {
     return f
   }, [ranking, variacao, reiSemana, recordes, semanaLider])
 
-  // rotação do ticker a cada 6s com fade
-  useEffect(() => {
-    setTickerIdx(0)
-    if (frasesTicker.length <= 1) return
-    const id = setInterval(() => {
-      setTickerFade(false)
-      setTimeout(() => { setTickerIdx(i => (i + 1) % frasesTicker.length); setTickerFade(true) }, 400)
-    }, 6000)
-    return () => clearInterval(id)
-  }, [frasesTicker])
-
   // confete ao abrir o hall quando há recorde novo (últimos 7 dias)
   const recordeNovo = useMemo(() => {
     if (!recordes) return false
@@ -216,7 +248,8 @@ export default function RankingPage() {
   }, [recordes])
 
   async function loadData() {
-    setLoading(true)
+    // spinner só quando ainda não há dados; refreshes trocam os dados em background sem desmontar a tela
+    if (ranking.length === 0) setLoading(true)
     const params = (extra: string) => {
       let u = `/api/ranking?modo=${modo}${extra}`
       if (escopo === 'geral') u += `&escopo=geral`
@@ -266,6 +299,12 @@ export default function RankingPage() {
           } catch { setVariacao({}) }
         } else setVariacao({})
       } else setVariacao({})
+
+      // após a 1ª carga bem-sucedida, desliga as animações de entrada (não re-piscam nos refreshes)
+      if (primeiraCarga.current) {
+        primeiraCarga.current = false
+        setTimeout(() => setJaAnimou(true), 900)
+      }
     }
     setLoading(false)
   }
@@ -284,7 +323,7 @@ export default function RankingPage() {
   const periodoTitulo = periodo === 'semana'
     ? 'Melhores da Semana'
     : periodo === 'ano'
-      ? 'Acumulado do Ano'
+      ? 'Melhores do Ano'
       : (producoes.find(p => p.id === producaoId)?.nome || 'Ranking')
 
   async function compartilharPodioArt() {
@@ -342,7 +381,7 @@ export default function RankingPage() {
     // no Ranking Geral + modo representações, mostra o logo da empresa no lugar da foto
     const usaLogo = escopo === 'geral' && modo === 'representante' && !!item.logo
     return (
-      <div className="flex-1 flex flex-col items-center rounded-2xl px-4 text-center anim-fade-up" style={{
+      <div className={`flex-1 flex flex-col items-center rounded-2xl px-4 text-center ${animCls}`} style={{
         animationDelay: delay,
         paddingTop: primeiro ? 20 : 28, paddingBottom: primeiro ? 28 : 20,
         marginTop: primeiro ? 0 : 20,
@@ -380,16 +419,9 @@ export default function RankingPage() {
         <div className="flex flex-col items-center justify-center py-12 gap-2"><Trophy size={32} style={{ color: 'var(--muted-color)' }} /><p className="text-sm" style={{ color: 'var(--muted-color)' }}>Nenhuma venda no período</p></div>
       ) : (
         <>
-          {frasesTicker.length > 0 && (
-            <div className="rounded-full px-4 py-2 mb-4 flex items-center gap-2 overflow-hidden anim-fade-up" style={{ background: 'linear-gradient(90deg, rgba(212,175,55,0.14), rgba(0,0,0,0.15))', border: '1px solid rgba(212,175,55,0.25)' }}>
-              <Swords size={14} style={{ color: 'var(--accent)' }} className="shrink-0" />
-              <p className="text-xs sm:text-sm font-medium truncate transition-opacity duration-300 text-pretty" style={{ color: 'var(--text2)', opacity: tickerFade ? 1 : 0 }}>
-                {frasesTicker[tickerIdx] || frasesTicker[0]}
-              </p>
-            </div>
-          )}
+          <Ticker frases={frasesTicker} />
           {escopo === 'geral' && ranking.length >= 2 && (
-            <div className="rounded-xl px-4 py-2.5 mb-5 flex items-center gap-2 anim-fade-up" style={{ background: 'linear-gradient(90deg, rgba(212,175,55,0.12), rgba(0,0,0,0.12))', border: '1px solid rgba(212,175,55,0.25)' }}>
+            <div className={`rounded-xl px-4 py-2.5 mb-5 flex items-center gap-2 ${animCls}`} style={{ background: 'linear-gradient(90deg, rgba(212,175,55,0.12), rgba(0,0,0,0.12))', border: '1px solid rgba(212,175,55,0.25)' }}>
               <Flame size={16} style={{ color: 'var(--accent)' }} className="shrink-0" />
               <p className="text-xs sm:text-sm" style={{ color: 'var(--text2)' }}>
                 <span className="shimmer-gold font-bold" style={{ WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>{ranking[0].nome}</span>
@@ -406,30 +438,34 @@ export default function RankingPage() {
 
           {destaques && (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-              <div className="rounded-xl p-4 flex items-center gap-3 anim-fade-up" style={{ animationDelay: '0.36s', background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)' }}>
-                <Shield size={20} style={{ color: '#22c55e' }} />
-                <div className="min-w-0">
-                  <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted-color)' }}>Equipe do período</p>
-                  <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{destaques.top_equipe?.nome || '—'}</p>
-                  <p className="text-xs font-mono" style={{ color: '#22c55e' }}>{destaques.top_equipe ? fmtMoeda(destaques.top_equipe.valor) : '—'}</p>
-                </div>
-              </div>
-              <div className="rounded-xl p-4 flex items-center gap-3 anim-fade-up" style={{ animationDelay: '0.44s', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.25)' }}>
-                <Building2 size={20} style={{ color: '#3b82f6' }} />
-                <div className="min-w-0">
-                  <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted-color)' }}>Representação líder</p>
-                  <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{destaques.top_empresa?.nome || '—'}</p>
-                  <p className="text-xs font-mono" style={{ color: '#3b82f6' }}>{destaques.top_empresa ? fmtMoeda(destaques.top_empresa.valor) : '—'}</p>
-                </div>
-              </div>
-              <div className="rounded-xl p-4 flex items-center gap-3 anim-fade-up" style={{ animationDelay: '0.52s', background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.25)' }}>
-                <Gem size={20} style={{ color: 'var(--accent)' }} />
-                <div className="min-w-0">
-                  <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted-color)' }}>Maior ticket médio</p>
-                  <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{destaques.maior_ticket?.nome || '—'}</p>
-                  <p className="text-xs font-mono" style={{ color: 'var(--accent)' }}>{destaques.maior_ticket ? `${fmtMoeda(destaques.maior_ticket.ticket)} · ${destaques.maior_ticket.qtd} vd` : 'mín. 2 vendas'}</p>
-                </div>
-              </div>
+              <CardDestaque
+                cor="#d4af37" icon={Shield}
+                label="Equipe do período"
+                nome={destaques.top_equipe?.nome || '—'}
+                valor={destaques.top_equipe ? fmtMoeda(destaques.top_equipe.valor) : '—'}
+                sub={destaques.top_equipe ? `${destaques.top_equipe.qtd} cota${destaques.top_equipe.qtd !== 1 ? 's' : ''}` : null}
+                animCls={animCls}
+              />
+              <CardDestaque
+                cor="#3b82f6" icon={Building2}
+                label="Representação líder"
+                nome={destaques.top_empresa?.nome || '—'}
+                valor={destaques.top_empresa ? fmtMoeda(destaques.top_empresa.valor) : '—'}
+                sub={destaques.top_empresa ? `${destaques.top_empresa.qtd} cota${destaques.top_empresa.qtd !== 1 ? 's' : ''}` : null}
+                animCls={animCls}
+              />
+              <CardDestaque
+                cor="#a855f7"
+                avatarNome={recordes?.melhor_producao_individual?.vendedor || '—'}
+                foto={recordes?.melhor_producao_individual?.foto}
+                label="🏅 Vendedor Recordista"
+                nome={recordes?.melhor_producao_individual?.vendedor || '—'}
+                valor={recordes?.melhor_producao_individual ? fmtMoeda(recordes.melhor_producao_individual.valor) : '—'}
+                sub={recordes?.melhor_producao_individual
+                  ? [recordes.melhor_producao_individual.producao, recordes.melhor_producao_individual.equipe, recordes.melhor_producao_individual.empresa].filter(Boolean).join(' · ')
+                  : 'sem histórico'}
+                animCls={animCls}
+              />
             </div>
           )}
 
@@ -444,7 +480,7 @@ export default function RankingPage() {
                   : 'linear-gradient(90deg, rgba(212,175,55,0.5), var(--accent))'
                 const usaLogo = escopo === 'geral' && modo === 'representante' && !!r.logo
                 return (
-                  <div key={r.posicao} className="flex items-center gap-3 px-4 py-2.5" style={{ borderBottom: '1px solid var(--border)' }}>
+                  <div key={r.vendedor_id || r.empresa_id || r.nome} className="flex items-center gap-3 px-4 py-2.5 transition-all" style={{ borderBottom: '1px solid var(--border)' }}>
                     <span className="text-xs font-bold font-mono w-7 shrink-0" style={{ color: 'var(--muted-color)' }}>{r.posicao}º</span>
                     {usaLogo
                       ? <div className="rounded-full shrink-0 flex items-center justify-center bg-white/95" style={{ width: 32, height: 32 }}><img src={r.logo || "/placeholder.svg"} alt={r.empresa_nome || r.nome} className="object-contain" style={{ width: 22, height: 22 }} /></div>
@@ -514,7 +550,7 @@ export default function RankingPage() {
         </select>
       )}
       <button onClick={() => setPeriodo(periodo === 'semana' ? '' : 'semana')} className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-all" style={{ background: periodo === 'semana' ? 'var(--accent)' : 'rgba(255,255,255,0.03)', border: `1px solid ${periodo === 'semana' ? 'var(--accent)' : 'var(--border)'}`, color: periodo === 'semana' ? '#0a0a0a' : 'var(--muted-color)' }}><Zap size={13} />Melhores da Semana</button>
-      <button onClick={() => setPeriodo(periodo === 'ano' ? '' : 'ano')} className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-all" style={{ background: periodo === 'ano' ? 'var(--accent)' : 'rgba(255,255,255,0.03)', border: `1px solid ${periodo === 'ano' ? 'var(--accent)' : 'var(--border)'}`, color: periodo === 'ano' ? '#0a0a0a' : 'var(--muted-color)' }}><CalendarRange size={13} />Acumulado do Ano</button>
+      <button onClick={() => setPeriodo(periodo === 'ano' ? '' : 'ano')} className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-all" style={{ background: periodo === 'ano' ? 'var(--accent)' : 'rgba(255,255,255,0.03)', border: `1px solid ${periodo === 'ano' ? 'var(--accent)' : 'var(--border)'}`, color: periodo === 'ano' ? '#0a0a0a' : 'var(--muted-color)' }}><CalendarRange size={13} />🏆 Melhores do Ano</button>
       {abas.length > 1 && (
         <div className="flex items-center gap-1 rounded-full p-1" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
           {abas.map(a => {

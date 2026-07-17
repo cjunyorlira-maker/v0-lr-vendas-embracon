@@ -25,7 +25,7 @@ interface Campanha {
   countdown: { dias: number; fim: string }
   empresas: { id: string; nome: string; top_viagem_n: number }[]
   macbook: { empresa_id: string; empresa_nome: string; lider: any; ranking: any[]; dist_mac: number }[]
-  viagem: { equipes: any[]; comitivas: any[] }
+  viagem: { empresas: { empresa_id: string; empresa_nome: string; top_n: number; equipes: any[]; comitiva: { equipe_nome: string | null; membros: any[] } }[] }
   provocacoes: string[]
   meu_role: string
 }
@@ -160,58 +160,77 @@ export default function CampanhaPage() {
         ))}
       </div>
 
-      {/* SEÇÃO VIAGEM */}
+      {/* SEÇÃO VIAGEM — disputa INTERNA de cada representação */}
       <div className="flex items-center gap-2 mb-4">
         <Plane size={20} style={{ color: 'var(--accent)' }} />
         <h2 className="text-lg font-bold" style={{ color: 'var(--text)' }}>Disputa da Viagem</h2>
-        <span className="text-xs" style={{ color: 'var(--muted-color)' }}>· equipes das 3 empresas</span>
+        <span className="text-xs" style={{ color: 'var(--muted-color)' }}>· equipes brigam dentro de cada representação</span>
       </div>
 
-      {/* pódio das equipes */}
-      {data.viagem.equipes.length > 0 && (
-        <div className="flex items-end justify-center gap-3 mb-6">
-          {[data.viagem.equipes[1], data.viagem.equipes[0], data.viagem.equipes[2]].map((eq, visualIdx) => {
-            if (!eq) return <div key={visualIdx} className="flex-1" />
-            const rank = eq.posicao - 1
-            const cor = rank === 0 ? '#d4af37' : rank === 1 ? '#C0C0C0' : '#CD7F32'
-            const primeiro = rank === 0
-            return (
-              <div key={eq.id} className="flex-1 flex flex-col items-center rounded-2xl px-3 text-center anim-fade-up" style={{ animationDelay: `${visualIdx * 0.1}s`, paddingTop: primeiro ? 16 : 24, paddingBottom: primeiro ? 22 : 16, marginTop: primeiro ? 0 : 16, background: `linear-gradient(180deg, ${cor}14, rgba(0,0,0,0.12))`, border: `1px solid ${cor}${primeiro ? '66' : '40'}` }}>
-                <span className="text-2xl mb-1">{['🥇', '🥈', '🥉'][rank]}</span>
-                <p className="text-sm font-semibold text-pretty" style={{ color: 'var(--text)' }}>{eq.nome}</p>
-                <p className="text-[10px]" style={{ color: 'var(--muted-color)' }}>{eq.empresa_nome}</p>
-                <p className="font-bold font-mono mt-1" style={{ color: cor, fontSize: primeiro ? 20 : 16 }}>{fmt(eq.valor)}</p>
-              </div>
-            )
-          })}
-        </div>
-      )}
-
-      {/* QUEM EMBARCA HOJE */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-        {data.viagem.comitivas.map((c: any, i: number) => (
-          <div key={c.empresa_id} className="rounded-2xl p-4 anim-fade-up" style={{ animationDelay: `${i * 0.1}s`, background: 'rgba(0,0,0,0.18)', border: '1px solid rgba(34,197,94,0.25)' }}>
-            <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5" style={{ color: '#22c55e' }}>Quem embarca hoje ✈️</p>
-            <p className="text-xs mb-3" style={{ color: 'var(--muted-color)' }}>{c.empresa_nome}{c.equipe_nome ? ` · ${c.equipe_nome}` : ''}</p>
-            {c.membros.length > 0 ? (
-              <div className="flex flex-wrap gap-3">
-                {c.membros.map((m: any, idx: number) => (
-                  <div key={idx} className="flex flex-col items-center text-center" style={{ width: 72 }}>
-                    <Avatar nome={m.nome} foto={m.foto} size={48} borderColor={m.papel === 'supervisor' ? '#22c55e' : '#d4af37'} />
-                    <p className="text-[11px] font-medium mt-1 leading-tight truncate w-full" style={{ color: 'var(--text2)' }}>{m.nome.split(' ')[0]}</p>
-                    {m.papel === 'supervisor' ? (
-                      <p className="text-[9px] leading-tight" style={{ color: '#22c55e' }}>supervisão{m.equipe_nome ? ` · equipe ${m.equipe_nome}` : ''}</p>
-                    ) : (
-                      <p className="text-[9px] leading-tight" style={{ color: 'var(--muted-color)' }}>
-                        <span className="font-bold" style={{ color: '#d4af37' }}>{m.posicao}º</span> · {fmt(m.valor)}
-                      </p>
-                    )}
+        {data.viagem.empresas.map((emp, i) => {
+          const lider = emp.equipes[0] || null
+          const c = emp.comitiva
+          return (
+            <div key={emp.empresa_id} className="rounded-2xl p-4 anim-fade-up flex flex-col gap-3" style={{ animationDelay: `${i * 0.1}s`, background: 'rgba(0,0,0,0.18)', border: '1px solid var(--border)' }}>
+              <p className="text-xs font-semibold uppercase tracking-wide text-center" style={{ color: 'var(--muted-color)' }}>{emp.empresa_nome}</p>
+
+              {/* mini-ranking das equipes desta empresa */}
+              {lider ? (
+                <>
+                  <div className="flex flex-col items-center text-center rounded-xl p-4" style={{ background: 'linear-gradient(180deg, rgba(212,175,55,0.14), rgba(0,0,0,0.1))', border: '1px solid rgba(212,175,55,0.4)' }}>
+                    <div className="rounded-full p-1 shimmer-gold shrink-0 flex items-center justify-center" style={{ width: 56, height: 56 }}>
+                      <div className="rounded-full flex items-center justify-center" style={{ width: 48, height: 48, background: 'rgba(212,175,55,0.15)' }}>
+                        <Plane size={22} style={{ color: 'var(--accent)' }} />
+                      </div>
+                    </div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider mt-2" style={{ color: 'var(--accent)' }}>Ganhando a viagem ✈️</p>
+                    <p className="text-sm font-semibold mt-0.5" style={{ color: 'var(--text)' }}>{lider.nome}</p>
+                    <p className="text-lg font-bold font-mono" style={{ color: 'var(--accent)' }}>{fmt(lider.valor)}</p>
                   </div>
-                ))}
+                  <div className="flex flex-col gap-1.5">
+                    {emp.equipes.slice(1).map((e: any) => (
+                      <div key={e.id} className="flex items-center gap-2.5 rounded-lg px-2.5 py-2" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)' }}>
+                        <span className="text-xs font-bold font-mono w-5 shrink-0" style={{ color: 'var(--muted-color)' }}>{e.posicao}º</span>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs font-medium truncate" style={{ color: 'var(--text2)' }}>{e.nome}</p>
+                          <p className="text-[10px]" style={{ color: '#ef4444' }}>faltam {fmt(e.dist_lider)}</p>
+                        </div>
+                        <p className="text-xs font-mono shrink-0" style={{ color: 'var(--muted-color)' }}>{fmt(e.valor)}</p>
+                      </div>
+                    ))}
+                    {emp.equipes.length <= 1 && <p className="text-xs text-center py-2" style={{ color: 'var(--muted-color)' }}>Sem outras equipes na disputa</p>}
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-center py-6" style={{ color: 'var(--muted-color)' }}>Nenhuma venda ainda</p>
+              )}
+
+              {/* quem embarca hoje (desta empresa) */}
+              <div className="rounded-xl p-3 mt-1" style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.25)' }}>
+                <p className="text-[10px] font-bold uppercase tracking-wider mb-0.5" style={{ color: '#22c55e' }}>Quem embarca hoje ✈️</p>
+                <p className="text-[11px] mb-2.5" style={{ color: 'var(--muted-color)' }}>{c.equipe_nome ? `equipe ${c.equipe_nome} + top ${emp.top_n}` : `top ${emp.top_n} vendedores`}</p>
+                {c.membros.length > 0 ? (
+                  <div className="flex flex-wrap gap-3">
+                    {c.membros.map((m: any, idx: number) => (
+                      <div key={idx} className="flex flex-col items-center text-center" style={{ width: 68 }}>
+                        <Avatar nome={m.nome} foto={m.foto} size={44} borderColor={m.papel === 'supervisor' ? '#22c55e' : '#d4af37'} />
+                        <p className="text-[11px] font-medium mt-1 leading-tight truncate w-full" style={{ color: 'var(--text2)' }}>{m.nome.split(' ')[0]}</p>
+                        {m.papel === 'supervisor' ? (
+                          <p className="text-[9px] leading-tight" style={{ color: '#22c55e' }}>supervisão</p>
+                        ) : (
+                          <p className="text-[9px] leading-tight" style={{ color: 'var(--muted-color)' }}>
+                            <span className="font-bold" style={{ color: '#d4af37' }}>{m.posicao}º</span> · {fmt(m.valor)}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : <p className="text-xs py-2" style={{ color: 'var(--muted-color)' }}>Nenhuma venda ainda</p>}
               </div>
-            ) : <p className="text-xs py-3" style={{ color: 'var(--muted-color)' }}>Nenhuma venda ainda</p>}
-          </div>
-        ))}
+            </div>
+          )
+        })}
       </div>
     </>
   )

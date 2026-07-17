@@ -139,6 +139,10 @@
 }
 .anim-fade-up { animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
+/* card de destaque: leve elevação + brilho na cor do card ao passar o mouse */
+.card-glow { transition: box-shadow 0.25s ease, transform 0.25s ease; }
+.card-glow:hover { box-shadow: 0 10px 34px var(--glow); transform: translateY(-2px); }
+
 @keyframes barGrow {
   from { transform: scaleX(0); }
   to { transform: scaleX(1); }

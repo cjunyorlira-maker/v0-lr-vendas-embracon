@@ -105,15 +105,20 @@ export async function GET(req: NextRequest) {
       return { empresa_id: empId, empresa_nome: nomeEmpresa(empId), lider: lider ? { nome: lider.nome, foto: lider.foto, valor: lider.valor, qtd: lider.qtd } : null, ranking, dist_mac: distMac }
     })
 
-    // ── 2) VIAGEM: ranking das equipes (3 empresas juntas) + comitiva da nº1 de cada empresa ──
-    const equipesRank = Array.from(porEquipe.values())
-      .sort((a, b) => b.valor - a.valor)
-      .map((e, i) => ({ posicao: i + 1, id: e.id, nome: e.nome, empresa_id: e.empresa_id, empresa_nome: nomeEmpresa(e.empresa_id), valor: e.valor, qtd: e.qtd }))
+    // ── 2) VIAGEM: disputa INTERNA de cada empresa — equipes brigam dentro da própria representação ──
+    const viagemPorEmpresa = EMPRESAS_CAMPANHA.map((empId) => {
+      // mini-ranking das equipes DESTA empresa
+      const arr = Array.from(porEquipe.values())
+        .filter(e => e.empresa_id === empId)
+        .sort((a, b) => b.valor - a.valor)
+      const lider = arr[0] || null
+      const equipes = arr.map((e, i) => ({
+        posicao: i + 1, id: e.id, nome: e.nome, valor: e.valor, qtd: e.qtd,
+        dist_lider: lider ? Math.max(0, lider.valor - e.valor) : 0,
+      }))
 
-    const comitivas = EMPRESAS_CAMPANHA.map((empId) => {
-      // vaga da SUPERVISÃO: supervisor da equipe nº 1 da empresa (disputa de equipes)
-      const equipesDaEmp = equipesRank.filter(e => e.empresa_id === empId)
-      const topEquipe = equipesDaEmp[0] || null
+      // comitiva "quem embarca hoje": supervisão da equipe nº1 DA EMPRESA + top N vendedores DA EMPRESA
+      const topEquipe = arr[0] || null
       const membros: any[] = []
       if (topEquipe) {
         const info = equipeInfo.get(topEquipe.id)
@@ -124,11 +129,17 @@ export async function GET(req: NextRequest) {
           membros.push({ nome: info.supervisor_nome, foto: undefined, papel: 'supervisor', equipe_nome: topEquipe.nome, valor: null })
         }
       }
-      // vagas INDIVIDUAIS: top N vendedores da EMPRESA (independente de equipe)
       const n = TOP_VIAGEM[empId] || 3
       const vends = Array.from((porEmpVend.get(empId) || new Map()).values()).sort((a, b) => b.valor - a.valor).slice(0, n)
       vends.forEach((v, i) => membros.push({ nome: v.nome, foto: v.foto, papel: 'vendedor', posicao: i + 1, valor: v.valor }))
-      return { empresa_id: empId, empresa_nome: nomeEmpresa(empId), equipe_nome: topEquipe?.nome || null, top_n: n, membros }
+
+      return {
+        empresa_id: empId,
+        empresa_nome: nomeEmpresa(empId),
+        top_n: n,
+        equipes,
+        comitiva: { equipe_nome: topEquipe?.nome || null, membros },
+      }
     })
 
     // ── 3) COUNTDOWN ──
@@ -143,10 +154,12 @@ export async function GET(req: NextRequest) {
         provocacoes.push(`${mb.ranking[1].nome} está a ${fmt(mb.dist_mac)} de tomar o MacBook de ${mb.ranking[0].nome} 💻🔥`)
       }
     }
-    // viagem: 2ª equipe geral x 1ª
-    if (equipesRank.length >= 2) {
-      const dif = equipesRank[0].valor - equipesRank[1].valor
-      provocacoes.push(`${equipesRank[1].nome} precisa de ${fmt(dif)} para roubar a viagem da ${equipesRank[0].nome} ✈️`)
+    // viagem: disputa interna de cada empresa (2ª equipe x 1ª da mesma representação)
+    for (const ve of viagemPorEmpresa) {
+      if (ve.equipes.length >= 2) {
+        const dif = ve.equipes[0].valor - ve.equipes[1].valor
+        provocacoes.push(`${ve.equipes[1].nome} precisa de ${fmt(dif)} para tomar a viagem da ${ve.equipes[0].nome} na ${ve.empresa_nome} ✈️`)
+      }
     }
     provocacoes.push(`Faltam ${diasRestantes} dias. Uma venda muda tudo.`)
 
@@ -155,7 +168,7 @@ export async function GET(req: NextRequest) {
       countdown: { dias: diasRestantes, fim: fimDate.toISOString() },
       empresas: EMPRESAS_CAMPANHA.map(id => ({ id, nome: nomeEmpresa(id), top_viagem_n: TOP_VIAGEM[id] })),
       macbook,
-      viagem: { equipes: equipesRank, comitivas },
+      viagem: { empresas: viagemPorEmpresa },
       provocacoes,
       meu_role: me.role,
     })
