@@ -3,9 +3,8 @@
 import { useState, useEffect, useRef, useMemo, memo } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { Trophy, Loader2, Users, Building2, User, Shield, Zap, CalendarRange, Tv, ChevronUp, ChevronDown, Minus, Home, Globe, Flame, Crown, Swords, Share2, Check } from 'lucide-react'
+import { Trophy, Loader2, Users, Building2, User, Shield, Zap, CalendarRange, Tv, ChevronUp, ChevronDown, Minus, Home, Globe, Flame, Crown, Swords } from 'lucide-react'
 import { dispararConfete } from '@/lib/confetti'
-import { gerarArtePodio } from '@/lib/podium-art'
 
 interface RankItem { posicao: number; nome: string; foto?: string; valor: number; qtd: number; ticket_medio: number; maior_venda: number; equipe_nome?: string | null; empresa_nome?: string | null; empresa_id?: string | null; logo?: string | null; vendedor_id?: string | null; rei_semana?: boolean; streak_semanas?: number }
 
@@ -15,7 +14,13 @@ interface ReiSemana {
   datas: { ini: string; fim: string }
 }
 interface RecordeIndividual { vendedor: string; foto?: string; equipe?: string; empresa?: string; producao: string; valor: number }
-interface MelhorSemana { nome: string; foto?: string; equipe?: string; empresa?: string; valor: number }
+interface Fixos {
+  periodo_label: string // "do Mês" | "da Semana" | "do Ano"
+  melhor_equipe: { nome: string; empresa?: string; valor: number } | null
+  melhor_representacao: { nome: string; logo?: string; valor: number } | null
+  melhor_vendedor: { nome: string; foto?: string; equipe?: string; empresa?: string; valor: number } | null
+  recordista: RecordeIndividual | null
+}
 
 // paleta fixa (12 cores discretas) para diferenciar empresas no Ranking Geral
 const CORES_EMPRESA = ['#d4af37', '#3b82f6', '#22c55e', '#ec4899', '#f97316', '#06b6d4', '#a855f7', '#ef4444', '#14b8a6', '#eab308', '#8b5cf6', '#64748b']
@@ -144,12 +149,7 @@ export default function RankingPage() {
   const [variacao, setVariacao] = useState<Record<string, number>>({})
   const [telao, setTelao] = useState(false)
   const [reiSemana, setReiSemana] = useState<ReiSemana | null>(null)
-  const [semanaLider, setSemanaLider] = useState<{ nome: string; valor: number } | null>(null)
-  const [recordeIndividual, setRecordeIndividual] = useState<RecordeIndividual | null>(null)
-  const [melhorSemana, setMelhorSemana] = useState<MelhorSemana | null>(null)
-  const [periodoDatas, setPeriodoDatas] = useState<{ inicio: string; fim: string } | null>(null)
-  const [gerandoImg, setGerandoImg] = useState(false)
-  const [toast, setToast] = useState<string | null>(null)
+  const [fixos, setFixos] = useState<Fixos | null>(null)
   const [jaAnimou, setJaAnimou] = useState(false) // anima entrada só na 1ª carga
   const liderAnterior = useRef<string | null>(null)
   const primeiraCarga = useRef(true)
@@ -200,8 +200,6 @@ export default function RankingPage() {
         f.push(`🔥 ${ranking[1].nome} está a ${fmtMoeda(dif)} de assumir a liderança!`)
       }
     }
-    // ⚡ melhor da semana
-    if (melhorSemana && melhorSemana.valor > 0) f.push(`⚡ ${melhorSemana.nome} já vendeu ${fmtMoeda(melhorSemana.valor)} só esta semana`)
     // 🚀 maior arrancada (subida de posições na produção)
     let maiorSubida: { nome: string; delta: number } | null = null
     for (const r of ranking) {
@@ -232,7 +230,7 @@ export default function RankingPage() {
     // embaralha (Fisher-Yates) para não repetir sempre na mesma ordem
     for (let i = f.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [f[i], f[j]] = [f[j], f[i]] }
     return f
-  }, [ranking, variacao, reiSemana, melhorSemana, destaques, producoes, producaoId, periodo])
+  }, [ranking, variacao, reiSemana, destaques, producoes, producaoId, periodo])
 
   async function loadData() {
     // spinner só quando ainda não há dados; refreshes trocam os dados em background sem desmontar a tela
@@ -253,10 +251,7 @@ export default function RankingPage() {
       setRanking(data.ranking)
       setDestaques(data.destaques || null)
       setReiSemana(data.rei_semana || null)
-      setSemanaLider(data.semana_atual_lider || null)
-      setRecordeIndividual(data.recorde_individual || null)
-      setMelhorSemana(data.melhor_da_semana || null)
-      setPeriodoDatas(data.periodo || null)
+      setFixos(data.fixos || null)
       setRole(data.meu_role)
       if (data.producoes) setProducoes(data.producoes)
       if (data.producao_ativa && !producaoId && !periodo) setProducaoId(data.producao_ativa)
@@ -307,62 +302,6 @@ export default function RankingPage() {
     }
   }
 
-  const modoLabel = modo === 'vendedor' ? 'Vendedores' : modo === 'equipe' ? 'Equipes' : 'Representações'
-  const periodoTitulo = periodo === 'semana'
-    ? 'Melhores da Semana'
-    : periodo === 'ano'
-      ? 'Melhores do Ano'
-      : (producoes.find(p => p.id === producaoId)?.nome || 'Ranking')
-
-  async function compartilharPodioArt() {
-    if (gerandoImg || ranking.length === 0) return
-    setGerandoImg(true)
-    try {
-      const fmtDia = (s?: string) => { if (!s) return ''; const [, m, d] = s.slice(0, 10).split('-'); return `${d}/${m}` }
-      const periodoStr = periodoDatas ? `${fmtDia(periodoDatas.inicio)} a ${fmtDia(periodoDatas.fim)}` : ''
-      // no Geral não cita empresa isolada; na Minha operação usa a empresa em foco (ou o nome fixo da operação)
-      const nomeEmpresa = escopo === 'geral'
-        ? undefined
-        : (empresas.find(e => e.id === fEmpresa)?.nome || 'Grupo LR - SJC')
-
-      const blob = await gerarArtePodio({
-        titulo: periodoTitulo,
-        subtitulo: `RANKING · ${modoLabel}`,
-        periodo: periodoStr,
-        itens: ranking.slice(0, 5).map(r => ({
-          posicao: r.posicao, nome: r.nome, equipe: r.equipe_nome || undefined, empresa: r.empresa_nome || undefined,
-          valor: r.valor, qtd: r.qtd, foto: r.foto,
-        })),
-        escopo: escopo === 'geral' ? 'geral' : 'empresa',
-        nomeEmpresa,
-      })
-
-      // navigator.share (WhatsApp no mobile) com fallback de download
-      const slug = `${periodoTitulo}-${modoLabel}`.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-      const nome = `podio-${slug}.png`
-      const file = new File([blob], nome, { type: 'image/png' })
-      const nav = navigator as any
-      if (nav.canShare && nav.canShare({ files: [file] })) {
-        try {
-          await nav.share({ files: [file], title: 'Ranking', text: `${periodoTitulo} · ${modoLabel}` })
-          return
-        } catch (e: any) {
-          if (e?.name === 'AbortError') return // usuário cancelou; sem fallback
-        }
-      }
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url; a.download = nome
-      document.body.appendChild(a); a.click(); a.remove()
-      setTimeout(() => URL.revokeObjectURL(url), 4000)
-      setToast('Imagem salva — solta no grupo! 🔥'); setTimeout(() => setToast(null), 4000)
-    } catch {
-      setToast('Não foi possível gerar a imagem.'); setTimeout(() => setToast(null), 4000)
-    } finally {
-      setGerandoImg(false)
-    }
-  }
-
   const abas = [
     { k: 'vendedor', l: 'Vendedores', icon: User, roles: ['master', 'representante', 'adm', 'supervisor', 'vendedor'] },
     { k: 'equipe', l: 'Equipes', icon: Users, roles: ['master', 'representante', 'adm'] },
@@ -394,8 +333,8 @@ export default function RankingPage() {
     const primeiro = rank === 0
     const fotoSize = primeiro ? 88 : 72
     const delay = `${rank * 0.12}s`
-    // no Ranking Geral + modo representações, mostra o logo da empresa no lugar da foto
-    const usaLogo = escopo === 'geral' && modo === 'representante' && !!item.logo
+    // modo representações: mostra o logo da empresa no lugar da foto (independe do escopo)
+    const usaLogo = modo === 'representante' && !!item.logo
     return (
       <div className={`flex-1 flex flex-col items-center rounded-2xl px-4 text-center ${animCls}`} style={{
         animationDelay: delay,
@@ -452,61 +391,63 @@ export default function RankingPage() {
             <CardPodio item={top3[2]} rank={2} />
           </div>
 
-          {destaques && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-              <CardDestaque
-                cor="#d4af37" icon={Shield}
-                label="🛡️ Equipe da produção"
-                nome={destaques.top_equipe?.nome || '—'}
-                valor={destaques.top_equipe ? fmtMoeda(destaques.top_equipe.valor) : '—'}
-                sub={destaques.top_equipe ? `${destaques.top_equipe.qtd} cota${destaques.top_equipe.qtd !== 1 ? 's' : ''}` : null}
-                animCls={animCls}
-              />
-              <CardDestaque
-                cor="#3b82f6" icon={Building2}
-                label="🏢 Representação líder"
-                nome={destaques.top_empresa?.nome || '—'}
-                valor={destaques.top_empresa ? fmtMoeda(destaques.top_empresa.valor) : '—'}
-                sub={destaques.top_empresa ? `${destaques.top_empresa.qtd} cota${destaques.top_empresa.qtd !== 1 ? 's' : ''}` : null}
-                animCls={animCls}
-              />
-              <CardDestaque
-                cor="#22c55e"
-                avatarNome={melhorSemana?.nome || '—'}
-                foto={melhorSemana?.foto}
-                label="⭐ Melhor da Semana"
-                nome={melhorSemana?.nome || '—'}
-                valor={melhorSemana ? fmtMoeda(melhorSemana.valor) : '—'}
-                sub={melhorSemana
-                  ? ([melhorSemana.equipe, melhorSemana.empresa].filter(Boolean).join(' · ') || 'esta semana')
-                  : 'sem vendas esta semana'}
-                animCls={animCls}
-              />
-              <CardDestaque
-                cor="#a855f7"
-                avatarNome={recordeIndividual?.vendedor || '—'}
-                foto={recordeIndividual?.foto}
-                label="🏅 Vendedor Recordista"
-                nome={recordeIndividual?.vendedor || '—'}
-                valor={recordeIndividual ? fmtMoeda(recordeIndividual.valor) : '—'}
-                sub={recordeIndividual
-                  ? [recordeIndividual.producao, recordeIndividual.equipe, recordeIndividual.empresa].filter(Boolean).join(' · ')
-                  : 'sem histórico'}
-                animCls={animCls}
-              />
-            </div>
-          )}
+          {/* Cards de destaque: Equipe/Representação/Vendedor ACOMPANHAM o período (Mês/Semana/Ano); Recordista é histórico fixo */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+            <CardDestaque
+              cor="#d4af37" icon={Shield}
+              label={`🛡️ Melhor Equipe ${fixos?.periodo_label || 'do Mês'}`}
+              nome={fixos?.melhor_equipe?.nome || '—'}
+              valor={fixos?.melhor_equipe ? fmtMoeda(fixos.melhor_equipe.valor) : '—'}
+              sub={fixos?.melhor_equipe?.empresa || null}
+              animCls={animCls}
+            />
+            <CardDestaque
+              cor="#3b82f6"
+              icon={fixos?.melhor_representacao?.logo ? undefined : Building2}
+              foto={fixos?.melhor_representacao?.logo}
+              avatarNome={fixos?.melhor_representacao?.logo ? (fixos?.melhor_representacao?.nome || '—') : undefined}
+              label={`🏢 Melhor Representação ${fixos?.periodo_label || 'do Mês'}`}
+              nome={fixos?.melhor_representacao?.nome || '—'}
+              valor={fixos?.melhor_representacao ? fmtMoeda(fixos.melhor_representacao.valor) : '—'}
+              sub={fixos?.melhor_representacao ? 'representação' : 'sem vendas no período'}
+              animCls={animCls}
+            />
+            <CardDestaque
+              cor="#22c55e"
+              avatarNome={fixos?.melhor_vendedor?.nome || '—'}
+              foto={fixos?.melhor_vendedor?.foto}
+              label={`🥇 Melhor Vendedor ${fixos?.periodo_label || 'do Mês'}`}
+              nome={fixos?.melhor_vendedor?.nome || '—'}
+              valor={fixos?.melhor_vendedor ? fmtMoeda(fixos.melhor_vendedor.valor) : '—'}
+              sub={fixos?.melhor_vendedor
+                ? ([fixos.melhor_vendedor.equipe, fixos.melhor_vendedor.empresa].filter(Boolean).join(' · ') || null)
+                : 'sem vendas no período'}
+              animCls={animCls}
+            />
+            <CardDestaque
+              cor="#a855f7"
+              avatarNome={fixos?.recordista?.vendedor || '—'}
+              foto={fixos?.recordista?.foto}
+              label="🏅 Recordista"
+              nome={fixos?.recordista?.vendedor || '—'}
+              valor={fixos?.recordista ? fmtMoeda(fixos.recordista.valor) : '—'}
+              sub={fixos?.recordista
+                ? [fixos.recordista.producao, fixos.recordista.empresa].filter(Boolean).join(' · ')
+                : 'sem histórico'}
+              animCls={animCls}
+            />
+          </div>
 
           {resto.length > 0 && (
             <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
               {resto.map((r) => {
                 const pct = Math.max(4, Math.round((r.valor / maxValor) * 100))
-                // no Ranking Geral + representações, cada empresa ganha uma cor distinta na barra
-                const coresEmp = escopo === 'geral' && modo === 'representante'
+                // modo representações: cada empresa ganha uma cor distinta na barra (independe do escopo)
+                const coresEmp = modo === 'representante'
                 const barra = coresEmp
                   ? `linear-gradient(90deg, ${corDaEmpresa(r.empresa_id)}88, ${corDaEmpresa(r.empresa_id)})`
                   : 'linear-gradient(90deg, rgba(212,175,55,0.5), var(--accent))'
-                const usaLogo = escopo === 'geral' && modo === 'representante' && !!r.logo
+                const usaLogo = modo === 'representante' && !!r.logo
                 return (
                   <div key={r.vendedor_id || r.empresa_id || r.nome} className="flex items-center gap-3 px-4 py-2.5 transition-all" style={{ borderBottom: '1px solid var(--border)' }}>
                     <span className="text-xs font-bold font-mono w-7 shrink-0" style={{ color: 'var(--muted-color)' }}>{r.posicao}º</span>
@@ -541,30 +482,29 @@ export default function RankingPage() {
   )
 
   const microLabel = "text-[10px] font-semibold uppercase tracking-wider shrink-0 w-14"
+  // pill ativo: fundo dourado 18%, borda dourada e leve glow
   const pill = (ativo: boolean) => ({
-    background: ativo ? 'var(--accent)' : 'rgba(255,255,255,0.03)',
-    border: `1px solid ${ativo ? 'var(--accent)' : 'var(--border)'}`,
-    color: ativo ? '#0a0a0a' : 'var(--muted-color)',
+    background: ativo ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.03)',
+    border: `1px solid ${ativo ? 'rgba(212,175,55,0.6)' : 'var(--border)'}`,
+    color: ativo ? 'var(--accent)' : 'var(--muted-color)',
+    boxShadow: ativo ? '0 0 12px rgba(212,175,55,0.25)' : 'none',
   })
+  const pillCls = "flex items-center gap-1.5 rounded-full px-5 py-2.5 text-[13px] font-semibold transition-all"
 
   const filtros = (
     <div className="flex flex-col gap-2.5 mb-6">
-      {/* LINHA 1 — PERÍODO + ações à direita */}
+      {/* LINHA 1 — PERÍODO (não-toggle) + ações à direita */}
       <div className="flex items-center gap-2 flex-wrap">
         <span className={microLabel} style={{ color: 'var(--muted-color)' }}>Período</span>
         {producoes.length > 0 && (
-          <select value={periodo ? '' : producaoId} onChange={(e) => { setPeriodo(''); setProducaoId(e.target.value) }} className="rounded-full px-4 py-2 text-xs font-medium outline-none cursor-pointer" style={{ background: !periodo ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.03)', border: `1px solid ${!periodo ? 'rgba(212,175,55,0.3)' : 'var(--border)'}`, color: !periodo ? 'var(--accent)' : 'var(--muted-color)' }}>
-            {producoes.map(p => <option key={p.id} value={p.id} style={{ background: '#131313', color: '#fff' }}>{p.nome}</option>)}
+          <select value={producaoId} onMouseDown={() => setPeriodo('')} onChange={(e) => { setPeriodo(''); setProducaoId(e.target.value) }} className="rounded-full px-5 py-2.5 text-[13px] font-semibold outline-none cursor-pointer" style={pill(!periodo)}>
+            {producoes.map(p => <option key={p.id} value={p.id} style={{ background: '#131313', color: '#fff' }}>{`📦 ${p.nome}`}</option>)}
           </select>
         )}
-        <button onClick={() => setPeriodo(periodo === 'semana' ? '' : 'semana')} className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-all" style={pill(periodo === 'semana')}><Zap size={13} />Semana</button>
-        <button onClick={() => setPeriodo(periodo === 'ano' ? '' : 'ano')} className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-all" style={pill(periodo === 'ano')}><CalendarRange size={13} />Melhores do Ano</button>
+        <button onClick={() => setPeriodo('semana')} className={pillCls} style={pill(periodo === 'semana')}><Zap size={14} />Semana</button>
+        <button onClick={() => setPeriodo('ano')} className={pillCls} style={pill(periodo === 'ano')}><CalendarRange size={14} />Melhores do Ano</button>
         <div className="flex items-center gap-2 ml-auto">
-          <button onClick={compartilharPodioArt} disabled={gerandoImg || ranking.length === 0} className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-all disabled:opacity-50" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.3)', color: 'var(--accent)' }}>
-            {gerandoImg ? <Loader2 size={13} className="animate-spin" /> : <Share2 size={13} />}
-            {gerandoImg ? 'Gerando…' : 'Compartilhar pódio'}
-          </button>
-          <button onClick={toggleTelao} className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-all" style={pill(telao)}><Tv size={13} />Apresentar</button>
+          <button onClick={toggleTelao} className={pillCls} style={pill(telao)}><Tv size={14} />Apresentar</button>
         </div>
       </div>
 
@@ -575,15 +515,15 @@ export default function RankingPage() {
           <div className="flex items-center gap-1 rounded-full p-1" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
             {abas.map(a => {
               const Icon = a.icon; const ativo = modo === a.k
-              return <button key={a.k} onClick={() => setModo(a.k as any)} className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all" style={{ background: ativo ? 'var(--accent)' : 'transparent', color: ativo ? '#0a0a0a' : 'var(--muted-color)' }}><Icon size={13} />{a.l}</button>
+              return <button key={a.k} onClick={() => setModo(a.k as any)} className="flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-semibold transition-all" style={ativo ? { background: 'rgba(212,175,55,0.18)', color: 'var(--accent)', boxShadow: '0 0 12px rgba(212,175,55,0.25)' } : { background: 'transparent', color: 'var(--muted-color)' }}><Icon size={14} />{a.l}</button>
             })}
           </div>
         )}
         <span className="mx-1 text-xs" style={{ color: 'var(--border)' }}>·</span>
-        <button onClick={() => setEscopo('operacao')} className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium transition-all" style={pill(escopo === 'operacao')}><Home size={13} />Minha operação</button>
-        <button onClick={() => setEscopo('geral')} className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium transition-all" style={pill(escopo === 'geral')}><Globe size={13} />Geral</button>
+        <button onClick={() => setEscopo('operacao')} className={pillCls} style={pill(escopo === 'operacao')}><Home size={14} />Minha operação</button>
+        <button onClick={() => setEscopo('geral')} className={pillCls} style={pill(escopo === 'geral')}><Globe size={14} />Geral</button>
         {empresas.length > 0 && escopo !== 'geral' && (
-          <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} className="rounded-full px-4 py-1.5 text-xs outline-none cursor-pointer" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text2)' }}>
+          <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} className="rounded-full px-4 py-2 text-[13px] outline-none cursor-pointer" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text2)' }}>
             <option value="" style={{ background: '#131313' }}>Todas as empresas</option>
             {empresas.map(e => <option key={e.id} value={e.id} style={{ background: '#131313' }}>{e.nome}</option>)}
           </select>
@@ -626,12 +566,6 @@ export default function RankingPage() {
           {conteudo}
         </main>
       </div>
-      {toast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 rounded-full px-5 py-3 anim-fade-up" style={{ background: 'var(--accent)', color: '#0a0a0a', boxShadow: '0 12px 40px rgba(212,175,55,0.35)' }}>
-          <Check size={16} />
-          <span className="text-sm font-semibold">{toast}</span>
-        </div>
-      )}
     </div>
   )
 }
