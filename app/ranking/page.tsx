@@ -39,6 +39,13 @@ interface Destaques {
 }
 
 const fmtMoeda = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+// Compacto p/ mobile: >= 1 milhão vira "R$ 1,50M" (nunca quebra linha no card horizontal)
+const fmtMoedaCompacta = (v: number) => {
+  const n = v || 0
+  if (n >= 1_000_000) return `R$ ${(n / 1_000_000).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}M`
+  if (n >= 100_000) return `R$ ${Math.round(n / 1000)}k`
+  return fmtMoeda(n)
+}
 const fmtDia = (s?: string) => { if (!s) return ''; const [a, m, d] = s.slice(0, 10).split('-'); return `${d}/${m}` }
 
 const CORES_INICIAIS = ['#d4af37', '#3b82f6', '#22c55e', '#a855f7', '#ec4899', '#f97316', '#06b6d4']
@@ -368,6 +375,41 @@ export default function RankingPage() {
     )
   }
 
+  // Variante MOBILE do pódio: card horizontal compacto (medalha · foto · nome/sub · valor)
+  function CardPodioCompacto({ item, rank }: { item?: RankItem; rank: 0 | 1 | 2 }) {
+    if (!item) return null
+    const cor = rank === 0 ? cores.ouro : rank === 1 ? cores.prata : cores.bronze
+    const primeiro = rank === 0
+    const fotoSize = primeiro ? 64 : 48
+    const usaLogo = modo === 'representante' && !!item.logo
+    return (
+      <div className={`flex items-center gap-3 rounded-2xl px-3 py-3 ${animCls}`} style={{
+        animationDelay: `${rank * 0.1}s`,
+        background: `linear-gradient(90deg, ${cor}${primeiro ? '1a' : '10'} 0%, rgba(0,0,0,0.12) 70%)`,
+        border: `1px solid ${cor}${primeiro ? '66' : '40'}`,
+        boxShadow: primeiro ? `0 8px 28px ${cor}22` : 'none',
+      }}>
+        <span className="text-2xl shrink-0 w-7 text-center" aria-hidden>{medalha[rank]}</span>
+        <div className={`relative shrink-0 ${primeiro ? 'rounded-full p-0.5 shimmer-gold' : ''}`}>
+          {usaLogo
+            ? <div className="rounded-full flex items-center justify-center bg-white/95" style={{ width: fotoSize, height: fotoSize, border: primeiro ? undefined : `2px solid ${cor}` }}><img src={item.logo || "/placeholder.svg"} alt={item.empresa_nome || item.nome} className="object-contain" style={{ width: fotoSize * 0.7, height: fotoSize * 0.7 }} /></div>
+            : <Avatar nome={item.nome} foto={item.foto} size={fotoSize} borderColor={primeiro ? undefined : cor} />}
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            {item.rei_semana && <Coroa datas={reiSemana?.datas} />}
+            <p className="font-semibold leading-tight truncate" style={{ color: 'var(--text)', fontSize: primeiro ? 16 : 14 }}>{item.nome}</p>
+            <Variacao delta={variacao[item.nome] ?? null} />
+            {modo === 'vendedor' && (item.streak_semanas || 0) >= 3 && <StreakBadge n={item.streak_semanas || 0} />}
+          </div>
+          {(modo === 'vendedor' || modo === 'equipe') && <SubLinha item={item} />}
+          <p className="font-bold font-mono leading-tight mt-0.5" style={{ color: cor, fontSize: primeiro ? 20 : 17 }}>{fmtMoedaCompacta(item.valor)}</p>
+          <p className="text-[11px] truncate" style={{ color: 'var(--muted-color)' }}>{item.qtd} cota{item.qtd !== 1 ? 's' : ''} · tk {fmtMoedaCompacta(item.ticket_medio)}</p>
+        </div>
+      </div>
+    )
+  }
+
   {/* Vitrine de abertura: 4 cards de destaque. Desktop = grade de 4 colunas; mobile = carrossel horizontal com snap */}
   const cardsDestaque = (
     <div className="flex gap-3 overflow-x-auto snap-x pb-1 mb-6 lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0 [&>*]:min-w-[240px] [&>*]:snap-start [&>*]:shrink-0 lg:[&>*]:min-w-0 lg:[&>*]:shrink">
@@ -440,10 +482,17 @@ export default function RankingPage() {
               </p>
             </div>
           )}
-          <div className="flex items-start justify-center gap-3 mb-6">
+          {/* DESKTOP (md+): pódio clássico 2º | 1º | 3º com o 1º elevado — inalterado */}
+          <div className="hidden md:flex items-start justify-center gap-3 mb-6">
             <CardPodio item={top3[1]} rank={1} />
             <CardPodio item={top3[0]} rank={0} />
             <CardPodio item={top3[2]} rank={2} />
+          </div>
+          {/* MOBILE (< md): lista vertical 1º → 2º → 3º em cards horizontais compactos */}
+          <div className="flex flex-col gap-2.5 mb-6 md:hidden">
+            <CardPodioCompacto item={top3[0]} rank={0} />
+            <CardPodioCompacto item={top3[1]} rank={1} />
+            <CardPodioCompacto item={top3[2]} rank={2} />
           </div>
 
           {resto.length > 0 && (
@@ -616,7 +665,7 @@ export default function RankingPage() {
       <Sidebar />
       <div className="relative lg:ml-60" style={{ zIndex: 1 }}>
         <Header title="Ranking" />
-        <main className="mx-auto max-w-[1100px] px-6 py-8 lg:px-8">
+        <main className="mx-auto max-w-[1100px] px-4 md:px-6 py-8 lg:px-8">
           <div className="flex items-center gap-3 mb-5 flex-wrap">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.25)' }}><Trophy size={18} style={{ color: 'var(--accent)' }} /></div>
             <div>
