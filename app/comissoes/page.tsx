@@ -370,6 +370,17 @@ export default function ComissoesPage() {
     }
     return true
   })
+  // Busca rápida (cliente ou contrato/proposta) — filtra SÓ a tabela, sem mexer nos KPIs/fila
+  const vendasVisiveis = useMemo(() => {
+    const q = buscaVendas.trim().toLowerCase()
+    if (!q) return vendasFiltradas
+    return vendasFiltradas.filter((v: any) =>
+      (v.cliente || '').toLowerCase().includes(q) ||
+      String(v.numero_contrato || '').toLowerCase().includes(q) ||
+      String(v.numero_proposta || '').toLowerCase().includes(q)
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vendasFiltradas, buscaVendas])
   const totalLR = vendasFiltradas.reduce((s, v) => s + v.comissao_lr, 0)
   const totalRecebido = vendasFiltradas.reduce((s, v) => s + (v.comissao_recebida_rs || 0), 0)
   const totalFalta = totalLR - totalRecebido
@@ -595,6 +606,25 @@ export default function ComissoesPage() {
             <div>
               {!mapaSel ? (
                 <div className="space-y-2">
+                  {/* (e) MINIGRÁFICO: recebido por semana (últimas 8 sextas de pagamento) */}
+                  {recebidoPorSemana.length > 0 && (
+                    <div className="rounded-2xl p-5 mb-4" style={{ background: 'rgba(17,18,22,0.92)', border: '1px solid rgba(255,255,255,0.08)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)' }}>
+                      <div className="flex items-center gap-2 mb-4"><BarChart3 size={15} style={{ color: 'var(--accent)' }} /><p className="text-xs font-semibold uppercase tracking-wide" style={{ color: 'var(--muted-color)' }}>Recebido por semana</p></div>
+                      <div className="flex items-end justify-between gap-2" style={{ height: 120 }}>
+                        {recebidoPorSemana.map((s, i) => {
+                          const pct = Math.max(6, (s.total / maxSemana) * 100)
+                          const ultimo = i === recebidoPorSemana.length - 1
+                          return (
+                            <div key={s.data} className="flex-1 flex flex-col items-center justify-end gap-1.5 h-full">
+                              <span className="text-[9px] tabular-nums whitespace-nowrap" style={{ color: ultimo ? 'var(--accent)' : 'var(--muted-color)' }}>{fmtMoeda(s.total)}</span>
+                              <div className="w-full rounded-t-md anim-bar-grow" style={{ height: `${pct}%`, background: ultimo ? 'linear-gradient(180deg, #d4af37, #b8941f)' : 'rgba(212,175,55,0.35)', animationDelay: `${i * 60}ms` }} />
+                              <span className="text-[9px] tabular-nums" style={{ color: 'var(--muted-color)' }}>{new Date(s.data + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
                   <p className="text-sm mb-3" style={{ color: 'var(--muted-color)' }}>Mapas de comissão importados. Clique para ver e baixar.</p>
                   {mapas.length === 0 ? <p className="text-xs py-8 text-center" style={{ color: 'var(--muted-color)' }}>Nenhum mapa importado ainda. Importe no botão acima.</p> : mapas.map(m => (
                     <div key={m.id} onClick={() => abrirMapa(m.id)} className="flex items-center justify-between rounded-xl p-4 cursor-pointer" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
@@ -1103,6 +1133,21 @@ export default function ComissoesPage() {
                 </div>
               )}
 
+              {/* (d) Busca rápida: filtra a tabela na hora por cliente ou contrato/proposta */}
+              {vendas.length > 0 && (
+                <div className="mb-3 flex items-center gap-2 rounded-lg px-3 py-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', maxWidth: 380 }}>
+                  <Search size={15} style={{ color: 'var(--muted-color)' }} />
+                  <input
+                    value={buscaVendas}
+                    onChange={(e) => setBuscaVendas(e.target.value)}
+                    placeholder="Buscar por cliente ou contrato..."
+                    className="flex-1 bg-transparent text-sm outline-none"
+                    style={{ color: 'var(--text)' }}
+                  />
+                  {buscaVendas && <button onClick={() => setBuscaVendas('')} className="text-[11px] shrink-0" style={{ color: 'var(--muted-color)' }}>limpar</button>}
+                </div>
+              )}
+
               {vendas.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-12 gap-2"><DollarSign size={32} style={{ color: 'var(--muted-color)' }} /><p className="text-sm" style={{ color: 'var(--muted-color)' }}>Nenhuma venda</p></div>
               ) : (
@@ -1124,7 +1169,7 @@ export default function ComissoesPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {[...vendasFiltradas].sort((a, b) => {
+                        {[...vendasVisiveis].sort((a, b) => {
                           const va = valorColuna(a, ordenarPor), vb = valorColuna(b, ordenarPor)
                           let cmp = 0
                           if (typeof va === 'string' && typeof vb === 'string') cmp = va.localeCompare(vb)
@@ -1160,6 +1205,12 @@ export default function ComissoesPage() {
                       </tbody>
                     </table>
                   </div>
+                  {vendasVisiveis.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-10 gap-1.5">
+                      <Search size={22} style={{ color: 'var(--muted-color)' }} />
+                      <p className="text-sm" style={{ color: 'var(--muted-color)' }}>Nenhuma venda para &quot;{buscaVendas}&quot;</p>
+                    </div>
+                  )}
                 </div>
               )}
             </>
