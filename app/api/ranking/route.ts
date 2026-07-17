@@ -11,6 +11,14 @@ const supabaseAdmin = createClient(
 )
 
 const hojeISO = () => new Date().toISOString().slice(0, 10)
+// segunda-feira da semana corrente (ISO week)
+const inicioSemanaISO = () => {
+  const d = new Date()
+  const day = d.getDay() // 0=domingo .. 6=sábado
+  const diff = day === 0 ? 6 : day - 1
+  d.setDate(d.getDate() - diff)
+  return d.toISOString().slice(0, 10)
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -31,6 +39,7 @@ export async function GET(req: NextRequest) {
     const modo = searchParams.get('modo') || 'vendedor' // vendedor | equipe | representante
     const filtroEmpresa = searchParams.get('empresa') || ''
     const producaoIdParam = searchParams.get('producao_id') || ''
+    const periodoParam = searchParams.get('periodo') || '' // '' | 'semana' | 'ano'
 
     // ── período vem da tabela producoes ──
     const { data: producoesRaw } = await supabaseAdmin
@@ -46,9 +55,17 @@ export async function GET(req: NextRequest) {
       || producoes[0]
       || null
 
-    // overrides manuais opcionais
-    const inicio = searchParams.get('inicio') || producao?.data_inicio || `${new Date().getFullYear()}-01-01`
-    const fim = searchParams.get('fim') || producao?.data_fim || `${new Date().getFullYear()}-12-31`
+    // período: semana/ano têm prioridade; senão a produção (ou overrides manuais)
+    let inicio: string, fim: string, producaoAtiva: string | null
+    if (periodoParam === 'semana') {
+      inicio = inicioSemanaISO(); fim = hoje; producaoAtiva = null
+    } else if (periodoParam === 'ano') {
+      inicio = `${new Date().getFullYear()}-01-01`; fim = hoje; producaoAtiva = null
+    } else {
+      inicio = searchParams.get('inicio') || producao?.data_inicio || `${new Date().getFullYear()}-01-01`
+      fim = searchParams.get('fim') || producao?.data_fim || `${new Date().getFullYear()}-12-31`
+      producaoAtiva = producao?.id || null
+    }
 
     // busca vendas no período (com escopo do usuário)
     let q = supabaseAdmin
@@ -151,7 +168,8 @@ export async function GET(req: NextRequest) {
       ranking,
       destaques,
       producoes,
-      producao_ativa: producao?.id || null,
+      producao_ativa: producaoAtiva,
+      periodo_tipo: periodoParam || null,
       periodo: { inicio, fim },
       modo,
       meu_role: me.role,

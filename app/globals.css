@@ -131,3 +131,32 @@
   backdrop-filter: blur(4px);
   border: 1px solid rgba(255,255,255,0.06);
 }
+
+/* ── Animações do ranking/campanha ── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.anim-fade-up { animation: fadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes barGrow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.anim-bar-grow { transform-origin: left; animation: barGrow 1s ease-out both; }
+
+@keyframes shimmerGold {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer-gold {
+  background: linear-gradient(110deg, rgba(212,175,55,0.35) 25%, rgba(255,235,170,0.85) 50%, rgba(212,175,55,0.35) 75%);
+  background-size: 200% 100%;
+  animation: shimmerGold 2.4s linear infinite;
+}
+
+@keyframes pulseSoft {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.04); opacity: 0.92; }
+}
+.anim-pulse-soft { animation: pulseSoft 2s ease-in-out infinite; }

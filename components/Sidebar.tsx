@@ -6,8 +6,15 @@ import { createClient } from '@/lib/supabase/client'
 import {
   Home, Upload, Users, FileText, Target, Trophy, Users2,
   DollarSign, Settings, LogOut, Menu, X, Camera, Trash2,
-  Calculator, BookOpen, CalendarCheck,
+  Calculator, BookOpen, CalendarCheck, PartyPopper,
 } from 'lucide-react'
+
+// Empresas participantes da Campanha Mac & Viagem (mesma lista da API)
+const EMPRESAS_CAMPANHA = [
+  '4b4088bb-ab79-4a8f-8517-6b1fdc6b0fd1', // LR Multimarcas
+  '1be64a2b-2e15-416f-9eb9-8b0175d1c89f', // Grupo Marques
+  'f131525b-ce2b-4eb4-a282-8e5f4cc224f2', // G.L.R Ribeirão
+]
 
 interface NavItem {
   icon: React.ReactNode
@@ -22,6 +29,7 @@ const mainNav: NavItem[] = [
   { icon: <FileText size={16} />, label: 'Pagamentos', href: '/boletos' },
   { icon: <Target size={16} />, label: 'Lances', href: '/lances' },
   { icon: <Trophy size={16} />, label: 'Ranking', href: '/ranking' },
+  { icon: <PartyPopper size={16} />, label: 'Campanha', href: '/campanha' },
   { icon: <Calculator size={16} />, label: 'Simulador', href: '/simulador' },
   { icon: <BookOpen size={16} />, label: 'Tabelas', href: '/tabelas' },
   { icon: <CalendarCheck size={16} />, label: 'Assembleias', href: '/assembleias' },
@@ -199,6 +207,7 @@ interface SidebarContentProps {
   userNome: string | null
   userEmail: string | null
   userRole: string | null
+  empresaId: string | null
   empresaNome: string | null
   empresaLogo: string | null
   fotoUrl: string | null
@@ -206,7 +215,7 @@ interface SidebarContentProps {
   onSignOut: () => void
 }
 
-function SidebarContent({ userNome, userEmail, userRole, empresaNome, empresaLogo, fotoUrl, onFotoChange, onSignOut }: SidebarContentProps) {
+function SidebarContent({ userNome, userEmail, userRole, empresaId, empresaNome, empresaLogo, fotoUrl, onFotoChange, onSignOut }: SidebarContentProps) {
   const pathname = usePathname()
   let displayName = userNome || 'Usuário'
   if (userRole === 'representante' && empresaNome) {
@@ -242,6 +251,8 @@ function SidebarContent({ userNome, userEmail, userRole, empresaNome, empresaLog
           {mainNav.filter((item) => {
             // Equipe: não aparece para vendedor (ele não gerencia ninguém)
             if (item.href === '/equipe') return userRole !== 'vendedor'
+            // Campanha: só master e usuários das empresas participantes
+            if (item.href === '/campanha') return userRole === 'master' || (!!empresaId && EMPRESAS_CAMPANHA.includes(empresaId))
             return true
           }).map((item) => (<NavLink key={item.label} item={item} pathname={pathname} />))}
         </div>
@@ -294,6 +305,7 @@ export default function Sidebar() {
   const [userNome, setUserNome] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [userRole, setUserRole] = useState<string | null>(null)
+  const [empresaId, setEmpresaId] = useState<string | null>(null)
   const [empresaNome, setEmpresaNome] = useState<string | null>(null)
   const [empresaLogo, setEmpresaLogo] = useState<string | null>(null)
   const [fotoUrl, setFotoUrl] = useState<string | null>(null)
@@ -305,7 +317,7 @@ export default function Sidebar() {
       if (data.user) {
         const { data: usuario } = await supabase
           .from('usuarios')
-          .select(`nome, role, foto_url, empresas(nome, logo_url)`)
+          .select(`nome, role, foto_url, empresa_id, empresas(nome, logo_url)`)
           .eq('auth_user_id', data.user.id)
           .single()
 
@@ -313,6 +325,7 @@ export default function Sidebar() {
           setUserNome(usuario.nome)
           setUserEmail(data.user.email ?? null)
           setUserRole(usuario.role)
+          setEmpresaId(usuario.empresa_id ?? null)
           setFotoUrl(usuario.foto_url)
           const emp = usuario.empresas as any
           if (emp) {
@@ -352,6 +365,7 @@ export default function Sidebar() {
           userNome={userNome}
           userEmail={userEmail}
           userRole={userRole}
+          empresaId={empresaId}
           empresaNome={empresaNome}
           empresaLogo={empresaLogo}
           fotoUrl={fotoUrl}
