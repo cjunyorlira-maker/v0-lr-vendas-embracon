@@ -159,9 +159,12 @@ export default function RankingPage() {
   const [telao, setTelao] = useState(false)
   const [reiSemana, setReiSemana] = useState<ReiSemana | null>(null)
   const [fixos, setFixos] = useState<Fixos | null>(null)
+  const [foraDoRanking, setForaDoRanking] = useState<{ vendas: number; valor: number }>({ vendas: 0, valor: 0 })
   const [jaAnimou, setJaAnimou] = useState(false) // anima entrada só na 1ª carga
   const liderAnterior = useRef<string | null>(null)
   const primeiraCarga = useRef(true)
+  // guard anti-corrida: só a última requisição (modo/período mais recente) pode tocar a tela
+  const reqSeq = useRef(0)
   const animCls = jaAnimou ? '' : 'anim-fade-up'
 
   // ao voltar para "Minha operação", garante um modo permitido para o role
@@ -242,6 +245,7 @@ export default function RankingPage() {
   }, [ranking, variacao, reiSemana, destaques, producoes, producaoId, periodo])
 
   async function loadData() {
+    const meuReq = ++reqSeq.current // sequência desta requisição
     // spinner só quando ainda não há dados; refreshes trocam os dados em background sem desmontar a tela
     if (ranking.length === 0) setLoading(true)
     const params = (extra: string) => {
@@ -256,11 +260,13 @@ export default function RankingPage() {
 
     const res = await fetch(url)
     const data = await res.json()
+    if (meuReq !== reqSeq.current) return // resposta velha: descarta antes de qualquer setState
     if (data.ranking) {
       setRanking(data.ranking)
       setDestaques(data.destaques || null)
       setReiSemana(data.rei_semana || null)
       setFixos(data.fixos || null)
+      setForaDoRanking(data.fora_do_ranking || { vendas: 0, valor: 0 })
       setRole(data.meu_role)
       if (data.producoes) setProducoes(data.producoes)
       if (data.producao_ativa && !producaoId && !periodo) setProducaoId(data.producao_ativa)
@@ -281,6 +287,7 @@ export default function RankingPage() {
           try {
             const resAnt = await fetch(params(`&producao_id=${anterior.id}`))
             const dataAnt = await resAnt.json()
+            if (meuReq !== reqSeq.current) return // resposta velha: descarta
             const posAnt: Record<string, number> = {}
             for (const r of (dataAnt.ranking || [])) posAnt[r.nome] = r.posicao
             const v: Record<string, number> = {}
@@ -298,7 +305,7 @@ export default function RankingPage() {
         setTimeout(() => setJaAnimou(true), 900)
       }
     }
-    setLoading(false)
+    if (meuReq === reqSeq.current) setLoading(false)
   }
 
   async function toggleTelao() {
@@ -531,6 +538,13 @@ export default function RankingPage() {
                 )
               })}
             </div>
+          )}
+
+          {/* Transparência p/ gestão: vendas sem equipe ficam fora do ranking de Equipes */}
+          {modo === 'equipe' && foraDoRanking.vendas > 0 && (role === 'master' || role === 'adm') && (
+            <p className="mt-3 text-[11px] leading-relaxed px-1" style={{ color: '#f59e0b' }}>
+              {`\u26A0 ${foraDoRanking.vendas} venda${foraDoRanking.vendas !== 1 ? 's' : ''} sem equipe definida (${fmtMoeda(foraDoRanking.valor)}) fora do ranking \u2014 atribua a equipe no cadastro para pontuarem`}
+            </p>
           )}
 
         </>
