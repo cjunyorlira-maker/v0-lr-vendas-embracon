@@ -62,6 +62,8 @@
 
 @layer components {
   .tab-btn {
+    position: relative;
+    overflow: hidden;
     display: flex;
     align-items: center;
     gap: 0.5rem;
@@ -78,6 +80,20 @@
     transition: all 0.2s ease;
     white-space: nowrap;
   }
+  /* brilho deslizante no hover */
+  .tab-btn::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -120%;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(105deg, transparent, rgba(255, 235, 170, 0.35), transparent);
+    transform: skewX(-18deg);
+    transition: left 0.55s ease;
+    pointer-events: none;
+  }
+  .tab-btn:hover::after { left: 130%; }
   .tab-btn:hover {
     background: rgba(212, 175, 55, 0.1);
     border-color: rgba(212, 175, 55, 0.4);
@@ -86,10 +102,14 @@
     box-shadow: 0 4px 14px rgba(212, 175, 55, 0.12);
   }
   .tab-btn.ativo {
-    background: rgba(212, 175, 55, 0.18);
-    border-color: var(--accent);
-    color: var(--accent);
-    box-shadow: 0 4px 16px rgba(212, 175, 55, 0.2);
+    background: linear-gradient(135deg, #d4af37 0%, #c9a227 50%, #b8941f 100%);
+    border-color: #d4af37;
+    color: #0a0a0a;
+    box-shadow: 0 6px 20px rgba(212, 175, 55, 0.35);
+  }
+  .tab-btn.ativo:hover {
+    color: #0a0a0a;
+    transform: translateY(-1px);
   }
   .card-glass {
     background: rgba(17, 18, 22, 0.92);
@@ -241,7 +261,34 @@
   }
 }
 
+/* ── Comissões: fade entre abas ── */
+@keyframes tabFade {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.tab-fade { animation: tabFade 0.15s ease-out both; }
+
+/* ── Skeleton de carregamento (blocos pulsando) ── */
+@keyframes skeletonPulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.9; }
+}
+.skeleton {
+  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.09) 50%, rgba(255,255,255,0.04) 75%);
+  background-size: 200% 100%;
+  animation: shimmerGold 1.6s linear infinite, skeletonPulse 1.6s ease-in-out infinite;
+  border-radius: 0.75rem;
+}
+
+/* ── Badge vermelha pulsante (falta 1 para estornar) ── */
+@keyframes pulseVermelho {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239,68,68,0.5); }
+  50% { box-shadow: 0 0 0 5px rgba(239,68,68,0); }
+}
+.pulse-vermelho { animation: pulseVermelho 1.2s ease-in-out infinite; }
+
 @media (prefers-reduced-motion: reduce) {
   .globo-gira, .borda-viva, .borda-viva::before, .glow-pulse, .raio-pisca,
-  .card-borda-viva, .card-borda-viva::before { animation: none; }
+  .card-borda-viva, .card-borda-viva::before,
+  .skeleton, .pulse-vermelho, .tab-fade { animation: none; }
 }
