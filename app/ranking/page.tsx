@@ -15,7 +15,7 @@ interface ReiSemana {
 }
 interface RecordeIndividual { vendedor: string; foto?: string; equipe?: string; empresa?: string; producao: string; valor: number }
 interface Fixos {
-  producao: string | null
+  periodo_label: string // "do Mês" | "da Semana" | "do Ano"
   melhor_equipe: { nome: string; empresa?: string; valor: number } | null
   melhor_vendedor: { nome: string; foto?: string; equipe?: string; empresa?: string; valor: number } | null
   recordista: RecordeIndividual | null
@@ -390,26 +390,26 @@ export default function RankingPage() {
             <CardPodio item={top3[2]} rank={2} />
           </div>
 
-          {/* 3 cards fixos: sempre da produção corrente + operação toda (não mudam com período/modo/escopo/filtro) */}
+          {/* Cards de destaque: Equipe/Vendedor ACOMPANHAM o período (Mês/Semana/Ano); Recordista é histórico fixo */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
             <CardDestaque
               cor="#d4af37" icon={Shield}
-              label="🛡️ Melhor Equipe do Mês"
+              label={`🛡️ Melhor Equipe ${fixos?.periodo_label || 'do Mês'}`}
               nome={fixos?.melhor_equipe?.nome || '—'}
               valor={fixos?.melhor_equipe ? fmtMoeda(fixos.melhor_equipe.valor) : '—'}
-              sub={fixos?.melhor_equipe?.empresa || (fixos?.producao || null)}
+              sub={fixos?.melhor_equipe?.empresa || null}
               animCls={animCls}
             />
             <CardDestaque
               cor="#22c55e"
               avatarNome={fixos?.melhor_vendedor?.nome || '—'}
               foto={fixos?.melhor_vendedor?.foto}
-              label="🥇 Melhor Vendedor do Mês"
+              label={`🥇 Melhor Vendedor ${fixos?.periodo_label || 'do Mês'}`}
               nome={fixos?.melhor_vendedor?.nome || '—'}
               valor={fixos?.melhor_vendedor ? fmtMoeda(fixos.melhor_vendedor.valor) : '—'}
               sub={fixos?.melhor_vendedor
-                ? ([fixos.melhor_vendedor.equipe, fixos.melhor_vendedor.empresa].filter(Boolean).join(' · ') || (fixos.producao || null))
-                : 'sem vendas na produção'}
+                ? ([fixos.melhor_vendedor.equipe, fixos.melhor_vendedor.empresa].filter(Boolean).join(' · ') || null)
+                : 'sem vendas no período'}
               animCls={animCls}
             />
             <CardDestaque

@@ -176,20 +176,22 @@ export async function GET(req: NextRequest) {
     // ── gamificação: rei da semana, streak, hall de recordes ──
     const game = await calcularGamificacao(supabaseAdmin, producoes)
 
-    // ── CARDS FIXOS: sempre da PRODUÇÃO CORRENTE e da OPERAÇÃO TODA ──
-    // Independem de modo/período/escopo/filtros da tela. São iguais para todos os usuários.
-    const prodCorrente = producoes.find(p => p.data_inicio <= hoje && p.data_fim >= hoje) || producoes[0] || null
+    // ── CARDS DE DESTAQUE: melhor equipe/vendedor ACOMPANHAM o período selecionado ──
+    // Mesmo intervalo (inicio/fim) já resolvido para o ranking (produção/semana/ano),
+    // porém sempre sobre a OPERAÇÃO TODA (sem escopo/filtro de empresa) e excluindo placeholders.
+    // O rótulo muda com o período: Mês (produção) | Semana | Ano.
+    const periodoSufixo = periodoParam === 'semana' ? 'da Semana' : periodoParam === 'ano' ? 'do Ano' : 'do Mês'
     let fixos: {
-      producao: string | null
+      periodo_label: string
       melhor_equipe: { nome: string; empresa?: string; valor: number } | null
       melhor_vendedor: { nome: string; foto?: string; equipe?: string; empresa?: string; valor: number } | null
       recordista: typeof game.recordes.melhor_producao_individual
-    } = { producao: prodCorrente?.nome || null, melhor_equipe: null, melhor_vendedor: null, recordista: game.recordes.melhor_producao_individual }
-    if (prodCorrente) {
+    } = { periodo_label: periodoSufixo, melhor_equipe: null, melhor_vendedor: null, recordista: game.recordes.melhor_producao_individual }
+    {
       const { data: vFix } = await supabaseAdmin
         .from('vendas')
         .select('valor_credito, vendedor_id, equipe_id, usuarios:vendedor_id(nome, foto_url, placeholder), equipes(nome), empresas(nome)')
-        .gte('data_venda', prodCorrente.data_inicio).lte('data_venda', prodCorrente.data_fim)
+        .gte('data_venda', inicio).lte('data_venda', fim)
       const eqMap = new Map<string, { nome: string; empresa?: string; valor: number }>()
       const vendMap = new Map<string, { nome: string; foto?: string; equipe?: string; empresa?: string; valor: number }>()
       for (const v of (vFix || []) as any[]) {
