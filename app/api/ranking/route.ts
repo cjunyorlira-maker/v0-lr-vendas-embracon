@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
     // busca vendas no período (com escopo do usuário)
     let q = supabaseAdmin
       .from('vendas')
-      .select('valor_credito, vendedor_id, equipe_id, empresa_id, data_venda, usuarios:vendedor_id(nome, foto_url, role), equipes(nome), empresas(nome, logo_url)')
+      .select('valor_credito, vendedor_id, equipe_id, empresa_id, data_venda, usuarios:vendedor_id(nome, foto_url, placeholder), equipes(nome), empresas(nome, logo_url)')
       .gte('data_venda', inicio)
       .lte('data_venda', fim)
 
@@ -96,8 +96,6 @@ export async function GET(req: NextRequest) {
     const nomeDe = (v: any, campo: string) => { const x = Array.isArray(v[campo]) ? v[campo][0] : v[campo]; return x }
 
     // ── agrupamento principal conforme o modo ──
-    // roles que NÃO são vendedores reais (usuários-representação: M Pereira, Ravi, Invest etc.)
-    const ROLES_NAO_VENDEDOR = ['representante', 'adm', 'master']
     type Agg = { nome: string; foto?: string; valor: number; qtd: number; maior_venda: number; equipe_nome?: string; empresa_nome?: string; empresa_id?: string; logo?: string; vendedor_id?: string }
     const mapa = new Map<string, Agg>()
     for (const v of lista) {
@@ -105,7 +103,7 @@ export async function GET(req: NextRequest) {
       const u = nomeDe(v, 'usuarios'); const e = nomeDe(v, 'equipes'); const emp = nomeDe(v, 'empresas')
       let chave = '', nome = '', foto: string | undefined = undefined
       if (modo === 'vendedor') {
-        if (u && ROLES_NAO_VENDEDOR.includes(u.role)) continue // exclui usuários-representação
+        if (u?.placeholder === true) continue // exclui apenas cadastros-representação (placeholder), não vendedores reais
         chave = v.vendedor_id || 'sem'; nome = u?.nome || 'Sem vendedor'; foto = u?.foto_url
       } else if (modo === 'equipe') {
         chave = v.equipe_id || 'sem'; nome = e?.nome || 'Sem equipe'
@@ -181,7 +179,7 @@ export async function GET(req: NextRequest) {
       const semIni = inicioSemanaISO()
       let qs = supabaseAdmin
         .from('vendas')
-        .select('valor_credito, vendedor_id, data_venda, usuarios:vendedor_id(nome, foto_url, role), equipes(nome), empresas(nome)')
+        .select('valor_credito, vendedor_id, data_venda, usuarios:vendedor_id(nome, foto_url, placeholder), equipes(nome), empresas(nome)')
         .gte('data_venda', semIni).lte('data_venda', hoje)
       qs = aplicaEscopo(qs)
       if (filtroEmpresa && !escopoGeral) qs = qs.eq('empresa_id', filtroEmpresa)
@@ -189,7 +187,7 @@ export async function GET(req: NextRequest) {
       const semMap = new Map<string, { nome: string; foto?: string; equipe?: string; empresa?: string; valor: number }>()
       for (const v of (vendasSemana || []) as any[]) {
         const u = nomeDe(v, 'usuarios')
-        if (!v.vendedor_id || (u && ROLES_NAO_VENDEDOR.includes(u.role))) continue
+        if (!v.vendedor_id || u?.placeholder === true) continue
         const eq = nomeDe(v, 'equipes'); const emp = nomeDe(v, 'empresas')
         const it = semMap.get(v.vendedor_id) || { nome: u?.nome || 'Vendedor', foto: u?.foto_url, equipe: eq?.nome, empresa: emp?.nome, valor: 0 }
         it.valor += v.valor_credito || 0

@@ -1,7 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 const firstOf = <T,>(x: T | T[] | null | undefined): T | undefined => (Array.isArray(x) ? x[0] : x || undefined)
-const ROLES_NAO_VENDEDOR = ['representante', 'adm', 'master']
 
 // ── Semana baseada em segunda-feira (índice absoluto monotônico) ──
 // 2020-01-06 é uma segunda-feira; usada como época.
@@ -57,7 +56,7 @@ export async function calcularGamificacao(
 ): Promise<Gamificacao> {
   // Histórico completo de vendas (paginado)
   const historico = await fetchAll(admin, (q) =>
-    q.select('valor_credito, vendedor_id, equipe_id, empresa_id, data_venda, usuarios:vendedor_id(nome, foto_url, role), equipes(nome), empresas(nome), clientes(nome)')
+    q.select('valor_credito, vendedor_id, equipe_id, empresa_id, data_venda, usuarios:vendedor_id(nome, foto_url, placeholder), equipes(nome), empresas(nome), clientes(nome)')
   )
 
   const hojeIdx = weekIndex(new Date().toISOString().slice(0, 10))
@@ -81,7 +80,7 @@ export async function calcularGamificacao(
     const emp = v.empresa_id
     const eq = firstOf<any>(v.equipes)
     const cli = firstOf<any>(v.clientes)
-    const ehRep = u && ROLES_NAO_VENDEDOR.includes(u.role)
+    const ehRep = u?.placeholder === true // exclui apenas cadastros-representação (placeholder), não vendedores reais
     const idx = weekIndex(v.data_venda)
 
     // maior venda única (qualquer vendedor real)
