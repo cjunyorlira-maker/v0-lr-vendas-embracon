@@ -118,17 +118,19 @@ const Ticker = memo(function Ticker({ frases }: { frases: string[] }) {
 })
 
 // card de destaque compacto (foto/escudo à esquerda, borda esquerda grossa + brilho no hover)
-function CardDestaque({ cor, icon: Icon, foto, avatarNome, label, nome, valor, sub, animCls }: { cor: string; icon?: any; foto?: string; avatarNome?: string; label: string; nome: string; valor: string; sub?: string | null; animCls: string }) {
+function CardDestaque({ cor, icon: Icon, foto, avatarNome, label, nome, valor, sub, animCls, dur = '4.5s', delay = '0s' }: { cor: string; icon?: any; foto?: string; avatarNome?: string; label: string; nome: string; valor: string; sub?: string | null; animCls: string; dur?: string; delay?: string }) {
   return (
-    <div className={`card-glow relative rounded-xl px-3 py-2.5 flex items-center gap-3 ${animCls}`} style={{ minHeight: 72, background: `${cor}14`, border: `1px solid ${cor}40`, borderLeft: `3px solid ${cor}`, ['--glow' as any]: `${cor}44` }}>
-      {avatarNome !== undefined
-        ? <Avatar nome={avatarNome} foto={foto} size={44} borderColor={cor} />
-        : <div className="flex items-center justify-center rounded-lg shrink-0" style={{ width: 44, height: 44, background: `${cor}1f`, border: `1px solid ${cor}55` }}>{Icon && <Icon size={22} style={{ color: cor }} />}</div>}
-      <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-semibold uppercase tracking-wide truncate" style={{ color: 'var(--muted-color)' }}>{label}</p>
-        <p className="font-bold leading-tight truncate" style={{ color: 'var(--text)', fontSize: 16 }}>{nome}</p>
-        <p className="font-bold font-mono leading-tight" style={{ color: cor, fontSize: 18 }}>{valor}</p>
-        {sub && <p className="text-[10px] truncate" style={{ color: 'var(--muted-color)' }}>{sub}</p>}
+    <div className={`card-borda-viva ${animCls}`} style={{ ['--cor-card' as any]: cor, ['--dur' as any]: dur, ['--delay' as any]: delay }}>
+      <div className="card-glow relative rounded-[calc(0.75rem-1.5px)] px-3 py-2.5 flex items-center gap-3 h-full" style={{ minHeight: 76, background: 'var(--surface, #131313)', border: `1px solid ${cor}40`, borderLeft: `3px solid ${cor}`, ['--glow' as any]: `${cor}44` }}>
+        {avatarNome !== undefined
+          ? <Avatar nome={avatarNome} foto={foto} size={44} borderColor={cor} />
+          : <div className="flex items-center justify-center rounded-lg shrink-0" style={{ width: 44, height: 44, background: `${cor}1f`, border: `1px solid ${cor}55` }}>{Icon && <Icon size={22} style={{ color: cor }} />}</div>}
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-semibold uppercase tracking-wide truncate" style={{ color: 'var(--muted-color)' }}>{label}</p>
+          <p className="font-bold leading-tight truncate" style={{ color: 'var(--text)', fontSize: 16 }}>{nome}</p>
+          <p className="font-bold font-mono leading-tight" style={{ color: cor, fontSize: 18 }}>{valor}</p>
+          {sub && <p className="text-[10px] truncate" style={{ color: 'var(--muted-color)' }}>{sub}</p>}
+        </div>
       </div>
     </div>
   )
@@ -371,6 +373,7 @@ export default function RankingPage() {
     <div className="flex gap-3 overflow-x-auto snap-x pb-1 mb-6 lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0 [&>*]:min-w-[240px] [&>*]:snap-start [&>*]:shrink-0 lg:[&>*]:min-w-0 lg:[&>*]:shrink">
       <CardDestaque
         cor="#d4af37" icon={Shield}
+        dur="4.2s" delay="0s"
         label={`🛡️ Melhor Equipe ${fixos?.periodo_label || 'do Mês'}`}
         nome={fixos?.melhor_equipe?.nome || '—'}
         valor={fixos?.melhor_equipe ? fmtMoeda(fixos.melhor_equipe.valor) : '—'}
@@ -379,6 +382,7 @@ export default function RankingPage() {
       />
       <CardDestaque
         cor="#3b82f6"
+        dur="4.8s" delay="-1.2s"
         icon={fixos?.melhor_representacao?.logo ? undefined : Building2}
         foto={fixos?.melhor_representacao?.logo}
         avatarNome={fixos?.melhor_representacao?.logo ? (fixos?.melhor_representacao?.nome || '—') : undefined}
@@ -390,6 +394,7 @@ export default function RankingPage() {
       />
       <CardDestaque
         cor="#22c55e"
+        dur="4.5s" delay="-2.4s"
         avatarNome={fixos?.melhor_vendedor?.nome || '—'}
         foto={fixos?.melhor_vendedor?.foto}
         label={`🥇 Melhor Vendedor ${fixos?.periodo_label || 'do Mês'}`}
@@ -402,6 +407,7 @@ export default function RankingPage() {
       />
       <CardDestaque
         cor="#a855f7"
+        dur="5.1s" delay="-3.6s"
         avatarNome={fixos?.recordista?.vendedor || '—'}
         foto={fixos?.recordista?.foto}
         label="🏅 Recordista"
