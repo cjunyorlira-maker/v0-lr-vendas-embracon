@@ -366,6 +366,55 @@ export default function RankingPage() {
     )
   }
 
+  {/* Vitrine de abertura: 4 cards de destaque. Desktop = grade de 4 colunas; mobile = carrossel horizontal com snap */}
+  const cardsDestaque = (
+    <div className="flex gap-3 overflow-x-auto snap-x pb-1 mb-6 lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-0 [&>*]:min-w-[240px] [&>*]:snap-start [&>*]:shrink-0 lg:[&>*]:min-w-0 lg:[&>*]:shrink">
+      <CardDestaque
+        cor="#d4af37" icon={Shield}
+        label={`🛡️ Melhor Equipe ${fixos?.periodo_label || 'do Mês'}`}
+        nome={fixos?.melhor_equipe?.nome || '—'}
+        valor={fixos?.melhor_equipe ? fmtMoeda(fixos.melhor_equipe.valor) : '—'}
+        sub={fixos?.melhor_equipe?.empresa || null}
+        animCls={animCls}
+      />
+      <CardDestaque
+        cor="#3b82f6"
+        icon={fixos?.melhor_representacao?.logo ? undefined : Building2}
+        foto={fixos?.melhor_representacao?.logo}
+        avatarNome={fixos?.melhor_representacao?.logo ? (fixos?.melhor_representacao?.nome || '—') : undefined}
+        label={`🏢 Melhor Representação ${fixos?.periodo_label || 'do Mês'}`}
+        nome={fixos?.melhor_representacao?.nome || '—'}
+        valor={fixos?.melhor_representacao ? fmtMoeda(fixos.melhor_representacao.valor) : '—'}
+        sub={fixos?.melhor_representacao ? 'representação' : 'sem vendas no período'}
+        animCls={animCls}
+      />
+      <CardDestaque
+        cor="#22c55e"
+        avatarNome={fixos?.melhor_vendedor?.nome || '—'}
+        foto={fixos?.melhor_vendedor?.foto}
+        label={`🥇 Melhor Vendedor ${fixos?.periodo_label || 'do Mês'}`}
+        nome={fixos?.melhor_vendedor?.nome || '—'}
+        valor={fixos?.melhor_vendedor ? fmtMoeda(fixos.melhor_vendedor.valor) : '—'}
+        sub={fixos?.melhor_vendedor
+          ? ([fixos.melhor_vendedor.equipe, fixos.melhor_vendedor.empresa].filter(Boolean).join(' · ') || null)
+          : 'sem vendas no período'}
+        animCls={animCls}
+      />
+      <CardDestaque
+        cor="#a855f7"
+        avatarNome={fixos?.recordista?.vendedor || '—'}
+        foto={fixos?.recordista?.foto}
+        label="🏅 Recordista"
+        nome={fixos?.recordista?.vendedor || '—'}
+        valor={fixos?.recordista ? fmtMoeda(fixos.recordista.valor) : '—'}
+        sub={fixos?.recordista
+          ? [fixos.recordista.producao, fixos.recordista.empresa].filter(Boolean).join(' · ')
+          : 'sem histórico'}
+        animCls={animCls}
+      />
+    </div>
+  )
+
   const conteudo = (
     <>
       {loading ? (
@@ -389,53 +438,6 @@ export default function RankingPage() {
             <CardPodio item={top3[1]} rank={1} />
             <CardPodio item={top3[0]} rank={0} />
             <CardPodio item={top3[2]} rank={2} />
-          </div>
-
-          {/* Cards de destaque: Equipe/Representação/Vendedor ACOMPANHAM o período (Mês/Semana/Ano); Recordista é histórico fixo */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-            <CardDestaque
-              cor="#d4af37" icon={Shield}
-              label={`🛡️ Melhor Equipe ${fixos?.periodo_label || 'do Mês'}`}
-              nome={fixos?.melhor_equipe?.nome || '—'}
-              valor={fixos?.melhor_equipe ? fmtMoeda(fixos.melhor_equipe.valor) : '—'}
-              sub={fixos?.melhor_equipe?.empresa || null}
-              animCls={animCls}
-            />
-            <CardDestaque
-              cor="#3b82f6"
-              icon={fixos?.melhor_representacao?.logo ? undefined : Building2}
-              foto={fixos?.melhor_representacao?.logo}
-              avatarNome={fixos?.melhor_representacao?.logo ? (fixos?.melhor_representacao?.nome || '—') : undefined}
-              label={`🏢 Melhor Representação ${fixos?.periodo_label || 'do Mês'}`}
-              nome={fixos?.melhor_representacao?.nome || '—'}
-              valor={fixos?.melhor_representacao ? fmtMoeda(fixos.melhor_representacao.valor) : '—'}
-              sub={fixos?.melhor_representacao ? 'representação' : 'sem vendas no período'}
-              animCls={animCls}
-            />
-            <CardDestaque
-              cor="#22c55e"
-              avatarNome={fixos?.melhor_vendedor?.nome || '—'}
-              foto={fixos?.melhor_vendedor?.foto}
-              label={`🥇 Melhor Vendedor ${fixos?.periodo_label || 'do Mês'}`}
-              nome={fixos?.melhor_vendedor?.nome || '—'}
-              valor={fixos?.melhor_vendedor ? fmtMoeda(fixos.melhor_vendedor.valor) : '—'}
-              sub={fixos?.melhor_vendedor
-                ? ([fixos.melhor_vendedor.equipe, fixos.melhor_vendedor.empresa].filter(Boolean).join(' · ') || null)
-                : 'sem vendas no período'}
-              animCls={animCls}
-            />
-            <CardDestaque
-              cor="#a855f7"
-              avatarNome={fixos?.recordista?.vendedor || '—'}
-              foto={fixos?.recordista?.foto}
-              label="🏅 Recordista"
-              nome={fixos?.recordista?.vendedor || '—'}
-              valor={fixos?.recordista ? fmtMoeda(fixos.recordista.valor) : '—'}
-              sub={fixos?.recordista
-                ? [fixos.recordista.producao, fixos.recordista.empresa].filter(Boolean).join(' · ')
-                : 'sem histórico'}
-              animCls={animCls}
-            />
           </div>
 
           {resto.length > 0 && (
@@ -596,6 +598,7 @@ export default function RankingPage() {
             {escopo === 'geral' && <span className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold" style={{ background: 'rgba(212,175,55,0.15)', color: 'var(--accent)', border: '1px solid rgba(212,175,55,0.3)' }}><Globe size={13} />Geral</span>}
             <button onClick={toggleTelao} className="ml-auto flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium" style={{ background: 'var(--accent)', color: '#0a0a0a' }}><Tv size={13} />Sair</button>
           </div>
+          {cardsDestaque}
           {conteudo}
         </div>
       </div>
@@ -616,6 +619,7 @@ export default function RankingPage() {
             </div>
             <div className="ml-auto">{escopoToggle}</div>
           </div>
+          {cardsDestaque}
           {filtros}
           {conteudo}
         </main>
