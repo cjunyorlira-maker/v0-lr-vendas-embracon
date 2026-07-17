@@ -15,6 +15,7 @@ interface ReiSemana {
   datas: { ini: string; fim: string }
 }
 interface RecordeIndividual { vendedor: string; foto?: string; equipe?: string; empresa?: string; producao: string; valor: number }
+interface MelhorSemana { nome: string; foto?: string; equipe?: string; empresa?: string; valor: number }
 
 // paleta fixa (12 cores discretas) para diferenciar empresas no Ranking Geral
 const CORES_EMPRESA = ['#d4af37', '#3b82f6', '#22c55e', '#ec4899', '#f97316', '#06b6d4', '#a855f7', '#ef4444', '#14b8a6', '#eab308', '#8b5cf6', '#64748b']
@@ -77,12 +78,12 @@ function Coroa({ datas }: { datas?: { ini: string; fim: string } }) {
   return <span title={t} className="inline-flex shrink-0" aria-label={t}><Crown size={15} style={{ color: '#d4af37', fill: '#d4af37' }} /></span>
 }
 
-// badge de streak (>= 3 semanas)
+// badge de streak (>= 3 semanas) — texto por extenso
 function StreakBadge({ n }: { n: number }) {
   if (n < 3) return null
   return (
-    <span title={`${n} semanas consecutivas com venda`} className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold shrink-0" style={{ background: 'rgba(249,115,22,0.15)', color: '#f97316', border: '1px solid rgba(249,115,22,0.35)' }}>
-      <Flame size={10} />{n} sem.
+    <span title={`${n} semanas consecutivas com venda`} className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold shrink-0 whitespace-nowrap" style={{ background: 'rgba(249,115,22,0.15)', color: '#f97316', border: '1px solid rgba(249,115,22,0.35)' }}>
+      <Flame size={11} />{n} semanas seguidas vendendo
     </span>
   )
 }
@@ -145,6 +146,7 @@ export default function RankingPage() {
   const [reiSemana, setReiSemana] = useState<ReiSemana | null>(null)
   const [semanaLider, setSemanaLider] = useState<{ nome: string; valor: number } | null>(null)
   const [recordeIndividual, setRecordeIndividual] = useState<RecordeIndividual | null>(null)
+  const [melhorSemana, setMelhorSemana] = useState<MelhorSemana | null>(null)
   const [periodoDatas, setPeriodoDatas] = useState<{ inicio: string; fim: string } | null>(null)
   const [gerandoImg, setGerandoImg] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
@@ -187,26 +189,50 @@ export default function RankingPage() {
     return () => document.removeEventListener('fullscreenchange', onFs)
   }, [])
 
-  // frases do ticker da disputa (geradas dos dados)
+  // frases do ticker da disputa (geradas só a partir dos dados disponíveis; embaralhadas a cada carga)
   const frasesTicker = useMemo(() => {
     const f: string[] = []
+    // ⚔️ / 🔥 1º x 2º
     if (ranking.length >= 2) {
       const dif = ranking[0].valor - ranking[1].valor
-      if (dif > 0) f.push(`🔥 ${ranking[1].nome} está a ${fmtMoeda(dif)} de assumir a liderança!`)
+      if (dif > 0) {
+        f.push(`⚔️ ${ranking[0].nome} × ${ranking[1].nome}: apenas ${fmtMoeda(dif)} separa os dois`)
+        f.push(`🔥 ${ranking[1].nome} está a ${fmtMoeda(dif)} de assumir a liderança!`)
+      }
     }
-    // maior subida de posições nesta produção
+    // ⚡ melhor da semana
+    if (melhorSemana && melhorSemana.valor > 0) f.push(`⚡ ${melhorSemana.nome} já vendeu ${fmtMoeda(melhorSemana.valor)} só esta semana`)
+    // 🚀 maior arrancada (subida de posições na produção)
     let maiorSubida: { nome: string; delta: number } | null = null
     for (const r of ranking) {
       const d = variacao[r.nome]
       if (d !== undefined && d > 0 && (!maiorSubida || d > maiorSubida.delta)) maiorSubida = { nome: r.nome, delta: d }
     }
-    if (maiorSubida) f.push(`🚀 ${maiorSubida.nome}: subiu ${maiorSubida.delta} posiç${maiorSubida.delta === 1 ? 'ão' : 'ões'} nesta produção!`)
-    if (reiSemana?.geral) f.push(`👑 ${reiSemana.geral.nome}: Rei da Semana com ${fmtMoeda(reiSemana.geral.valor)}`)
-    // maior streak do ranking
+    if (maiorSubida) f.push(`🚀 Maior arrancada: ${maiorSubida.nome} subiu ${maiorSubida.delta} posiç${maiorSubida.delta === 1 ? 'ão' : 'ões'} na produção`)
+    // 👑 rei da semana passada
+    if (reiSemana?.geral) f.push(`👑 ${reiSemana.geral.nome}: Rei da Semana passada com ${fmtMoeda(reiSemana.geral.valor)}`)
+    // 🔥 maior streak
     const comStreak = ranking.filter(r => (r.streak_semanas || 0) >= 3).sort((a, b) => (b.streak_semanas || 0) - (a.streak_semanas || 0))[0]
-    if (comStreak) f.push(`🔥 ${comStreak.nome}: ${comStreak.streak_semanas} semanas seguidas vendendo!`)
+    if (comStreak) f.push(`🔥 ${comStreak.nome}: ${comStreak.streak_semanas} semanas seguidas vendendo — quem alcança?`)
+    // 💎 maior venda da produção
+    if (destaques?.maior_venda_unica && destaques.maior_venda_unica.valor > 0) f.push(`💎 Maior venda da produção: ${destaques.maior_venda_unica.vendedor} — ${fmtMoeda(destaques.maior_venda_unica.valor)}`)
+    // 📊 total do período + 🎉 marco de 10M
+    const total = ranking.reduce((s, r) => s + r.valor, 0)
+    if (total > 0) f.push(`📊 A operação já soma ${fmtMoeda(total)} — e não parou`)
+    const marco = Math.floor(total / 10_000_000) * 10_000_000
+    if (marco >= 10_000_000) f.push(`🎉 Passamos de ${fmtMoeda(marco)}!`)
+    // 🎯 dias restantes (só quando uma produção está selecionada)
+    if (!periodo && producaoId) {
+      const prod = producoes.find(p => p.id === producaoId)
+      if (prod?.data_fim) {
+        const dias = Math.ceil((new Date(prod.data_fim + 'T23:59:59').getTime() - Date.now()) / 86400000)
+        if (dias >= 0 && dias <= 60) f.push(`🎯 Falta${dias === 1 ? '' : 'm'} ${dias} dia${dias === 1 ? '' : 's'} para o fim da produção`)
+      }
+    }
+    // embaralha (Fisher-Yates) para não repetir sempre na mesma ordem
+    for (let i = f.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [f[i], f[j]] = [f[j], f[i]] }
     return f
-  }, [ranking, variacao, reiSemana])
+  }, [ranking, variacao, reiSemana, melhorSemana, destaques, producoes, producaoId, periodo])
 
   async function loadData() {
     // spinner só quando ainda não há dados; refreshes trocam os dados em background sem desmontar a tela
@@ -229,6 +255,7 @@ export default function RankingPage() {
       setReiSemana(data.rei_semana || null)
       setSemanaLider(data.semana_atual_lider || null)
       setRecordeIndividual(data.recorde_individual || null)
+      setMelhorSemana(data.melhor_da_semana || null)
       setPeriodoDatas(data.periodo || null)
       setRole(data.meu_role)
       if (data.producoes) setProducoes(data.producoes)
@@ -426,10 +453,10 @@ export default function RankingPage() {
           </div>
 
           {destaques && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
               <CardDestaque
                 cor="#d4af37" icon={Shield}
-                label="Equipe do período"
+                label="🛡️ Equipe da produção"
                 nome={destaques.top_equipe?.nome || '—'}
                 valor={destaques.top_equipe ? fmtMoeda(destaques.top_equipe.valor) : '—'}
                 sub={destaques.top_equipe ? `${destaques.top_equipe.qtd} cota${destaques.top_equipe.qtd !== 1 ? 's' : ''}` : null}
@@ -437,10 +464,22 @@ export default function RankingPage() {
               />
               <CardDestaque
                 cor="#3b82f6" icon={Building2}
-                label="Representação líder"
+                label="🏢 Representação líder"
                 nome={destaques.top_empresa?.nome || '—'}
                 valor={destaques.top_empresa ? fmtMoeda(destaques.top_empresa.valor) : '—'}
                 sub={destaques.top_empresa ? `${destaques.top_empresa.qtd} cota${destaques.top_empresa.qtd !== 1 ? 's' : ''}` : null}
+                animCls={animCls}
+              />
+              <CardDestaque
+                cor="#22c55e"
+                avatarNome={melhorSemana?.nome || '—'}
+                foto={melhorSemana?.foto}
+                label="⭐ Melhor da Semana"
+                nome={melhorSemana?.nome || '—'}
+                valor={melhorSemana ? fmtMoeda(melhorSemana.valor) : '—'}
+                sub={melhorSemana
+                  ? ([melhorSemana.equipe, melhorSemana.empresa].filter(Boolean).join(' · ') || 'esta semana')
+                  : 'sem vendas esta semana'}
                 animCls={animCls}
               />
               <CardDestaque

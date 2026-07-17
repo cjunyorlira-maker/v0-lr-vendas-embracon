@@ -76,13 +76,18 @@ export async function GET(req: NextRequest) {
       .gte('data_venda', inicio)
       .lte('data_venda', fim)
 
-    if (escopoGeral) { /* Ranking Geral: qualquer autenticado vê todas as empresas */ }
-    else if (me.role === 'master') { /* tudo */ }
-    else if ((await getEscopo(me)).escopoGlobal) { /* adm matriz vê tudo */ }
-    else if (['representante', 'adm'].includes(me.role)) q = q.eq('empresa_id', me.empresa_id)
-    else if (me.role === 'supervisor') q = q.eq('equipe_id', me.equipe_id)
-    else if (me.role === 'vendedor') q = q.eq('empresa_id', me.empresa_id)
-
+    // escopo reutilizável (ranking do período + melhor da semana corrente compartilham as mesmas regras)
+    const esc = await getEscopo(me)
+    const aplicaEscopo = (qb: any) => {
+      if (escopoGeral) return qb                                   // Ranking Geral: todas as empresas
+      if (me.role === 'master') return qb                          // tudo
+      if (esc.escopoGlobal) return qb                              // adm matriz vê tudo
+      if (['representante', 'adm'].includes(me.role)) return qb.eq('empresa_id', me.empresa_id)
+      if (me.role === 'supervisor') return qb.eq('equipe_id', me.equipe_id)
+      if (me.role === 'vendedor') return qb.eq('empresa_id', me.empresa_id)
+      return qb
+    }
+    q = aplicaEscopo(q)
     // filtro manual de empresa não se aplica ao Ranking Geral (é sempre agregado de todas)
     if (filtroEmpresa && !escopoGeral) q = q.eq('empresa_id', filtroEmpresa)
     const { data: vendas } = await q
@@ -170,6 +175,30 @@ export async function GET(req: NextRequest) {
       maior_venda_unica: maiorVendaUnica,
     }
 
+    // ── Melhor da Semana (segunda→agora), sempre da semana corrente, respeitando o escopo ativo ──
+    let melhorDaSemana: { nome: string; foto?: string; equipe?: string; empresa?: string; valor: number } | null = null
+    {
+      const semIni = inicioSemanaISO()
+      let qs = supabaseAdmin
+        .from('vendas')
+        .select('valor_credito, vendedor_id, data_venda, usuarios:vendedor_id(nome, foto_url, role), equipes(nome), empresas(nome)')
+        .gte('data_venda', semIni).lte('data_venda', hoje)
+      qs = aplicaEscopo(qs)
+      if (filtroEmpresa && !escopoGeral) qs = qs.eq('empresa_id', filtroEmpresa)
+      const { data: vendasSemana } = await qs
+      const semMap = new Map<string, { nome: string; foto?: string; equipe?: string; empresa?: string; valor: number }>()
+      for (const v of (vendasSemana || []) as any[]) {
+        const u = nomeDe(v, 'usuarios')
+        if (!v.vendedor_id || (u && ROLES_NAO_VENDEDOR.includes(u.role))) continue
+        const eq = nomeDe(v, 'equipes'); const emp = nomeDe(v, 'empresas')
+        const it = semMap.get(v.vendedor_id) || { nome: u?.nome || 'Vendedor', foto: u?.foto_url, equipe: eq?.nome, empresa: emp?.nome, valor: 0 }
+        it.valor += v.valor_credito || 0
+        if (!it.equipe && eq?.nome) it.equipe = eq.nome
+        semMap.set(v.vendedor_id, it)
+      }
+      melhorDaSemana = Array.from(semMap.values()).sort((a, b) => b.valor - a.valor)[0] || null
+    }
+
     // ── gamificação: rei da semana, streak, hall de recordes ──
     const game = await calcularGamificacao(supabaseAdmin, producoes)
 
@@ -204,6 +233,7 @@ export async function GET(req: NextRequest) {
       meu_role: me.role,
       rei_semana: game.rei_semana,
       semana_atual_lider: game.semana_atual_lider,
+      melhor_da_semana: melhorDaSemana,
       // Hall de Recordes removido; mantém só o recorde do card "Vendedor Recordista"
       recorde_individual: game.recordes.melhor_producao_individual,
     })
