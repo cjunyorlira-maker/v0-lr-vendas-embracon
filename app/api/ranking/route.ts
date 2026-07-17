@@ -184,15 +184,17 @@ export async function GET(req: NextRequest) {
     let fixos: {
       periodo_label: string
       melhor_equipe: { nome: string; empresa?: string; valor: number } | null
+      melhor_representacao: { nome: string; logo?: string; valor: number } | null
       melhor_vendedor: { nome: string; foto?: string; equipe?: string; empresa?: string; valor: number } | null
       recordista: typeof game.recordes.melhor_producao_individual
-    } = { periodo_label: periodoSufixo, melhor_equipe: null, melhor_vendedor: null, recordista: game.recordes.melhor_producao_individual }
+    } = { periodo_label: periodoSufixo, melhor_equipe: null, melhor_representacao: null, melhor_vendedor: null, recordista: game.recordes.melhor_producao_individual }
     {
       const { data: vFix } = await supabaseAdmin
         .from('vendas')
-        .select('valor_credito, vendedor_id, equipe_id, usuarios:vendedor_id(nome, foto_url, placeholder), equipes(nome), empresas(nome)')
+        .select('valor_credito, vendedor_id, equipe_id, empresa_id, usuarios:vendedor_id(nome, foto_url, placeholder), equipes(nome), empresas(nome, logo_url)')
         .gte('data_venda', inicio).lte('data_venda', fim)
       const eqMap = new Map<string, { nome: string; empresa?: string; valor: number }>()
+      const empMap = new Map<string, { nome: string; logo?: string; valor: number }>()
       const vendMap = new Map<string, { nome: string; foto?: string; equipe?: string; empresa?: string; valor: number }>()
       for (const v of (vFix || []) as any[]) {
         const cred = v.valor_credito || 0
@@ -201,12 +203,17 @@ export async function GET(req: NextRequest) {
           const it = eqMap.get(v.equipe_id) || { nome: eq?.nome || 'Equipe', empresa: emp?.nome, valor: 0 }
           it.valor += cred; if (!it.empresa && emp?.nome) it.empresa = emp.nome; eqMap.set(v.equipe_id, it)
         }
+        if (v.empresa_id) {
+          const it = empMap.get(v.empresa_id) || { nome: emp?.nome || 'Representação', logo: emp?.logo_url, valor: 0 }
+          it.valor += cred; if (!it.logo && emp?.logo_url) it.logo = emp.logo_url; empMap.set(v.empresa_id, it)
+        }
         if (v.vendedor_id && u?.placeholder !== true) {
           const it = vendMap.get(v.vendedor_id) || { nome: u?.nome || 'Vendedor', foto: u?.foto_url, equipe: eq?.nome, empresa: emp?.nome, valor: 0 }
           it.valor += cred; if (!it.equipe && eq?.nome) it.equipe = eq.nome; vendMap.set(v.vendedor_id, it)
         }
       }
       fixos.melhor_equipe = Array.from(eqMap.values()).sort((a, b) => b.valor - a.valor)[0] || null
+      fixos.melhor_representacao = Array.from(empMap.values()).sort((a, b) => b.valor - a.valor)[0] || null
       fixos.melhor_vendedor = Array.from(vendMap.values()).sort((a, b) => b.valor - a.valor)[0] || null
     }
 

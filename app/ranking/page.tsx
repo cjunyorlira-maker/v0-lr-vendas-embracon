@@ -17,6 +17,7 @@ interface RecordeIndividual { vendedor: string; foto?: string; equipe?: string; 
 interface Fixos {
   periodo_label: string // "do Mês" | "da Semana" | "do Ano"
   melhor_equipe: { nome: string; empresa?: string; valor: number } | null
+  melhor_representacao: { nome: string; logo?: string; valor: number } | null
   melhor_vendedor: { nome: string; foto?: string; equipe?: string; empresa?: string; valor: number } | null
   recordista: RecordeIndividual | null
 }
@@ -390,14 +391,25 @@ export default function RankingPage() {
             <CardPodio item={top3[2]} rank={2} />
           </div>
 
-          {/* Cards de destaque: Equipe/Vendedor ACOMPANHAM o período (Mês/Semana/Ano); Recordista é histórico fixo */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+          {/* Cards de destaque: Equipe/Representação/Vendedor ACOMPANHAM o período (Mês/Semana/Ano); Recordista é histórico fixo */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
             <CardDestaque
               cor="#d4af37" icon={Shield}
               label={`🛡️ Melhor Equipe ${fixos?.periodo_label || 'do Mês'}`}
               nome={fixos?.melhor_equipe?.nome || '—'}
               valor={fixos?.melhor_equipe ? fmtMoeda(fixos.melhor_equipe.valor) : '—'}
               sub={fixos?.melhor_equipe?.empresa || null}
+              animCls={animCls}
+            />
+            <CardDestaque
+              cor="#3b82f6"
+              icon={fixos?.melhor_representacao?.logo ? undefined : Building2}
+              foto={fixos?.melhor_representacao?.logo}
+              avatarNome={fixos?.melhor_representacao?.logo ? (fixos?.melhor_representacao?.nome || '—') : undefined}
+              label={`🏢 Melhor Representação ${fixos?.periodo_label || 'do Mês'}`}
+              nome={fixos?.melhor_representacao?.nome || '—'}
+              valor={fixos?.melhor_representacao ? fmtMoeda(fixos.melhor_representacao.valor) : '—'}
+              sub={fixos?.melhor_representacao ? 'representação' : 'sem vendas no período'}
               animCls={animCls}
             />
             <CardDestaque
