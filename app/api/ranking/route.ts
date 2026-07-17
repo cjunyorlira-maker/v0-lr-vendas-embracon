@@ -40,6 +40,7 @@ export async function GET(req: NextRequest) {
     const filtroEmpresa = searchParams.get('empresa') || ''
     const producaoIdParam = searchParams.get('producao_id') || ''
     const periodoParam = searchParams.get('periodo') || '' // '' | 'semana' | 'ano'
+    const escopoGeral = searchParams.get('escopo') === 'geral' // vê todas as empresas, ignora escopo por role
 
     // ── período vem da tabela producoes ──
     const { data: producoesRaw } = await supabaseAdmin
@@ -70,41 +71,48 @@ export async function GET(req: NextRequest) {
     // busca vendas no período (com escopo do usuário)
     let q = supabaseAdmin
       .from('vendas')
-      .select('valor_credito, vendedor_id, equipe_id, empresa_id, data_venda, usuarios:vendedor_id(nome, foto_url), equipes(nome), empresas(nome)')
+      .select('valor_credito, vendedor_id, equipe_id, empresa_id, data_venda, usuarios:vendedor_id(nome, foto_url, role), equipes(nome), empresas(nome, logo_url)')
       .gte('data_venda', inicio)
       .lte('data_venda', fim)
 
-    if (me.role === 'master') { /* tudo */ }
+    if (escopoGeral) { /* Ranking Geral: qualquer autenticado vê todas as empresas */ }
+    else if (me.role === 'master') { /* tudo */ }
     else if ((await getEscopo(me)).escopoGlobal) { /* adm matriz vê tudo */ }
     else if (['representante', 'adm'].includes(me.role)) q = q.eq('empresa_id', me.empresa_id)
     else if (me.role === 'supervisor') q = q.eq('equipe_id', me.equipe_id)
     else if (me.role === 'vendedor') q = q.eq('empresa_id', me.empresa_id)
 
-    if (filtroEmpresa) q = q.eq('empresa_id', filtroEmpresa)
+    // filtro manual de empresa não se aplica ao Ranking Geral (é sempre agregado de todas)
+    if (filtroEmpresa && !escopoGeral) q = q.eq('empresa_id', filtroEmpresa)
     const { data: vendas } = await q
     const lista = (vendas || []) as any[]
 
     const nomeDe = (v: any, campo: string) => { const x = Array.isArray(v[campo]) ? v[campo][0] : v[campo]; return x }
 
     // ── agrupamento principal conforme o modo ──
-    type Agg = { nome: string; foto?: string; valor: number; qtd: number; maior_venda: number }
+    // roles que NÃO são vendedores reais (usuários-representação: M Pereira, Ravi, Invest etc.)
+    const ROLES_NAO_VENDEDOR = ['representante', 'adm', 'master']
+    type Agg = { nome: string; foto?: string; valor: number; qtd: number; maior_venda: number; equipe_nome?: string; empresa_nome?: string; empresa_id?: string; logo?: string }
     const mapa = new Map<string, Agg>()
     for (const v of lista) {
       const cred = v.valor_credito || 0
+      const u = nomeDe(v, 'usuarios'); const e = nomeDe(v, 'equipes'); const emp = nomeDe(v, 'empresas')
       let chave = '', nome = '', foto: string | undefined = undefined
       if (modo === 'vendedor') {
-        const u = nomeDe(v, 'usuarios'); chave = v.vendedor_id || 'sem'; nome = u?.nome || 'Sem vendedor'; foto = u?.foto_url
+        if (u && ROLES_NAO_VENDEDOR.includes(u.role)) continue // exclui usuários-representação
+        chave = v.vendedor_id || 'sem'; nome = u?.nome || 'Sem vendedor'; foto = u?.foto_url
       } else if (modo === 'equipe') {
-        const e = nomeDe(v, 'equipes'); chave = v.equipe_id || 'sem'; nome = e?.nome || 'Sem equipe'
+        chave = v.equipe_id || 'sem'; nome = e?.nome || 'Sem equipe'
       } else {
-        const emp = nomeDe(v, 'empresas'); chave = v.empresa_id || 'sem'; nome = emp?.nome || 'Sem empresa'
+        chave = v.empresa_id || 'sem'; nome = emp?.nome || 'Sem empresa'
       }
-      if (!mapa.has(chave)) mapa.set(chave, { nome, foto, valor: 0, qtd: 0, maior_venda: 0 })
+      if (!mapa.has(chave)) mapa.set(chave, { nome, foto, valor: 0, qtd: 0, maior_venda: 0, equipe_nome: e?.nome, empresa_nome: emp?.nome, empresa_id: v.empresa_id, logo: emp?.logo_url })
       const item = mapa.get(chave)!
       item.valor += cred; item.qtd += 1; item.maior_venda = Math.max(item.maior_venda, cred)
+      if (!item.equipe_nome && e?.nome) item.equipe_nome = e.nome
     }
 
-    // modo representante: troca o nome da empresa pelo nome do representante
+    // modo representante: troca o nome da empresa pelo nome do representante (mantém logo/empresa_id da bandeira)
     if (modo === 'representante') {
       const empresaIds = Array.from(mapa.keys()).filter(k => k !== 'sem')
       if (empresaIds.length > 0) {
@@ -122,6 +130,10 @@ export async function GET(req: NextRequest) {
         posicao: i + 1, nome: r.nome, foto: r.foto, valor: r.valor, qtd: r.qtd,
         ticket_medio: r.qtd > 0 ? r.valor / r.qtd : 0,
         maior_venda: r.maior_venda,
+        equipe_nome: r.equipe_nome || null,
+        empresa_nome: r.empresa_nome || null,
+        empresa_id: r.empresa_id || null,
+        logo: r.logo || null,
       }))
 
     // ── destaques (independentes do modo) ──

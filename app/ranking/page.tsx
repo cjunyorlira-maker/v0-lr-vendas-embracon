@@ -3,10 +3,19 @@
 import { useState, useEffect, useRef } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { Trophy, Loader2, Users, Building2, User, Shield, Gem, Zap, CalendarRange, Tv, ChevronUp, ChevronDown, Minus } from 'lucide-react'
+import { Trophy, Loader2, Users, Building2, User, Shield, Gem, Zap, CalendarRange, Tv, ChevronUp, ChevronDown, Minus, Home, Globe, Flame } from 'lucide-react'
 import { dispararConfete } from '@/lib/confetti'
 
-interface RankItem { posicao: number; nome: string; foto?: string; valor: number; qtd: number; ticket_medio: number; maior_venda: number }
+interface RankItem { posicao: number; nome: string; foto?: string; valor: number; qtd: number; ticket_medio: number; maior_venda: number; equipe_nome?: string | null; empresa_nome?: string | null; empresa_id?: string | null; logo?: string | null }
+
+// paleta fixa (12 cores discretas) para diferenciar empresas no Ranking Geral
+const CORES_EMPRESA = ['#d4af37', '#3b82f6', '#22c55e', '#ec4899', '#f97316', '#06b6d4', '#a855f7', '#ef4444', '#14b8a6', '#eab308', '#8b5cf6', '#64748b']
+function corDaEmpresa(id?: string | null) {
+  if (!id) return CORES_EMPRESA[0]
+  let h = 0
+  for (let i = 0; i < id.length; i++) h = id.charCodeAt(i) + ((h << 5) - h)
+  return CORES_EMPRESA[Math.abs(h) % CORES_EMPRESA.length]
+}
 interface Producao { id: string; nome: string; data_inicio: string; data_fim: string }
 interface Destaques {
   top_equipe: { nome: string; valor: number; qtd: number } | null
@@ -61,6 +70,7 @@ export default function RankingPage() {
   const [periodo, setPeriodo] = useState<'' | 'semana' | 'ano'>('')
   const [loading, setLoading] = useState(true)
   const [modo, setModo] = useState<'vendedor' | 'equipe' | 'representante'>('vendedor')
+  const [escopo, setEscopo] = useState<'operacao' | 'geral'>('operacao')
   const [role, setRole] = useState('')
   const [fEmpresa, setFEmpresa] = useState('')
   const [empresas, setEmpresas] = useState<any[]>([])
@@ -68,18 +78,32 @@ export default function RankingPage() {
   const [telao, setTelao] = useState(false)
   const liderAnterior = useRef<string | null>(null)
 
-  useEffect(() => { loadData() }, [modo, fEmpresa, producaoId, periodo])
+  // ao voltar para "Minha operação", garante um modo permitido para o role
+  useEffect(() => {
+    if (escopo === 'operacao') {
+      const permitido: Record<string, string[]> = {
+        vendedor: ['vendedor'], supervisor: ['vendedor'],
+        adm: ['vendedor', 'equipe'], representante: ['vendedor', 'equipe'],
+        master: ['vendedor', 'equipe', 'representante'],
+      }
+      const ok = permitido[role] || ['vendedor']
+      if (!ok.includes(modo)) { setModo('vendedor'); return }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [escopo, role])
+
+  useEffect(() => { loadData() }, [modo, fEmpresa, producaoId, periodo, escopo])
   useEffect(() => {
     fetch('/api/usuarios/listar').then(r => r.json()).then(d => { if (d.empresas) setEmpresas(d.empresas) }).catch(() => {})
   }, [])
 
-  // auto-refresh de 60s no modo telão
+  // auto-refresh de 60s no modo telão OU no Ranking Geral (tempo real)
   useEffect(() => {
-    if (!telao) return
+    if (!telao && escopo !== 'geral') return
     const id = setInterval(() => loadData(), 60000)
     return () => clearInterval(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [telao, modo, fEmpresa, producaoId, periodo])
+  }, [telao, escopo, modo, fEmpresa, producaoId, periodo])
 
   // sincroniza estado do telão quando o usuário sai do fullscreen (Esc)
   useEffect(() => {
@@ -92,7 +116,8 @@ export default function RankingPage() {
     setLoading(true)
     const params = (extra: string) => {
       let u = `/api/ranking?modo=${modo}${extra}`
-      if (fEmpresa) u += `&empresa=${fEmpresa}`
+      if (escopo === 'geral') u += `&escopo=geral`
+      else if (fEmpresa) u += `&empresa=${fEmpresa}`
       return u
     }
     let url = params('')
@@ -152,7 +177,8 @@ export default function RankingPage() {
     { k: 'vendedor', l: 'Vendedores', icon: User, roles: ['master', 'representante', 'adm', 'supervisor', 'vendedor'] },
     { k: 'equipe', l: 'Equipes', icon: Users, roles: ['master', 'representante', 'adm'] },
     { k: 'representante', l: 'Representações', icon: Building2, roles: ['master'] },
-  ].filter(a => a.roles.includes(role) || role === '')
+  // no Ranking Geral todos veem todas as abas (é a disputa entre empresas)
+  ].filter(a => escopo === 'geral' || a.roles.includes(role) || role === '')
 
   const cores = { ouro: '#d4af37', prata: '#C0C0C0', bronze: '#CD7F32' }
   const medalha = ['\u{1F947}', '\u{1F948}', '\u{1F949}']
@@ -160,12 +186,26 @@ export default function RankingPage() {
   const resto = ranking.slice(3)
   const maxValor = ranking[0]?.valor || 1
 
+  // linha secundária "equipe · empresa" (empresa em dourado 70% p/ leitura rápida da bandeira)
+  function SubLinha({ item, center }: { item: RankItem; center?: boolean }) {
+    if (!item.equipe_nome && !item.empresa_nome) return null
+    return (
+      <p className={`text-[11px] leading-tight truncate ${center ? 'text-center' : ''}`} style={{ color: 'var(--muted-color)' }}>
+        {item.equipe_nome && <span>{item.equipe_nome}</span>}
+        {item.equipe_nome && item.empresa_nome && <span> · </span>}
+        {item.empresa_nome && <span style={{ color: 'rgba(212,175,55,0.7)', fontWeight: 600 }}>{item.empresa_nome}</span>}
+      </p>
+    )
+  }
+
   function CardPodio({ item, rank }: { item?: RankItem; rank: 0 | 1 | 2 }) {
     if (!item) return <div className="flex-1" />
     const cor = rank === 0 ? cores.ouro : rank === 1 ? cores.prata : cores.bronze
     const primeiro = rank === 0
     const fotoSize = primeiro ? 88 : 72
     const delay = `${rank * 0.12}s`
+    // no Ranking Geral + modo representações, mostra o logo da empresa no lugar da foto
+    const usaLogo = escopo === 'geral' && modo === 'representante' && !!item.logo
     return (
       <div className="flex-1 flex flex-col items-center rounded-2xl px-4 text-center anim-fade-up" style={{
         animationDelay: delay,
@@ -177,7 +217,9 @@ export default function RankingPage() {
       }}>
         <div className="relative">
           <div className={primeiro ? 'rounded-full p-1 shimmer-gold' : ''}>
-            <Avatar nome={item.nome} foto={item.foto} size={fotoSize} borderColor={primeiro ? undefined : cor} />
+            {usaLogo
+              ? <div className="rounded-full shrink-0 flex items-center justify-center bg-white/95" style={{ width: fotoSize, height: fotoSize, border: primeiro ? undefined : `3px solid ${cor}`, boxShadow: primeiro ? undefined : `0 0 16px ${cor}55` }}><img src={item.logo || "/placeholder.svg"} alt={item.empresa_nome || item.nome} className="object-contain" style={{ width: fotoSize * 0.7, height: fotoSize * 0.7 }} /></div>
+              : <Avatar nome={item.nome} foto={item.foto} size={fotoSize} borderColor={primeiro ? undefined : cor} />}
           </div>
           <span className="absolute -bottom-1 -right-1 text-2xl" aria-hidden>{medalha[rank]}</span>
         </div>
@@ -185,6 +227,7 @@ export default function RankingPage() {
           <p className="font-semibold leading-tight text-pretty" style={{ color: 'var(--text)', fontSize: primeiro ? 16 : 14 }}>{item.nome}</p>
           <Variacao delta={variacao[item.nome] ?? null} />
         </div>
+        {modo === 'vendedor' && <div className="mt-0.5 max-w-full"><SubLinha item={item} center /></div>}
         <p className="text-[11px] mt-0.5 mb-2" style={{ color: 'var(--muted-color)' }}>{fmtMoeda(item.maior_venda)} maior venda</p>
         <p className="font-bold font-mono" style={{ color: cor, fontSize: primeiro ? 24 : 19 }}>{fmtMoeda(item.valor)}</p>
         <p className="text-[11px] mt-1" style={{ color: 'var(--muted-color)' }}>{item.qtd} cota{item.qtd !== 1 ? 's' : ''} · ticket {fmtMoeda(item.ticket_medio)}</p>
@@ -200,6 +243,16 @@ export default function RankingPage() {
         <div className="flex flex-col items-center justify-center py-12 gap-2"><Trophy size={32} style={{ color: 'var(--muted-color)' }} /><p className="text-sm" style={{ color: 'var(--muted-color)' }}>Nenhuma venda no período</p></div>
       ) : (
         <>
+          {escopo === 'geral' && ranking.length >= 2 && (
+            <div className="rounded-xl px-4 py-2.5 mb-5 flex items-center gap-2 anim-fade-up" style={{ background: 'linear-gradient(90deg, rgba(212,175,55,0.12), rgba(0,0,0,0.12))', border: '1px solid rgba(212,175,55,0.25)' }}>
+              <Flame size={16} style={{ color: 'var(--accent)' }} className="shrink-0" />
+              <p className="text-xs sm:text-sm" style={{ color: 'var(--text2)' }}>
+                <span className="shimmer-gold font-bold" style={{ WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>{ranking[0].nome}</span>
+                {' '}lidera com <b style={{ color: 'var(--accent)' }}>{fmtMoeda(ranking[0].valor)}</b>
+                {' — '}{ranking[1].nome} está a <b style={{ color: '#ef4444' }}>{fmtMoeda(ranking[0].valor - ranking[1].valor)}</b>!
+              </p>
+            </div>
+          )}
           <div className="flex items-start justify-center gap-3 mb-6">
             <CardPodio item={top3[1]} rank={1} />
             <CardPodio item={top3[0]} rank={0} />
@@ -239,17 +292,26 @@ export default function RankingPage() {
             <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
               {resto.map((r) => {
                 const pct = Math.max(4, Math.round((r.valor / maxValor) * 100))
+                // no Ranking Geral + representações, cada empresa ganha uma cor distinta na barra
+                const coresEmp = escopo === 'geral' && modo === 'representante'
+                const barra = coresEmp
+                  ? `linear-gradient(90deg, ${corDaEmpresa(r.empresa_id)}88, ${corDaEmpresa(r.empresa_id)})`
+                  : 'linear-gradient(90deg, rgba(212,175,55,0.5), var(--accent))'
+                const usaLogo = escopo === 'geral' && modo === 'representante' && !!r.logo
                 return (
                   <div key={r.posicao} className="flex items-center gap-3 px-4 py-2.5" style={{ borderBottom: '1px solid var(--border)' }}>
                     <span className="text-xs font-bold font-mono w-7 shrink-0" style={{ color: 'var(--muted-color)' }}>{r.posicao}º</span>
-                    <Avatar nome={r.nome} foto={r.foto} size={32} />
+                    {usaLogo
+                      ? <div className="rounded-full shrink-0 flex items-center justify-center bg-white/95" style={{ width: 32, height: 32 }}><img src={r.logo || "/placeholder.svg"} alt={r.empresa_nome || r.nome} className="object-contain" style={{ width: 22, height: 22 }} /></div>
+                      : <Avatar nome={r.nome} foto={r.foto} size={32} />}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
                         <p className="text-sm font-medium truncate" style={{ color: 'var(--text2)' }}>{r.nome}</p>
                         <Variacao delta={variacao[r.nome] ?? null} />
                       </div>
+                      {modo === 'vendedor' && <SubLinha item={r} />}
                       <div className="mt-1 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
-                        <div className="h-full rounded-full anim-bar-grow" style={{ width: `${pct}%`, background: 'linear-gradient(90deg, rgba(212,175,55,0.5), var(--accent))' }} />
+                        <div className="h-full rounded-full anim-bar-grow" style={{ width: `${pct}%`, background: barra }} />
                       </div>
                     </div>
                     <div className="text-right shrink-0">
@@ -264,6 +326,13 @@ export default function RankingPage() {
         </>
       )}
     </>
+  )
+
+  const toggleEscopo = (
+    <div className="flex items-center gap-2 mb-4">
+      <button onClick={() => setEscopo('operacao')} className="flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition-all" style={{ background: escopo === 'operacao' ? 'var(--accent)' : 'rgba(255,255,255,0.03)', border: `1px solid ${escopo === 'operacao' ? 'var(--accent)' : 'var(--border)'}`, color: escopo === 'operacao' ? '#0a0a0a' : 'var(--muted-color)' }}><Home size={15} />Minha operação</button>
+      <button onClick={() => setEscopo('geral')} className="flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition-all" style={{ background: escopo === 'geral' ? 'var(--accent)' : 'rgba(255,255,255,0.03)', border: `1px solid ${escopo === 'geral' ? 'var(--accent)' : 'var(--border)'}`, color: escopo === 'geral' ? '#0a0a0a' : 'var(--muted-color)' }}><Globe size={15} />Ranking Geral</button>
+    </div>
   )
 
   const filtros = (
@@ -283,7 +352,7 @@ export default function RankingPage() {
           })}
         </div>
       )}
-      {empresas.length > 0 && (
+      {empresas.length > 0 && escopo !== 'geral' && (
         <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} className="rounded-full px-4 py-2 text-xs outline-none cursor-pointer" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text2)' }}>
           <option value="" style={{ background: '#131313' }}>Todas as empresas</option>
           {empresas.map(e => <option key={e.id} value={e.id} style={{ background: '#131313' }}>{e.nome}</option>)}
@@ -301,6 +370,7 @@ export default function RankingPage() {
           <div className="flex items-center gap-3 mb-5">
             <Trophy size={24} style={{ color: 'var(--accent)' }} />
             <h2 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>Ranking de Produção</h2>
+            {escopo === 'geral' && <span className="flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold" style={{ background: 'rgba(212,175,55,0.15)', color: 'var(--accent)', border: '1px solid rgba(212,175,55,0.3)' }}><Globe size={13} />Geral</span>}
             <button onClick={toggleTelao} className="ml-auto flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium" style={{ background: 'var(--accent)', color: '#0a0a0a' }}><Tv size={13} />Sair</button>
           </div>
           {conteudo}
@@ -322,6 +392,7 @@ export default function RankingPage() {
               <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Por valor vendido no período</p>
             </div>
           </div>
+          {toggleEscopo}
           {filtros}
           {conteudo}
         </main>
