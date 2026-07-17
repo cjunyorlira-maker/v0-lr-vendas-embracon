@@ -491,38 +491,59 @@ export default function RankingPage() {
   })
   const pillCls = "flex items-center gap-1.5 rounded-full px-5 py-2.5 text-[13px] font-semibold transition-all"
 
+  // Pill com "borda viva" (traço dourado circulando) quando INATIVO; estilo dourado padrão quando ativo.
+  // iconCls permite animar o ícone (ex.: raio piscante do botão Semana).
+  function PillEfeito({ ativo, onClick, icon: Icon, label, iconCls = '' }: { ativo: boolean; onClick: () => void; icon: any; label: string; iconCls?: string }) {
+    const inner = (
+      <button
+        onClick={onClick}
+        className={pillCls}
+        style={ativo ? pill(true) : { background: 'var(--bg, #0a0a0a)', border: '1px solid transparent', color: 'var(--muted-color)' }}
+      >
+        <Icon size={14} className={iconCls} />{label}
+      </button>
+    )
+    return ativo ? inner : <span className="borda-viva pill inline-flex">{inner}</span>
+  }
+
   // Toggle de escopo em destaque — padrão do botão "Nova Venda" do Header (gradiente dourado + brilho deslizante)
-  function EscopoBtn({ ativo, onClick, label }: { ativo: boolean; onClick: () => void; label: string }) {
+  // globe=true → botão "Ranking Geral" com globo girando, borda de energia (inativo) e glow pulsante (ativo)
+  function EscopoBtn({ ativo, onClick, label, globe = false }: { ativo: boolean; onClick: () => void; label: string; globe?: boolean }) {
+    const conteudo = globe
+      ? <><Globe size={14} className="globo-gira shrink-0" /><span>{label}</span></>
+      : <span>{label}</span>
     if (ativo) {
       return (
         <button
           onClick={onClick}
-          className="group relative flex h-9 items-center overflow-hidden rounded-lg px-5 text-[13px] font-semibold transition-all duration-200"
+          className={`group relative flex h-9 items-center gap-1.5 overflow-hidden rounded-lg px-5 text-[13px] font-semibold transition-all duration-200${globe ? ' glow-pulse' : ''}`}
           style={{ background: 'linear-gradient(135deg, #d4af37 0%, #c9a227 50%, #b8941f 100%)', color: '#0a0a0a', boxShadow: '0 2px 12px rgba(212,175,55,0.25)' }}
           onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px) scale(1.02)'; e.currentTarget.style.boxShadow = '0 4px 20px rgba(212,175,55,0.4)' }}
           onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0) scale(1)'; e.currentTarget.style.boxShadow = '0 2px 12px rgba(212,175,55,0.25)' }}
         >
           <span className="pointer-events-none absolute inset-0 -translate-x-full skew-x-12 bg-white/20 transition-transform duration-500 group-hover:translate-x-full" />
-          <span>{label}</span>
+          {conteudo}
         </button>
       )
     }
-    return (
+    const botao = (
       <button
         onClick={onClick}
-        className="flex h-9 items-center rounded-lg px-5 text-[13px] font-semibold transition-all duration-200"
-        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--muted-color)' }}
-        onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(212,175,55,0.4)'; e.currentTarget.style.color = 'var(--text2)' }}
-        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted-color)' }}
+        className="flex h-9 items-center gap-1.5 rounded-lg px-5 text-[13px] font-semibold transition-all duration-200"
+        style={{ background: 'var(--bg, #0a0a0a)', border: globe ? '1px solid transparent' : '1px solid var(--border)', color: 'var(--muted-color)' }}
+        onMouseEnter={(e) => { if (!globe) e.currentTarget.style.borderColor = 'rgba(212,175,55,0.4)'; e.currentTarget.style.color = 'var(--text2)' }}
+        onMouseLeave={(e) => { if (!globe) e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted-color)' }}
       >
-        <span>{label}</span>
+        {conteudo}
       </button>
     )
+    // "Ranking Geral" inativo ganha a borda de energia circulando (chama o clique)
+    return globe ? <span className="borda-viva inline-flex">{botao}</span> : botao
   }
   const escopoToggle = (
     <div className="flex items-center gap-2">
       <EscopoBtn ativo={escopo === 'operacao'} onClick={() => setEscopo('operacao')} label="🏠 Minha Operação" />
-      <EscopoBtn ativo={escopo === 'geral'} onClick={() => setEscopo('geral')} label="🌎 Ranking Geral" />
+      <EscopoBtn ativo={escopo === 'geral'} onClick={() => setEscopo('geral')} label="Ranking Geral" globe />
     </div>
   )
 
@@ -536,10 +557,10 @@ export default function RankingPage() {
             {producoes.map(p => <option key={p.id} value={p.id} style={{ background: '#131313', color: '#fff' }}>{`📦 ${p.nome}`}</option>)}
           </select>
         )}
-        <button onClick={() => setPeriodo('semana')} className={pillCls} style={pill(periodo === 'semana')}><Zap size={14} />Semana</button>
-        <button onClick={() => setPeriodo('ano')} className={pillCls} style={pill(periodo === 'ano')}><CalendarRange size={14} />Melhores do Ano</button>
+        <PillEfeito ativo={periodo === 'semana'} onClick={() => setPeriodo('semana')} icon={Zap} label="Semana" iconCls="raio-pisca" />
+        <PillEfeito ativo={periodo === 'ano'} onClick={() => setPeriodo('ano')} icon={CalendarRange} label="Melhores do Ano" />
         <div className="flex items-center gap-2 ml-auto">
-          <button onClick={toggleTelao} className={pillCls} style={pill(telao)}><Tv size={14} />Apresentar</button>
+          <PillEfeito ativo={telao} onClick={toggleTelao} icon={Tv} label="Apresentar" />
         </div>
       </div>
 

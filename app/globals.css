@@ -164,3 +164,51 @@
   50% { transform: scale(1.04); opacity: 0.92; }
 }
 .anim-pulse-soft { animation: pulseSoft 2s ease-in-out infinite; }
+
+/* ── Toggle "Ranking Geral": globo girando + borda de energia + glow pulsante ── */
+@keyframes giraGlobo { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.globo-gira { animation: giraGlobo 6s linear infinite; }
+
+@property --ang { syntax: '<angle>'; initial-value: 0deg; inherits: false; }
+@keyframes giraBorda { to { --ang: 360deg; } }
+/* wrapper com "traço" dourado circulando o contorno (só quando o botão está inativo) */
+.borda-viva {
+  position: relative;
+  border-radius: 0.5rem;
+  padding: 1.5px;
+  background: conic-gradient(from var(--ang, 0deg), transparent 0%, transparent 70%, rgba(212,175,55,0.9) 82%, #f3d97a 88%, rgba(212,175,55,0.9) 94%, transparent 100%);
+  animation: giraBorda 3.2s linear infinite;
+}
+/* fallback p/ navegadores sem @property: pseudo-elemento girando via transform */
+@supports not (background: conic-gradient(from var(--ang), red, red)) {
+  .borda-viva { background: transparent; overflow: hidden; animation: none; }
+  .borda-viva::before {
+    content: "";
+    position: absolute;
+    inset: -1.5px;
+    background: conic-gradient(transparent 0%, transparent 70%, rgba(212,175,55,0.9) 82%, #f3d97a 88%, rgba(212,175,55,0.9) 94%, transparent 100%);
+    animation: giraBordaFallback 3.2s linear infinite;
+  }
+}
+@keyframes giraBordaFallback { to { transform: rotate(360deg); } }
+/* variante arredondada (pills): Melhores do Ano, Apresentar, Semana */
+.borda-viva.pill { border-radius: 9999px; }
+
+/* glow sutil pulsante para o botão ativo */
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 2px 12px rgba(212,175,55,0.35); }
+  50% { box-shadow: 0 2px 20px rgba(212,175,55,0.35); }
+}
+.glow-pulse { animation: glowPulse 2.5s ease-in-out infinite; }
+
+/* raio (Zap) do botão Semana: pisca com brilho dourado */
+@keyframes raioPisca {
+  0%, 100% { opacity: 1; filter: drop-shadow(0 0 0 rgba(212,175,55,0)); }
+  45% { opacity: 0.55; filter: drop-shadow(0 0 5px rgba(212,175,55,0.95)); }
+  55% { opacity: 1; filter: drop-shadow(0 0 6px rgba(243,217,122,0.95)); }
+}
+.raio-pisca { animation: raioPisca 1.4s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .globo-gira, .borda-viva, .borda-viva::before, .glow-pulse, .raio-pisca { animation: none; }
+}
