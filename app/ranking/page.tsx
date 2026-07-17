@@ -491,6 +491,21 @@ export default function RankingPage() {
   })
   const pillCls = "flex items-center gap-1.5 rounded-full px-5 py-2.5 text-[13px] font-semibold transition-all"
 
+  // Pill com "borda viva" (traço dourado circulando) quando INATIVO; estilo dourado padrão quando ativo.
+  // iconCls permite animar o ícone (ex.: raio piscante do botão Semana).
+  function PillEfeito({ ativo, onClick, icon: Icon, label, iconCls = '' }: { ativo: boolean; onClick: () => void; icon: any; label: string; iconCls?: string }) {
+    const inner = (
+      <button
+        onClick={onClick}
+        className={pillCls}
+        style={ativo ? pill(true) : { background: 'var(--bg, #0a0a0a)', border: '1px solid transparent', color: 'var(--muted-color)' }}
+      >
+        <Icon size={14} className={iconCls} />{label}
+      </button>
+    )
+    return ativo ? inner : <span className="borda-viva pill inline-flex">{inner}</span>
+  }
+
   // Toggle de escopo em destaque — padrão do botão "Nova Venda" do Header (gradiente dourado + brilho deslizante)
   // globe=true → botão "Ranking Geral" com globo girando, borda de energia (inativo) e glow pulsante (ativo)
   function EscopoBtn({ ativo, onClick, label, globe = false }: { ativo: boolean; onClick: () => void; label: string; globe?: boolean }) {
@@ -542,10 +557,10 @@ export default function RankingPage() {
             {producoes.map(p => <option key={p.id} value={p.id} style={{ background: '#131313', color: '#fff' }}>{`📦 ${p.nome}`}</option>)}
           </select>
         )}
-        <button onClick={() => setPeriodo('semana')} className={pillCls} style={pill(periodo === 'semana')}><Zap size={14} />Semana</button>
-        <button onClick={() => setPeriodo('ano')} className={pillCls} style={pill(periodo === 'ano')}><CalendarRange size={14} />Melhores do Ano</button>
+        <PillEfeito ativo={periodo === 'semana'} onClick={() => setPeriodo('semana')} icon={Zap} label="Semana" iconCls="raio-pisca" />
+        <PillEfeito ativo={periodo === 'ano'} onClick={() => setPeriodo('ano')} icon={CalendarRange} label="Melhores do Ano" />
         <div className="flex items-center gap-2 ml-auto">
-          <button onClick={toggleTelao} className={pillCls} style={pill(telao)}><Tv size={14} />Apresentar</button>
+          <PillEfeito ativo={telao} onClick={toggleTelao} icon={Tv} label="Apresentar" />
         </div>
       </div>
 
