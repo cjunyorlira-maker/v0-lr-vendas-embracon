@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo, memo } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { Trophy, Loader2, Users, Building2, User, Shield, Zap, CalendarRange, Tv, ChevronUp, ChevronDown, Minus, Home, Globe, Flame, Crown, Swords } from 'lucide-react'
+import { Trophy, Loader2, Users, Building2, User, Shield, Zap, CalendarRange, Tv, ChevronUp, ChevronDown, Minus, Globe, Flame, Crown, Swords } from 'lucide-react'
 import { dispararConfete } from '@/lib/confetti'
 
 interface RankItem { posicao: number; nome: string; foto?: string; valor: number; qtd: number; ticket_medio: number; maior_venda: number; equipe_nome?: string | null; empresa_nome?: string | null; empresa_id?: string | null; logo?: string | null; vendedor_id?: string | null; rei_semana?: boolean; streak_semanas?: number }
@@ -491,6 +491,41 @@ export default function RankingPage() {
   })
   const pillCls = "flex items-center gap-1.5 rounded-full px-5 py-2.5 text-[13px] font-semibold transition-all"
 
+  // Toggle de escopo em destaque — padrão do botão "Nova Venda" do Header (gradiente dourado + brilho deslizante)
+  function EscopoBtn({ ativo, onClick, label }: { ativo: boolean; onClick: () => void; label: string }) {
+    if (ativo) {
+      return (
+        <button
+          onClick={onClick}
+          className="group relative flex h-9 items-center overflow-hidden rounded-lg px-5 text-[13px] font-semibold transition-all duration-200"
+          style={{ background: 'linear-gradient(135deg, #d4af37 0%, #c9a227 50%, #b8941f 100%)', color: '#0a0a0a', boxShadow: '0 2px 12px rgba(212,175,55,0.25)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-1px) scale(1.02)'; e.currentTarget.style.boxShadow = '0 4px 20px rgba(212,175,55,0.4)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0) scale(1)'; e.currentTarget.style.boxShadow = '0 2px 12px rgba(212,175,55,0.25)' }}
+        >
+          <span className="pointer-events-none absolute inset-0 -translate-x-full skew-x-12 bg-white/20 transition-transform duration-500 group-hover:translate-x-full" />
+          <span>{label}</span>
+        </button>
+      )
+    }
+    return (
+      <button
+        onClick={onClick}
+        className="flex h-9 items-center rounded-lg px-5 text-[13px] font-semibold transition-all duration-200"
+        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--muted-color)' }}
+        onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'rgba(212,175,55,0.4)'; e.currentTarget.style.color = 'var(--text2)' }}
+        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--muted-color)' }}
+      >
+        <span>{label}</span>
+      </button>
+    )
+  }
+  const escopoToggle = (
+    <div className="flex items-center gap-2">
+      <EscopoBtn ativo={escopo === 'operacao'} onClick={() => setEscopo('operacao')} label="🏠 Minha Operação" />
+      <EscopoBtn ativo={escopo === 'geral'} onClick={() => setEscopo('geral')} label="🌎 Ranking Geral" />
+    </div>
+  )
+
   const filtros = (
     <div className="flex flex-col gap-2.5 mb-6">
       {/* LINHA 1 — PERÍODO (não-toggle) + ações à direita */}
@@ -519,9 +554,6 @@ export default function RankingPage() {
             })}
           </div>
         )}
-        <span className="mx-1 text-xs" style={{ color: 'var(--border)' }}>·</span>
-        <button onClick={() => setEscopo('operacao')} className={pillCls} style={pill(escopo === 'operacao')}><Home size={14} />Minha operação</button>
-        <button onClick={() => setEscopo('geral')} className={pillCls} style={pill(escopo === 'geral')}><Globe size={14} />Geral</button>
         {empresas.length > 0 && escopo !== 'geral' && (
           <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} className="rounded-full px-4 py-2 text-[13px] outline-none cursor-pointer" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text2)' }}>
             <option value="" style={{ background: '#131313' }}>Todas as empresas</option>
@@ -555,12 +587,13 @@ export default function RankingPage() {
       <div className="relative lg:ml-60" style={{ zIndex: 1 }}>
         <Header title="Ranking" />
         <main className="mx-auto max-w-[1100px] px-6 py-8 lg:px-8">
-          <div className="flex items-center gap-3 mb-5">
+          <div className="flex items-center gap-3 mb-5 flex-wrap">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.25)' }}><Trophy size={18} style={{ color: 'var(--accent)' }} /></div>
             <div>
               <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Ranking de Produção</h2>
               <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Por valor vendido no período</p>
             </div>
+            <div className="ml-auto">{escopoToggle}</div>
           </div>
           {filtros}
           {conteudo}
