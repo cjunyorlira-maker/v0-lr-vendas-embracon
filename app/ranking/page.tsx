@@ -476,41 +476,55 @@ export default function RankingPage() {
     </>
   )
 
-  const toggleEscopo = (
-    <div className="flex items-center gap-2 mb-4">
-      <button onClick={() => setEscopo('operacao')} className="flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition-all" style={{ background: escopo === 'operacao' ? 'var(--accent)' : 'rgba(255,255,255,0.03)', border: `1px solid ${escopo === 'operacao' ? 'var(--accent)' : 'var(--border)'}`, color: escopo === 'operacao' ? '#0a0a0a' : 'var(--muted-color)' }}><Home size={15} />Minha operação</button>
-      <button onClick={() => setEscopo('geral')} className="flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold transition-all" style={{ background: escopo === 'geral' ? 'var(--accent)' : 'rgba(255,255,255,0.03)', border: `1px solid ${escopo === 'geral' ? 'var(--accent)' : 'var(--border)'}`, color: escopo === 'geral' ? '#0a0a0a' : 'var(--muted-color)' }}><Globe size={15} />Ranking Geral</button>
-    </div>
-  )
+  const microLabel = "text-[10px] font-semibold uppercase tracking-wider shrink-0 w-14"
+  const pill = (ativo: boolean) => ({
+    background: ativo ? 'var(--accent)' : 'rgba(255,255,255,0.03)',
+    border: `1px solid ${ativo ? 'var(--accent)' : 'var(--border)'}`,
+    color: ativo ? '#0a0a0a' : 'var(--muted-color)',
+  })
 
   const filtros = (
-    <div className="flex items-center gap-2 flex-wrap mb-6">
-      {producoes.length > 0 && (
-        <select value={periodo ? '' : producaoId} onChange={(e) => { setPeriodo(''); setProducaoId(e.target.value) }} className="rounded-full px-4 py-2 text-xs font-medium outline-none cursor-pointer" style={{ background: !periodo ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.03)', border: `1px solid ${!periodo ? 'rgba(212,175,55,0.3)' : 'var(--border)'}`, color: !periodo ? 'var(--accent)' : 'var(--muted-color)' }}>
-          {producoes.map(p => <option key={p.id} value={p.id} style={{ background: '#131313', color: '#fff' }}>{p.nome}</option>)}
-        </select>
-      )}
-      <button onClick={() => setPeriodo(periodo === 'semana' ? '' : 'semana')} className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-all" style={{ background: periodo === 'semana' ? 'var(--accent)' : 'rgba(255,255,255,0.03)', border: `1px solid ${periodo === 'semana' ? 'var(--accent)' : 'var(--border)'}`, color: periodo === 'semana' ? '#0a0a0a' : 'var(--muted-color)' }}><Zap size={13} />Melhores da Semana</button>
-      <button onClick={() => setPeriodo(periodo === 'ano' ? '' : 'ano')} className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-all" style={{ background: periodo === 'ano' ? 'var(--accent)' : 'rgba(255,255,255,0.03)', border: `1px solid ${periodo === 'ano' ? 'var(--accent)' : 'var(--border)'}`, color: periodo === 'ano' ? '#0a0a0a' : 'var(--muted-color)' }}><CalendarRange size={13} />🏆 Melhores do Ano</button>
-      {abas.length > 1 && (
-        <div className="flex items-center gap-1 rounded-full p-1" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
-          {abas.map(a => {
-            const Icon = a.icon; const ativo = modo === a.k
-            return <button key={a.k} onClick={() => setModo(a.k as any)} className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all" style={{ background: ativo ? 'var(--accent)' : 'transparent', color: ativo ? '#0a0a0a' : 'var(--muted-color)' }}><Icon size={13} />{a.l}</button>
-          })}
+    <div className="flex flex-col gap-2.5 mb-6">
+      {/* LINHA 1 — PERÍODO + ações à direita */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className={microLabel} style={{ color: 'var(--muted-color)' }}>Período</span>
+        {producoes.length > 0 && (
+          <select value={periodo ? '' : producaoId} onChange={(e) => { setPeriodo(''); setProducaoId(e.target.value) }} className="rounded-full px-4 py-2 text-xs font-medium outline-none cursor-pointer" style={{ background: !periodo ? 'rgba(212,175,55,0.12)' : 'rgba(255,255,255,0.03)', border: `1px solid ${!periodo ? 'rgba(212,175,55,0.3)' : 'var(--border)'}`, color: !periodo ? 'var(--accent)' : 'var(--muted-color)' }}>
+            {producoes.map(p => <option key={p.id} value={p.id} style={{ background: '#131313', color: '#fff' }}>{p.nome}</option>)}
+          </select>
+        )}
+        <button onClick={() => setPeriodo(periodo === 'semana' ? '' : 'semana')} className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-all" style={pill(periodo === 'semana')}><Zap size={13} />Semana</button>
+        <button onClick={() => setPeriodo(periodo === 'ano' ? '' : 'ano')} className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-all" style={pill(periodo === 'ano')}><CalendarRange size={13} />Melhores do Ano</button>
+        <div className="flex items-center gap-2 ml-auto">
+          <button onClick={compartilharPodioArt} disabled={gerandoImg || ranking.length === 0} className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-all disabled:opacity-50" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.3)', color: 'var(--accent)' }}>
+            {gerandoImg ? <Loader2 size={13} className="animate-spin" /> : <Share2 size={13} />}
+            {gerandoImg ? 'Gerando…' : 'Compartilhar pódio'}
+          </button>
+          <button onClick={toggleTelao} className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-all" style={pill(telao)}><Tv size={13} />Apresentar</button>
         </div>
-      )}
-      {empresas.length > 0 && escopo !== 'geral' && (
-        <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} className="rounded-full px-4 py-2 text-xs outline-none cursor-pointer" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text2)' }}>
-          <option value="" style={{ background: '#131313' }}>Todas as empresas</option>
-          {empresas.map(e => <option key={e.id} value={e.id} style={{ background: '#131313' }}>{e.nome}</option>)}
-        </select>
-      )}
-      <button onClick={compartilharPodioArt} disabled={gerandoImg || ranking.length === 0} className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-all ml-auto disabled:opacity-50" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.3)', color: 'var(--accent)' }}>
-        {gerandoImg ? <Loader2 size={13} className="animate-spin" /> : <Share2 size={13} />}
-        {gerandoImg ? 'Gerando…' : 'Compartilhar pódio'}
-      </button>
-      <button onClick={toggleTelao} className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium transition-all" style={{ background: telao ? 'var(--accent)' : 'rgba(255,255,255,0.03)', border: `1px solid ${telao ? 'var(--accent)' : 'var(--border)'}`, color: telao ? '#0a0a0a' : 'var(--muted-color)' }}><Tv size={13} />Apresentar</button>
+      </div>
+
+      {/* LINHA 2 — VISÃO (abas) + escopo */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className={microLabel} style={{ color: 'var(--muted-color)' }}>Visão</span>
+        {abas.length > 1 && (
+          <div className="flex items-center gap-1 rounded-full p-1" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
+            {abas.map(a => {
+              const Icon = a.icon; const ativo = modo === a.k
+              return <button key={a.k} onClick={() => setModo(a.k as any)} className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all" style={{ background: ativo ? 'var(--accent)' : 'transparent', color: ativo ? '#0a0a0a' : 'var(--muted-color)' }}><Icon size={13} />{a.l}</button>
+            })}
+          </div>
+        )}
+        <span className="mx-1 text-xs" style={{ color: 'var(--border)' }}>·</span>
+        <button onClick={() => setEscopo('operacao')} className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium transition-all" style={pill(escopo === 'operacao')}><Home size={13} />Minha operação</button>
+        <button onClick={() => setEscopo('geral')} className="flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-medium transition-all" style={pill(escopo === 'geral')}><Globe size={13} />Geral</button>
+        {empresas.length > 0 && escopo !== 'geral' && (
+          <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} className="rounded-full px-4 py-1.5 text-xs outline-none cursor-pointer" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text2)' }}>
+            <option value="" style={{ background: '#131313' }}>Todas as empresas</option>
+            {empresas.map(e => <option key={e.id} value={e.id} style={{ background: '#131313' }}>{e.nome}</option>)}
+          </select>
+        )}
+      </div>
     </div>
   )
 
@@ -544,7 +558,6 @@ export default function RankingPage() {
               <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Por valor vendido no período</p>
             </div>
           </div>
-          {toggleEscopo}
           {filtros}
           {conteudo}
         </main>
