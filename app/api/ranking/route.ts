@@ -113,17 +113,7 @@ export async function GET(req: NextRequest) {
       if (!item.equipe_nome && e?.nome) item.equipe_nome = e.nome
     }
 
-    // modo representante: troca o nome da empresa pelo nome do representante (mantém logo/empresa_id da bandeira)
-    if (modo === 'representante') {
-      const empresaIds = Array.from(mapa.keys()).filter(k => k !== 'sem')
-      if (empresaIds.length > 0) {
-        const { data: reps } = await supabaseAdmin.from('usuarios').select('nome, foto_url, empresa_id').eq('role', 'representante').in('empresa_id', empresaIds)
-        for (const [chave, item] of mapa.entries()) {
-          const rep = (reps || []).find((r: any) => r.empresa_id === chave)
-          if (rep) { item.nome = rep.nome; item.foto = rep.foto_url }
-        }
-      }
-    }
+    // modo representante: cada item é a EMPRESA (nome + logo de empresas), nunca o dono/representante
 
     const ranking = Array.from(mapa.values())
       .sort((a, b) => b.valor - a.valor)
@@ -214,7 +204,8 @@ export async function GET(req: NextRequest) {
       meu_role: me.role,
       rei_semana: game.rei_semana,
       semana_atual_lider: game.semana_atual_lider,
-      recordes: game.recordes,
+      // Hall de Recordes removido; mantém só o recorde do card "Vendedor Recordista"
+      recorde_individual: game.recordes.melhor_producao_individual,
     })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })

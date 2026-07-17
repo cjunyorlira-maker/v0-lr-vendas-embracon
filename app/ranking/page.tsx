@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useMemo, memo } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { Trophy, Loader2, Users, Building2, User, Shield, Zap, CalendarRange, Tv, ChevronUp, ChevronDown, Minus, Home, Globe, Flame, Crown, Swords, ScrollText, ChevronRight, Medal, Timer, Award, Share2, Check } from 'lucide-react'
+import { Trophy, Loader2, Users, Building2, User, Shield, Zap, CalendarRange, Tv, ChevronUp, ChevronDown, Minus, Home, Globe, Flame, Crown, Swords, Share2, Check } from 'lucide-react'
 import { dispararConfete } from '@/lib/confetti'
 import { compartilharPodio } from '@/lib/podio-share'
 
@@ -14,13 +14,7 @@ interface ReiSemana {
   por_empresa: Record<string, { vendedor_id: string; nome: string; foto?: string; valor: number }>
   datas: { ini: string; fim: string }
 }
-interface Recordes {
-  maior_venda_unica: { vendedor: string; cliente: string; valor: number; data: string } | null
-  melhor_semana_individual: { vendedor: string; valor: number; datas: { ini: string; fim: string } } | null
-  melhor_producao_equipe: { equipe: string; producao: string; valor: number } | null
-  melhor_producao_individual: { vendedor: string; foto?: string; equipe?: string; empresa?: string; producao: string; valor: number } | null
-  contemplacao_mais_rapida: { cliente: string; dias: number; data_venda: string; data_assembleia: string } | null
-}
+interface RecordeIndividual { vendedor: string; foto?: string; equipe?: string; empresa?: string; producao: string; valor: number }
 
 // paleta fixa (12 cores discretas) para diferenciar empresas no Ranking Geral
 const CORES_EMPRESA = ['#d4af37', '#3b82f6', '#22c55e', '#ec4899', '#f97316', '#06b6d4', '#a855f7', '#ef4444', '#14b8a6', '#eab308', '#8b5cf6', '#64748b']
@@ -40,7 +34,6 @@ interface Destaques {
 
 const fmtMoeda = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 const fmtDia = (s?: string) => { if (!s) return ''; const [a, m, d] = s.slice(0, 10).split('-'); return `${d}/${m}` }
-const diasDe = (s?: string) => { if (!s) return Infinity; return Math.floor((Date.now() - new Date(s + 'T00:00:00').getTime()) / 86400000) }
 
 const CORES_INICIAIS = ['#d4af37', '#3b82f6', '#22c55e', '#a855f7', '#ec4899', '#f97316', '#06b6d4']
 function corDoNome(nome: string) {
@@ -94,24 +87,6 @@ function StreakBadge({ n }: { n: number }) {
   )
 }
 
-// placa de troféu do Hall de Recordes
-function PlacaRecorde({ icon: Icon, titulo, detentor, valor, sub, novo }: { icon: any; titulo: string; detentor?: string | null; valor: string | null; sub: string | null; novo?: boolean }) {
-  return (
-    <div className="relative rounded-xl p-4 flex items-center gap-3" style={{ background: 'linear-gradient(180deg, rgba(212,175,55,0.08), rgba(0,0,0,0.2))', border: '1px solid rgba(212,175,55,0.35)' }}>
-      {novo && <span className="anim-pulse-soft absolute top-2 right-2 rounded-full px-1.5 py-0.5 text-[9px] font-bold" style={{ background: '#d4af37', color: '#0a0a0a' }}>NOVO</span>}
-      <div className="flex h-11 w-11 items-center justify-center rounded-lg shrink-0" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.3)' }}>
-        <Icon size={20} style={{ color: '#d4af37' }} />
-      </div>
-      <div className="min-w-0">
-        <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted-color)' }}>{titulo}</p>
-        <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{detentor || '—'}</p>
-        <p className="text-sm font-bold font-mono" style={{ color: '#d4af37' }}>{valor || '—'}</p>
-        {sub && <p className="text-[10px] truncate" style={{ color: 'var(--muted-color)' }}>{sub}</p>}
-      </div>
-    </div>
-  )
-}
-
 // ticker da disputa: componente isolado e memoizado — a rotação a cada 6s NÃO re-renderiza o pódio
 const Ticker = memo(function Ticker({ frases }: { frases: string[] }) {
   const [idx, setIdx] = useState(0)
@@ -136,18 +111,18 @@ const Ticker = memo(function Ticker({ frases }: { frases: string[] }) {
   )
 })
 
-// card de destaque impactante (foto/escudo à esquerda, nome pesado, valor grande, borda esquerda grossa + brilho no hover)
+// card de destaque compacto (foto/escudo à esquerda, borda esquerda grossa + brilho no hover)
 function CardDestaque({ cor, icon: Icon, foto, avatarNome, label, nome, valor, sub, animCls }: { cor: string; icon?: any; foto?: string; avatarNome?: string; label: string; nome: string; valor: string; sub?: string | null; animCls: string }) {
   return (
-    <div className={`card-glow relative rounded-xl p-4 flex items-center gap-4 ${animCls}`} style={{ minHeight: 96, background: `${cor}14`, border: `1px solid ${cor}40`, borderLeft: `3px solid ${cor}`, ['--glow' as any]: `${cor}44` }}>
+    <div className={`card-glow relative rounded-xl px-3 py-2.5 flex items-center gap-3 ${animCls}`} style={{ minHeight: 72, background: `${cor}14`, border: `1px solid ${cor}40`, borderLeft: `3px solid ${cor}`, ['--glow' as any]: `${cor}44` }}>
       {avatarNome !== undefined
-        ? <Avatar nome={avatarNome} foto={foto} size={56} borderColor={cor} />
-        : <div className="flex items-center justify-center rounded-xl shrink-0" style={{ width: 56, height: 56, background: `${cor}1f`, border: `1px solid ${cor}55` }}>{Icon && <Icon size={26} style={{ color: cor }} />}</div>}
+        ? <Avatar nome={avatarNome} foto={foto} size={44} borderColor={cor} />
+        : <div className="flex items-center justify-center rounded-lg shrink-0" style={{ width: 44, height: 44, background: `${cor}1f`, border: `1px solid ${cor}55` }}>{Icon && <Icon size={22} style={{ color: cor }} />}</div>}
       <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--muted-color)' }}>{label}</p>
-        <p className="font-extrabold leading-tight truncate" style={{ color: 'var(--text)', fontSize: 18 }}>{nome}</p>
-        <p className="font-bold font-mono leading-tight" style={{ color: cor, fontSize: 22 }}>{valor}</p>
-        {sub && <p className="text-[11px] truncate mt-0.5" style={{ color: 'var(--muted-color)' }}>{sub}</p>}
+        <p className="text-[10px] font-semibold uppercase tracking-wide truncate" style={{ color: 'var(--muted-color)' }}>{label}</p>
+        <p className="font-bold leading-tight truncate" style={{ color: 'var(--text)', fontSize: 16 }}>{nome}</p>
+        <p className="font-bold font-mono leading-tight" style={{ color: cor, fontSize: 18 }}>{valor}</p>
+        {sub && <p className="text-[10px] truncate" style={{ color: 'var(--muted-color)' }}>{sub}</p>}
       </div>
     </div>
   )
@@ -169,13 +144,11 @@ export default function RankingPage() {
   const [telao, setTelao] = useState(false)
   const [reiSemana, setReiSemana] = useState<ReiSemana | null>(null)
   const [semanaLider, setSemanaLider] = useState<{ nome: string; valor: number } | null>(null)
-  const [recordes, setRecordes] = useState<Recordes | null>(null)
-  const [hallAberto, setHallAberto] = useState(false)
+  const [recordeIndividual, setRecordeIndividual] = useState<RecordeIndividual | null>(null)
   const [periodoDatas, setPeriodoDatas] = useState<{ inicio: string; fim: string } | null>(null)
   const [gerandoImg, setGerandoImg] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
   const [jaAnimou, setJaAnimou] = useState(false) // anima entrada só na 1ª carga
-  const hallConfetou = useRef(false)
   const liderAnterior = useRef<string | null>(null)
   const primeiraCarga = useRef(true)
   const animCls = jaAnimou ? '' : 'anim-fade-up'
@@ -232,20 +205,8 @@ export default function RankingPage() {
     // maior streak do ranking
     const comStreak = ranking.filter(r => (r.streak_semanas || 0) >= 3).sort((a, b) => (b.streak_semanas || 0) - (a.streak_semanas || 0))[0]
     if (comStreak) f.push(`🔥 ${comStreak.nome}: ${comStreak.streak_semanas} semanas seguidas vendendo!`)
-    // recorde de melhor semana em risco (< 20%)
-    if (recordes?.melhor_semana_individual && semanaLider) {
-      const rec = recordes.melhor_semana_individual.valor
-      const falta = rec - semanaLider.valor
-      if (falta > 0 && falta < rec * 0.2) f.push(`📜 Recorde em risco: ${semanaLider.nome} está a ${fmtMoeda(falta)} do recorde de melhor semana!`)
-    }
     return f
-  }, [ranking, variacao, reiSemana, recordes, semanaLider])
-
-  // confete ao abrir o hall quando há recorde novo (últimos 7 dias)
-  const recordeNovo = useMemo(() => {
-    if (!recordes) return false
-    return diasDe(recordes.maior_venda_unica?.data) <= 7 || diasDe(recordes.contemplacao_mais_rapida?.data_assembleia) <= 7 || diasDe(recordes.melhor_semana_individual?.datas?.fim) <= 7
-  }, [recordes])
+  }, [ranking, variacao, reiSemana])
 
   async function loadData() {
     // spinner só quando ainda não há dados; refreshes trocam os dados em background sem desmontar a tela
@@ -267,7 +228,7 @@ export default function RankingPage() {
       setDestaques(data.destaques || null)
       setReiSemana(data.rei_semana || null)
       setSemanaLider(data.semana_atual_lider || null)
-      setRecordes(data.recordes || null)
+      setRecordeIndividual(data.recorde_individual || null)
       setPeriodoDatas(data.periodo || null)
       setRole(data.meu_role)
       if (data.producoes) setProducoes(data.producoes)
@@ -335,9 +296,12 @@ export default function RankingPage() {
         ticket_medio: r.ticket_medio, equipe_nome: r.equipe_nome, empresa_nome: r.empresa_nome, logo: r.logo,
       }))
       const slug = `${periodoTitulo}-${modoLabel}`.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+      // rodapé: no Geral nunca cita empresa isolada; na Minha operação usa o nome fixo da operação
+      const rodapeEsq = escopo === 'geral' ? 'Ranking Geral da Operação' : 'Grupo LR - SJC'
       const res = await compartilharPodio(itens, {
         periodoTitulo, modoLabel, datas: periodoDatas,
         usaLogo: escopo === 'geral' && modo === 'representante',
+        rodapeEsq,
       }, slug)
       if (res === 'baixado') { setToast('Imagem salva — solta no grupo! 🔥'); setTimeout(() => setToast(null), 4000) }
     } catch {
@@ -456,13 +420,13 @@ export default function RankingPage() {
               />
               <CardDestaque
                 cor="#a855f7"
-                avatarNome={recordes?.melhor_producao_individual?.vendedor || '—'}
-                foto={recordes?.melhor_producao_individual?.foto}
+                avatarNome={recordeIndividual?.vendedor || '—'}
+                foto={recordeIndividual?.foto}
                 label="🏅 Vendedor Recordista"
-                nome={recordes?.melhor_producao_individual?.vendedor || '—'}
-                valor={recordes?.melhor_producao_individual ? fmtMoeda(recordes.melhor_producao_individual.valor) : '—'}
-                sub={recordes?.melhor_producao_individual
-                  ? [recordes.melhor_producao_individual.producao, recordes.melhor_producao_individual.equipe, recordes.melhor_producao_individual.empresa].filter(Boolean).join(' · ')
+                nome={recordeIndividual?.vendedor || '—'}
+                valor={recordeIndividual ? fmtMoeda(recordeIndividual.valor) : '—'}
+                sub={recordeIndividual
+                  ? [recordeIndividual.producao, recordeIndividual.equipe, recordeIndividual.empresa].filter(Boolean).join(' · ')
                   : 'sem histórico'}
                 animCls={animCls}
               />
@@ -507,29 +471,6 @@ export default function RankingPage() {
             </div>
           )}
 
-          {recordes && (
-            <div className="mt-6 rounded-xl overflow-hidden" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid rgba(212,175,55,0.25)' }}>
-              <button
-                onClick={() => { const abrir = !hallAberto; setHallAberto(abrir); if (abrir && recordeNovo && !hallConfetou.current) { hallConfetou.current = true; dispararConfete() } }}
-                className="w-full flex items-center gap-3 px-4 py-3"
-              >
-                <ScrollText size={18} style={{ color: 'var(--accent)' }} />
-                <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Hall de Recordes</span>
-                {recordeNovo && (
-                  <span className="anim-pulse-soft rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: '#d4af37', color: '#0a0a0a' }}>NOVO RECORDE!</span>
-                )}
-                <ChevronRight size={16} className="ml-auto transition-transform" style={{ color: 'var(--muted-color)', transform: hallAberto ? 'rotate(90deg)' : 'none' }} />
-              </button>
-              {hallAberto && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 pt-0">
-                  <PlacaRecorde icon={Trophy} titulo="Maior venda única" detentor={recordes.maior_venda_unica?.vendedor} valor={recordes.maior_venda_unica ? fmtMoeda(recordes.maior_venda_unica.valor) : null} sub={recordes.maior_venda_unica ? `${recordes.maior_venda_unica.cliente} · ${fmtDia(recordes.maior_venda_unica.data)}` : null} novo={diasDe(recordes.maior_venda_unica?.data) <= 7} />
-                  <PlacaRecorde icon={Medal} titulo="Melhor semana individual" detentor={recordes.melhor_semana_individual?.vendedor} valor={recordes.melhor_semana_individual ? fmtMoeda(recordes.melhor_semana_individual.valor) : null} sub={recordes.melhor_semana_individual ? `${fmtDia(recordes.melhor_semana_individual.datas.ini)} a ${fmtDia(recordes.melhor_semana_individual.datas.fim)}` : null} novo={diasDe(recordes.melhor_semana_individual?.datas?.fim) <= 7} />
-                  <PlacaRecorde icon={Award} titulo="Melhor produção de equipe" detentor={recordes.melhor_producao_equipe?.equipe} valor={recordes.melhor_producao_equipe ? fmtMoeda(recordes.melhor_producao_equipe.valor) : null} sub={recordes.melhor_producao_equipe?.producao || null} novo={false} />
-                  <PlacaRecorde icon={Timer} titulo="Contemplação mais rápida" detentor={recordes.contemplacao_mais_rapida?.cliente} valor={recordes.contemplacao_mais_rapida ? `${recordes.contemplacao_mais_rapida.dias} dias` : null} sub={recordes.contemplacao_mais_rapida ? `venda ${fmtDia(recordes.contemplacao_mais_rapida.data_venda)} → assembleia ${fmtDia(recordes.contemplacao_mais_rapida.data_assembleia)}` : null} novo={diasDe(recordes.contemplacao_mais_rapida?.data_assembleia) <= 7} />
-                </div>
-              )}
-            </div>
-          )}
         </>
       )}
     </>
