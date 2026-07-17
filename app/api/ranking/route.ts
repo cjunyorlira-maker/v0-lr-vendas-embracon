@@ -99,6 +99,8 @@ export async function GET(req: NextRequest) {
     // ── agrupamento principal conforme o modo ──
     type Agg = { nome: string; foto?: string; valor: number; qtd: number; maior_venda: number; equipe_nome?: string; empresa_nome?: string; empresa_id?: string; logo?: string; vendedor_id?: string }
     const mapa = new Map<string, Agg>()
+    // no modo equipe, vendas sem equipe_id ficam FORA do ranking (não viram uma "equipe" fantasma)
+    const foraDoRanking = { vendas: 0, valor: 0 }
     for (const v of lista) {
       const cred = v.valor_credito || 0
       const u = nomeDe(v, 'usuarios'); const e = nomeDe(v, 'equipes'); const emp = nomeDe(v, 'empresas')
@@ -107,7 +109,8 @@ export async function GET(req: NextRequest) {
         if (u?.placeholder === true) continue // exclui apenas cadastros-representação (placeholder), não vendedores reais
         chave = v.vendedor_id || 'sem'; nome = u?.nome || 'Sem vendedor'; foto = u?.foto_url
       } else if (modo === 'equipe') {
-        chave = v.equipe_id || 'sem'; nome = e?.nome || 'Sem equipe'
+        if (!v.equipe_id) { foraDoRanking.vendas += 1; foraDoRanking.valor += cred; continue } // sem equipe → não pontua
+        chave = v.equipe_id; nome = e?.nome || 'Equipe'
       } else {
         chave = v.empresa_id || 'sem'; nome = emp?.nome || 'Sem empresa'
       }
@@ -254,6 +257,8 @@ export async function GET(req: NextRequest) {
       semana_atual_lider: game.semana_atual_lider,
       // 3 cards fixos: sempre produção corrente + operação toda (independem de modo/período/escopo/filtro)
       fixos,
+      // transparência (só modo equipe): total excluído por não ter equipe definida
+      fora_do_ranking: foraDoRanking,
     })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })

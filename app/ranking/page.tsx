@@ -159,6 +159,7 @@ export default function RankingPage() {
   const [telao, setTelao] = useState(false)
   const [reiSemana, setReiSemana] = useState<ReiSemana | null>(null)
   const [fixos, setFixos] = useState<Fixos | null>(null)
+  const [foraDoRanking, setForaDoRanking] = useState<{ vendas: number; valor: number }>({ vendas: 0, valor: 0 })
   const [jaAnimou, setJaAnimou] = useState(false) // anima entrada só na 1ª carga
   const liderAnterior = useRef<string | null>(null)
   const primeiraCarga = useRef(true)
@@ -261,6 +262,7 @@ export default function RankingPage() {
       setDestaques(data.destaques || null)
       setReiSemana(data.rei_semana || null)
       setFixos(data.fixos || null)
+      setForaDoRanking(data.fora_do_ranking || { vendas: 0, valor: 0 })
       setRole(data.meu_role)
       if (data.producoes) setProducoes(data.producoes)
       if (data.producao_ativa && !producaoId && !periodo) setProducaoId(data.producao_ativa)
@@ -531,6 +533,13 @@ export default function RankingPage() {
                 )
               })}
             </div>
+          )}
+
+          {/* Transparência p/ gestão: vendas sem equipe ficam fora do ranking de Equipes */}
+          {modo === 'equipe' && foraDoRanking.vendas > 0 && (role === 'master' || role === 'adm') && (
+            <p className="mt-3 text-[11px] leading-relaxed px-1" style={{ color: '#f59e0b' }}>
+              {`\u26A0 ${foraDoRanking.vendas} venda${foraDoRanking.vendas !== 1 ? 's' : ''} sem equipe definida (${fmtMoeda(foraDoRanking.valor)}) fora do ranking \u2014 atribua a equipe no cadastro para pontuarem`}
+            </p>
           )}
 
         </>
