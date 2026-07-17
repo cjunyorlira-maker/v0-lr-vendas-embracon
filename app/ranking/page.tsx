@@ -358,7 +358,7 @@ export default function RankingPage() {
           <Variacao delta={variacao[item.nome] ?? null} />
         </div>
         {modo === 'vendedor' && (item.streak_semanas || 0) >= 3 && <div className="mt-1"><StreakBadge n={item.streak_semanas || 0} /></div>}
-        {modo === 'vendedor' && <div className="mt-0.5 max-w-full"><SubLinha item={item} center /></div>}
+            {(modo === 'vendedor' || modo === 'equipe') && <div className="mt-0.5 max-w-full"><SubLinha item={item} center /></div>}
         <p className="text-[11px] mt-0.5 mb-2" style={{ color: 'var(--muted-color)' }}>{fmtMoeda(item.maior_venda)} maior venda</p>
         <p className="font-bold font-mono" style={{ color: cor, fontSize: primeiro ? 24 : 19 }}>{fmtMoeda(item.valor)}</p>
         <p className="text-[11px] mt-1" style={{ color: 'var(--muted-color)' }}>{item.qtd} cota{item.qtd !== 1 ? 's' : ''} · ticket {fmtMoeda(item.ticket_medio)}</p>
@@ -461,7 +461,7 @@ export default function RankingPage() {
                         <Variacao delta={variacao[r.nome] ?? null} />
                         {modo === 'vendedor' && <StreakBadge n={r.streak_semanas || 0} />}
                       </div>
-                      {modo === 'vendedor' && <SubLinha item={r} />}
+                        {(modo === 'vendedor' || modo === 'equipe') && <SubLinha item={r} />}
                       <div className="mt-1 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
                         <div className="h-full rounded-full anim-bar-grow" style={{ width: `${pct}%`, background: barra }} />
                       </div>
