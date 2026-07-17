@@ -163,6 +163,8 @@ export default function RankingPage() {
   const [jaAnimou, setJaAnimou] = useState(false) // anima entrada só na 1ª carga
   const liderAnterior = useRef<string | null>(null)
   const primeiraCarga = useRef(true)
+  // guard anti-corrida: só a última requisição (modo/período mais recente) pode tocar a tela
+  const reqSeq = useRef(0)
   const animCls = jaAnimou ? '' : 'anim-fade-up'
 
   // ao voltar para "Minha operação", garante um modo permitido para o role
@@ -243,6 +245,7 @@ export default function RankingPage() {
   }, [ranking, variacao, reiSemana, destaques, producoes, producaoId, periodo])
 
   async function loadData() {
+    const meuReq = ++reqSeq.current // sequência desta requisição
     // spinner só quando ainda não há dados; refreshes trocam os dados em background sem desmontar a tela
     if (ranking.length === 0) setLoading(true)
     const params = (extra: string) => {
@@ -257,6 +260,7 @@ export default function RankingPage() {
 
     const res = await fetch(url)
     const data = await res.json()
+    if (meuReq !== reqSeq.current) return // resposta velha: descarta antes de qualquer setState
     if (data.ranking) {
       setRanking(data.ranking)
       setDestaques(data.destaques || null)
@@ -283,6 +287,7 @@ export default function RankingPage() {
           try {
             const resAnt = await fetch(params(`&producao_id=${anterior.id}`))
             const dataAnt = await resAnt.json()
+            if (meuReq !== reqSeq.current) return // resposta velha: descarta
             const posAnt: Record<string, number> = {}
             for (const r of (dataAnt.ranking || [])) posAnt[r.nome] = r.posicao
             const v: Record<string, number> = {}
@@ -300,7 +305,7 @@ export default function RankingPage() {
         setTimeout(() => setJaAnimou(true), 900)
       }
     }
-    setLoading(false)
+    if (meuReq === reqSeq.current) setLoading(false)
   }
 
   async function toggleTelao() {
