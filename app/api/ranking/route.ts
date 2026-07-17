@@ -173,32 +173,40 @@ export async function GET(req: NextRequest) {
       maior_venda_unica: maiorVendaUnica,
     }
 
-    // ── Melhor da Semana (segunda→agora), sempre da semana corrente, respeitando o escopo ativo ──
-    let melhorDaSemana: { nome: string; foto?: string; equipe?: string; empresa?: string; valor: number } | null = null
-    {
-      const semIni = inicioSemanaISO()
-      let qs = supabaseAdmin
-        .from('vendas')
-        .select('valor_credito, vendedor_id, data_venda, usuarios:vendedor_id(nome, foto_url, placeholder), equipes(nome), empresas(nome)')
-        .gte('data_venda', semIni).lte('data_venda', hoje)
-      qs = aplicaEscopo(qs)
-      if (filtroEmpresa && !escopoGeral) qs = qs.eq('empresa_id', filtroEmpresa)
-      const { data: vendasSemana } = await qs
-      const semMap = new Map<string, { nome: string; foto?: string; equipe?: string; empresa?: string; valor: number }>()
-      for (const v of (vendasSemana || []) as any[]) {
-        const u = nomeDe(v, 'usuarios')
-        if (!v.vendedor_id || u?.placeholder === true) continue
-        const eq = nomeDe(v, 'equipes'); const emp = nomeDe(v, 'empresas')
-        const it = semMap.get(v.vendedor_id) || { nome: u?.nome || 'Vendedor', foto: u?.foto_url, equipe: eq?.nome, empresa: emp?.nome, valor: 0 }
-        it.valor += v.valor_credito || 0
-        if (!it.equipe && eq?.nome) it.equipe = eq.nome
-        semMap.set(v.vendedor_id, it)
-      }
-      melhorDaSemana = Array.from(semMap.values()).sort((a, b) => b.valor - a.valor)[0] || null
-    }
-
     // ── gamificação: rei da semana, streak, hall de recordes ──
     const game = await calcularGamificacao(supabaseAdmin, producoes)
+
+    // ── CARDS FIXOS: sempre da PRODUÇÃO CORRENTE e da OPERAÇÃO TODA ──
+    // Independem de modo/período/escopo/filtros da tela. São iguais para todos os usuários.
+    const prodCorrente = producoes.find(p => p.data_inicio <= hoje && p.data_fim >= hoje) || producoes[0] || null
+    let fixos: {
+      producao: string | null
+      melhor_equipe: { nome: string; empresa?: string; valor: number } | null
+      melhor_vendedor: { nome: string; foto?: string; equipe?: string; empresa?: string; valor: number } | null
+      recordista: typeof game.recordes.melhor_producao_individual
+    } = { producao: prodCorrente?.nome || null, melhor_equipe: null, melhor_vendedor: null, recordista: game.recordes.melhor_producao_individual }
+    if (prodCorrente) {
+      const { data: vFix } = await supabaseAdmin
+        .from('vendas')
+        .select('valor_credito, vendedor_id, equipe_id, usuarios:vendedor_id(nome, foto_url, placeholder), equipes(nome), empresas(nome)')
+        .gte('data_venda', prodCorrente.data_inicio).lte('data_venda', prodCorrente.data_fim)
+      const eqMap = new Map<string, { nome: string; empresa?: string; valor: number }>()
+      const vendMap = new Map<string, { nome: string; foto?: string; equipe?: string; empresa?: string; valor: number }>()
+      for (const v of (vFix || []) as any[]) {
+        const cred = v.valor_credito || 0
+        const u = nomeDe(v, 'usuarios'); const eq = nomeDe(v, 'equipes'); const emp = nomeDe(v, 'empresas')
+        if (v.equipe_id) {
+          const it = eqMap.get(v.equipe_id) || { nome: eq?.nome || 'Equipe', empresa: emp?.nome, valor: 0 }
+          it.valor += cred; if (!it.empresa && emp?.nome) it.empresa = emp.nome; eqMap.set(v.equipe_id, it)
+        }
+        if (v.vendedor_id && u?.placeholder !== true) {
+          const it = vendMap.get(v.vendedor_id) || { nome: u?.nome || 'Vendedor', foto: u?.foto_url, equipe: eq?.nome, empresa: emp?.nome, valor: 0 }
+          it.valor += cred; if (!it.equipe && eq?.nome) it.equipe = eq.nome; vendMap.set(v.vendedor_id, it)
+        }
+      }
+      fixos.melhor_equipe = Array.from(eqMap.values()).sort((a, b) => b.valor - a.valor)[0] || null
+      fixos.melhor_vendedor = Array.from(vendMap.values()).sort((a, b) => b.valor - a.valor)[0] || null
+    }
 
     // marca coroa (rei geral + reis por empresa) e streak em cada item do ranking
     const reisSet = new Set(game.reis_ids)
@@ -231,9 +239,8 @@ export async function GET(req: NextRequest) {
       meu_role: me.role,
       rei_semana: game.rei_semana,
       semana_atual_lider: game.semana_atual_lider,
-      melhor_da_semana: melhorDaSemana,
-      // Hall de Recordes removido; mantém só o recorde do card "Vendedor Recordista"
-      recorde_individual: game.recordes.melhor_producao_individual,
+      // 3 cards fixos: sempre produção corrente + operação toda (independem de modo/período/escopo/filtro)
+      fixos,
     })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
