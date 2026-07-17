@@ -48,7 +48,7 @@ export async function GET() {
 
     let q = supabaseAdmin
       .from('vendas')
-      .select('id, valor_credito, grupo, cota, empresa_id, equipe_id, vendedor_id, com_seguro, comissao_seguro_recebida, clientes(nome)')
+      .select('id, valor_credito, grupo, cota, empresa_id, equipe_id, vendedor_id, com_seguro, comissao_seguro_recebida, clientes(nome), empresas(nome)')
       .eq('com_seguro', true)
       .order('criado_em', { ascending: false })
 
@@ -57,9 +57,12 @@ export async function GET() {
 
     const lista = (vendas || []).map((v: any) => {
       const cliente = Array.isArray(v.clientes) ? v.clientes[0] : v.clientes
+      const empresa = Array.isArray(v.empresas) ? v.empresas[0] : v.empresas
       return {
         id: v.id,
         cliente_nome: cliente?.nome || null,
+        empresa_id: v.empresa_id,
+        empresa_nome: empresa?.nome || null,
         grupo: v.grupo,
         cota: v.cota,
         valor_credito: v.valor_credito || 0,

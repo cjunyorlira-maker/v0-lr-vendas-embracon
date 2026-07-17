@@ -787,15 +787,20 @@ export default function ComissoesPage() {
                 {rankingFaturamento.length === 0 && <p className="text-sm text-center py-8" style={{ color: 'var(--muted-color)' }}>Nenhuma venda no período.</p>}
               </div>
             </div>
-          ) : aba === 'seguro' ? (
+          ) : aba === 'seguro' ? (() => {
+            // Filtro de empresa da tela atua só para master (escopo global). Representante já vem limitado do servidor.
+            const seguroFiltrado = (meuRole === 'master' && fEmpresa)
+              ? vendasSeguro.filter(v => v.empresa_id === fEmpresa)
+              : vendasSeguro
+            return (
             <div className="rounded-xl p-4" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
                 <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Comissão de Seguro (0,30%)</h3>
                 <div className="text-xs" style={{ color: 'var(--muted-color)' }}>
-                  Recebido: {fmtMoeda(vendasSeguro.filter(v => v.comissao_seguro_recebida).reduce((s, v) => s + (v.valor_credito * 0.003), 0))} / Total: {fmtMoeda(vendasSeguro.reduce((s, v) => s + (v.valor_credito * 0.003), 0))}
+                  Recebido: {fmtMoeda(seguroFiltrado.filter(v => v.comissao_seguro_recebida).reduce((s, v) => s + (v.valor_credito * 0.003), 0))} / Total: {fmtMoeda(seguroFiltrado.reduce((s, v) => s + (v.valor_credito * 0.003), 0))}
                 </div>
               </div>
-              {loadingSeguro ? <p className="text-sm" style={{ color: 'var(--muted-color)' }}>Carregando...</p> : vendasSeguro.length === 0 ? <p className="text-sm" style={{ color: 'var(--muted-color)' }}>Nenhuma venda com seguro.</p> : (
+              {loadingSeguro ? <p className="text-sm" style={{ color: 'var(--muted-color)' }}>Carregando...</p> : seguroFiltrado.length === 0 ? <p className="text-sm" style={{ color: 'var(--muted-color)' }}>Nenhuma venda com seguro.</p> : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead><tr style={{ borderBottom: '1px solid var(--border)' }}>
@@ -806,9 +811,12 @@ export default function ComissoesPage() {
                       <th className="p-2 text-center" style={{ color: 'var(--muted-color)' }}>Recebido</th>
                     </tr></thead>
                     <tbody>
-                      {vendasSeguro.map(v => (
+                      {seguroFiltrado.map(v => (
                         <tr key={v.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                          <td className="p-2" style={{ color: 'var(--text)' }}>{v.cliente_nome || '-'}</td>
+                          <td className="p-2">
+                            <span style={{ color: 'var(--text)' }}>{v.cliente_nome || '-'}</span>
+                            {v.empresa_nome && <span className="ml-1.5 text-[11px]" style={{ color: 'rgba(212,175,55,0.7)' }}>· {v.empresa_nome}</span>}
+                          </td>
                           <td className="p-2" style={{ color: 'var(--text2)' }}>{v.grupo}/{v.cota}</td>
                           <td className="p-2 text-right" style={{ color: 'var(--text2)' }}>{fmtMoeda(v.valor_credito)}</td>
                           <td className="p-2 text-right font-semibold" style={{ color: 'var(--accent)' }}>{fmtMoeda(v.valor_credito * 0.003)}</td>
@@ -822,7 +830,8 @@ export default function ComissoesPage() {
                 </div>
               )}
             </div>
-          ) : aba === 'master' ? (
+            )
+          })() : aba === 'master' ? (
             meuRole !== 'master' ? null : loadingMaster ? (
               <div className="flex items-center justify-center py-12"><Loader2 size={20} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
             ) : !masterData ? (
@@ -886,6 +895,25 @@ export default function ComissoesPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* Subtotal do filtro (só aparece com filtro ativo) — os 4 cards acima seguem GLOBAIS */}
+                  {(mFiltroEmpresa || mBusca.trim()) && vendasMaster.length > 0 && (() => {
+                    const sub = vendasMaster.reduce((a: any, v: any) => ({
+                      devido: a.devido + (v.valor_devido_venda || 0),
+                      aReceber: a.aReceber + (v.valor_pendente || 0),
+                      aVencer: a.aVencer + (v.valor_a_vencer || 0),
+                    }), { devido: 0, aReceber: 0, aVencer: 0 })
+                    const nomeEmpresa = mFiltroEmpresa ? ((empresasMaster.find(([id]) => id === mFiltroEmpresa)?.[1] as string) || 'empresa') : 'Todas as empresas'
+                    return (
+                      <div className="rounded-lg px-4 py-2.5 mb-3 flex items-center gap-x-4 gap-y-1 flex-wrap text-xs" style={{ background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.25)' }}>
+                        <span className="font-semibold" style={{ color: 'var(--accent)' }}>Filtro: {nomeEmpresa}{mBusca.trim() ? ` · "${mBusca.trim()}"` : ''}</span>
+                        <span style={{ color: 'var(--muted-color)' }}>{vendasMaster.length} venda{vendasMaster.length === 1 ? '' : 's'}</span>
+                        <span style={{ color: 'var(--text2)' }}>devido <b style={{ color: 'var(--text)' }}>{fmtMoeda(sub.devido)}</b></span>
+                        <span style={{ color: 'var(--text2)' }}>a receber <b style={{ color: 'var(--accent)' }}>{fmtMoeda(sub.aReceber)}</b></span>
+                        <span style={{ color: 'var(--text2)' }}>a vencer <b style={{ color: '#3b82f6' }}>{fmtMoeda(sub.aVencer)}</b></span>
+                      </div>
+                    )
+                  })()}
 
                   {/* Lista por venda */}
                   {vendasMaster.length === 0 ? (
