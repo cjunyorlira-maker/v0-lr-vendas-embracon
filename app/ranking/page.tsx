@@ -5,7 +5,7 @@ import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import { Trophy, Loader2, Users, Building2, User, Shield, Zap, CalendarRange, Tv, ChevronUp, ChevronDown, Minus, Home, Globe, Flame, Crown, Swords, Share2, Check } from 'lucide-react'
 import { dispararConfete } from '@/lib/confetti'
-import { compartilharPodio } from '@/lib/podio-share'
+import { gerarArtePodio } from '@/lib/podium-art'
 
 interface RankItem { posicao: number; nome: string; foto?: string; valor: number; qtd: number; ticket_medio: number; maior_venda: number; equipe_nome?: string | null; empresa_nome?: string | null; empresa_id?: string | null; logo?: string | null; vendedor_id?: string | null; rei_semana?: boolean; streak_semanas?: number }
 
@@ -291,19 +291,44 @@ export default function RankingPage() {
     if (gerandoImg || ranking.length === 0) return
     setGerandoImg(true)
     try {
-      const itens = ranking.slice(0, 5).map(r => ({
-        posicao: r.posicao, nome: r.nome, foto: r.foto, valor: r.valor, qtd: r.qtd,
-        ticket_medio: r.ticket_medio, equipe_nome: r.equipe_nome, empresa_nome: r.empresa_nome, logo: r.logo,
-      }))
+      const fmtDia = (s?: string) => { if (!s) return ''; const [, m, d] = s.slice(0, 10).split('-'); return `${d}/${m}` }
+      const periodoStr = periodoDatas ? `${fmtDia(periodoDatas.inicio)} a ${fmtDia(periodoDatas.fim)}` : ''
+      // no Geral não cita empresa isolada; na Minha operação usa a empresa em foco (ou o nome fixo da operação)
+      const nomeEmpresa = escopo === 'geral'
+        ? undefined
+        : (empresas.find(e => e.id === fEmpresa)?.nome || 'Grupo LR - SJC')
+
+      const blob = await gerarArtePodio({
+        titulo: periodoTitulo,
+        subtitulo: `RANKING · ${modoLabel}`,
+        periodo: periodoStr,
+        itens: ranking.slice(0, 5).map(r => ({
+          posicao: r.posicao, nome: r.nome, equipe: r.equipe_nome || undefined, empresa: r.empresa_nome || undefined,
+          valor: r.valor, qtd: r.qtd, foto: r.foto,
+        })),
+        escopo: escopo === 'geral' ? 'geral' : 'empresa',
+        nomeEmpresa,
+      })
+
+      // navigator.share (WhatsApp no mobile) com fallback de download
       const slug = `${periodoTitulo}-${modoLabel}`.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
-      // rodapé: no Geral nunca cita empresa isolada; na Minha operação usa o nome fixo da operação
-      const rodapeEsq = escopo === 'geral' ? 'Ranking Geral da Operação' : 'Grupo LR - SJC'
-      const res = await compartilharPodio(itens, {
-        periodoTitulo, modoLabel, datas: periodoDatas,
-        usaLogo: escopo === 'geral' && modo === 'representante',
-        rodapeEsq,
-      }, slug)
-      if (res === 'baixado') { setToast('Imagem salva — solta no grupo! 🔥'); setTimeout(() => setToast(null), 4000) }
+      const nome = `podio-${slug}.png`
+      const file = new File([blob], nome, { type: 'image/png' })
+      const nav = navigator as any
+      if (nav.canShare && nav.canShare({ files: [file] })) {
+        try {
+          await nav.share({ files: [file], title: 'Ranking', text: `${periodoTitulo} · ${modoLabel}` })
+          return
+        } catch (e: any) {
+          if (e?.name === 'AbortError') return // usuário cancelou; sem fallback
+        }
+      }
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url; a.download = nome
+      document.body.appendChild(a); a.click(); a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 4000)
+      setToast('Imagem salva — solta no grupo! 🔥'); setTimeout(() => setToast(null), 4000)
     } catch {
       setToast('Não foi possível gerar a imagem.'); setTimeout(() => setToast(null), 4000)
     } finally {
