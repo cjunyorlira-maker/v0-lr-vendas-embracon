@@ -6,7 +6,8 @@ import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import AdicionarUsuarioModal from '@/components/AdicionarUsuarioModal'
 import ResetSenhaModal from '@/components/ResetSenhaModal'
-import { Plus, Users, Users2, UserX, UserCheck, Trash2, KeyRound, AlertTriangle, AlertOctagon } from 'lucide-react'
+import FotoUsuarioModal from '@/components/FotoUsuarioModal'
+import { Plus, Users, Users2, UserX, UserCheck, Trash2, KeyRound, AlertTriangle, AlertOctagon, Camera } from 'lucide-react'
 
 interface Usuario {
   id: string
@@ -18,7 +19,19 @@ interface Usuario {
   empresa_id: string | null
   equipe_id: string | null
   criado_em: string
+  foto_url?: string | null
   empresa?: { nome: string } | null
+}
+
+const CORES_INICIAIS = ['#d4af37', '#3b82f6', '#22c55e', '#a855f7', '#ec4899', '#f97316', '#06b6d4']
+function corDoNome(nome: string) {
+  let h = 0
+  for (let i = 0; i < nome.length; i++) h = nome.charCodeAt(i) + ((h << 5) - h)
+  return CORES_INICIAIS[Math.abs(h) % CORES_INICIAIS.length]
+}
+function iniciais(nome: string) {
+  const p = nome.trim().split(/\s+/)
+  return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase() || '?'
 }
 
 interface Equipe {
@@ -68,6 +81,7 @@ export default function EquipePage() {
   const [textoConfirmDeletar, setTextoConfirmDeletar] = useState('')
   const [acaoLoading, setAcaoLoading] = useState(false)
   const [confirmReset, setConfirmReset] = useState<Usuario | null>(null)
+  const [fotoModal, setFotoModal] = useState<Usuario | null>(null)
   const [mudarEquipeModal, setMudarEquipeModal] = useState<any>(null)
   const [novaEquipe, setNovaEquipe] = useState('')
   const [salvandoEquipe, setSalvandoEquipe] = useState(false)
@@ -224,10 +238,15 @@ export default function EquipePage() {
                     {usuariosFiltrados.map((u) => (
                       <tr key={u.id} style={{ borderBottom: '1px solid var(--border)', opacity: u.ativo ? 1 : 0.5 }}>
                         <td className="px-4 py-3">
-                          <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{u.nome}</span>
-                          {u.id === currentUserId && (
-                            <span className="ml-2 text-xs" style={{ color: 'var(--accent)' }}>(você)</span>
-                          )}
+                          <div className="flex items-center gap-3">
+                            {u.foto_url
+                              ? <img src={u.foto_url || "/placeholder.svg"} alt={u.nome} width={32} height={32} className="rounded-full shrink-0" style={{ width: 32, height: 32, objectFit: 'cover' }} />
+                              : <div className="rounded-full shrink-0 flex items-center justify-center text-xs font-bold" style={{ width: 32, height: 32, background: `${corDoNome(u.nome)}22`, color: corDoNome(u.nome) }}>{iniciais(u.nome)}</div>}
+                            <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{u.nome}</span>
+                            {u.id === currentUserId && (
+                              <span className="text-xs" style={{ color: 'var(--accent)' }}>(você)</span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-3">
                           <span className="text-sm font-mono" style={{ color: 'var(--text2)' }}>{u.email}</span>
@@ -256,6 +275,12 @@ export default function EquipePage() {
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-2">
+                            {(['master','representante','adm'].includes(currentUserRole || '') || u.id === currentUserId) && (
+                              <button onClick={() => setFotoModal(u)} className="flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors" style={{ color: 'var(--accent)', background: 'rgba(212,175,55,0.08)' }} title="Alterar foto">
+                                <Camera size={14} />
+                                <span className="hidden sm:inline">Foto</span>
+                              </button>
+                            )}
                             {['master','representante','adm'].includes(currentUserRole || '') && ['vendedor','supervisor'].includes(u.role) && u.id !== currentUserId && (
                               <button onClick={() => { setMudarEquipeModal(u); setNovaEquipe(u.equipe_id || '') }} className="flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors" style={{ color: '#a855f7', background: 'rgba(168,85,247,0.08)' }} title="Mudar equipe">
                                 <Users2 size={14} />
@@ -307,6 +332,13 @@ export default function EquipePage() {
         open={!!confirmReset}
         onClose={() => setConfirmReset(null)}
         usuario={confirmReset}
+        onSuccess={loadData}
+      />
+
+      <FotoUsuarioModal
+        open={!!fotoModal}
+        onClose={() => setFotoModal(null)}
+        usuario={fotoModal}
         onSuccess={loadData}
       />
 

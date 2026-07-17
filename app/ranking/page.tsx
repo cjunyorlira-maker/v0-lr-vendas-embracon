@@ -3,70 +3,114 @@
 import { useState, useEffect } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { Trophy, Loader2, Users, Building2, User, Medal } from 'lucide-react'
+import { Trophy, Loader2, Users, Building2, User, Shield, Gem } from 'lucide-react'
 
-interface RankItem { posicao: number; nome: string; foto?: string; valor: number; qtd: number }
+interface RankItem { posicao: number; nome: string; foto?: string; valor: number; qtd: number; ticket_medio: number; maior_venda: number }
+interface Producao { id: string; nome: string; data_inicio: string; data_fim: string }
+interface Destaques {
+  top_equipe: { nome: string; valor: number; qtd: number } | null
+  top_empresa: { nome: string; valor: number; qtd: number } | null
+  maior_ticket: { nome: string; foto?: string; ticket: number; qtd: number } | null
+  maior_venda_unica: { valor: number; vendedor: string; empresa: string } | null
+}
 
 const fmtMoeda = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 
+// cor determinística para o círculo de iniciais
+const CORES_INICIAIS = ['#d4af37', '#3b82f6', '#22c55e', '#a855f7', '#ec4899', '#f97316', '#06b6d4']
+function corDoNome(nome: string) {
+  let h = 0
+  for (let i = 0; i < nome.length; i++) h = nome.charCodeAt(i) + ((h << 5) - h)
+  return CORES_INICIAIS[Math.abs(h) % CORES_INICIAIS.length]
+}
+function iniciais(nome: string) {
+  const p = nome.trim().split(/\s+/)
+  return ((p[0]?.[0] || '') + (p[1]?.[0] || '')).toUpperCase() || '?'
+}
+
+function Avatar({ nome, foto, size, borderColor }: { nome: string; foto?: string; size: number; borderColor?: string }) {
+  const borda = borderColor ? { border: `3px solid ${borderColor}`, boxShadow: `0 0 16px ${borderColor}55` } : {}
+  if (foto) {
+    return <img src={foto || "/placeholder.svg"} alt={nome} width={size} height={size} className="rounded-full shrink-0" style={{ width: size, height: size, objectFit: 'cover', ...borda }} />
+  }
+  const cor = corDoNome(nome)
+  return (
+    <div className="rounded-full shrink-0 flex items-center justify-center font-bold" style={{ width: size, height: size, background: `${cor}22`, color: cor, fontSize: size * 0.36, ...borda }}>
+      {iniciais(nome)}
+    </div>
+  )
+}
+
 export default function RankingPage() {
   const [ranking, setRanking] = useState<RankItem[]>([])
+  const [destaques, setDestaques] = useState<Destaques | null>(null)
+  const [producoes, setProducoes] = useState<Producao[]>([])
+  const [producaoId, setProducaoId] = useState('')
   const [loading, setLoading] = useState(true)
   const [modo, setModo] = useState<'vendedor' | 'equipe' | 'representante'>('vendedor')
   const [role, setRole] = useState('')
-  const [inicio, setInicio] = useState('')
-  const [fim, setFim] = useState('')
   const [fEmpresa, setFEmpresa] = useState('')
   const [empresas, setEmpresas] = useState<any[]>([])
-  const [periodoAtivo, setPeriodoAtivo] = useState<'producao' | 'semana' | 'ano'>('producao')
 
-  useEffect(() => { loadData() }, [modo, fEmpresa])
+  useEffect(() => { loadData() }, [modo, fEmpresa, producaoId])
   useEffect(() => {
     fetch('/api/usuarios/listar').then(r => r.json()).then(d => { if (d.empresas) setEmpresas(d.empresas) }).catch(() => {})
   }, [])
 
-  async function loadData(customInicio?: string, customFim?: string) {
+  async function loadData() {
     setLoading(true)
     let url = `/api/ranking?modo=${modo}`
-    if (customInicio && customFim) url += `&inicio=${customInicio}&fim=${customFim}`
+    if (producaoId) url += `&producao_id=${producaoId}`
     if (fEmpresa) url += `&empresa=${fEmpresa}`
     const res = await fetch(url)
     const data = await res.json()
     if (data.ranking) {
       setRanking(data.ranking)
+      setDestaques(data.destaques || null)
       setRole(data.meu_role)
-      if (data.periodo && periodoAtivo === 'producao') { setInicio(data.periodo.inicio); setFim(data.periodo.fim) }
+      if (data.producoes) setProducoes(data.producoes)
+      if (data.producao_ativa && !producaoId) setProducaoId(data.producao_ativa)
     }
     setLoading(false)
   }
 
-  function aplicarPeriodo(tipo: 'producao' | 'semana' | 'ano') {
-    setPeriodoAtivo(tipo)
-    if (tipo === 'semana') {
-      const hoje = new Date(); const dia = hoje.getDay()
-      const dom = new Date(hoje); dom.setDate(hoje.getDate() - dia)
-      const sab = new Date(dom); sab.setDate(dom.getDate() + 6)
-      const iso = (d: Date) => d.toISOString().slice(0, 10)
-      setInicio(iso(dom)); setFim(iso(sab)); loadData(iso(dom), iso(sab))
-    } else if (tipo === 'ano') {
-      const ano = new Date().getFullYear()
-      loadData(`${ano}-01-01`, `${ano}-12-31`)
-      setInicio(`${ano}-01-01`); setFim(`${ano}-12-31`)
-    } else {
-      loadData()
-    }
-  }
-
-  const podio = ranking.slice(0, 5)
-  const resto = ranking.slice(5)
-
   const abas = [
     { k: 'vendedor', l: 'Vendedores', icon: User, roles: ['master', 'representante', 'adm', 'supervisor', 'vendedor'] },
     { k: 'equipe', l: 'Equipes', icon: Users, roles: ['master', 'representante', 'adm'] },
-    { k: 'representante', l: 'Representantes', icon: Building2, roles: ['master'] },
+    { k: 'representante', l: 'Representações', icon: Building2, roles: ['master'] },
   ].filter(a => a.roles.includes(role) || role === '')
 
-  const medalCor = (pos: number) => pos === 1 ? '#FFD700' : pos === 2 ? '#C0C0C0' : pos === 3 ? '#CD7F32' : 'var(--muted-color)'
+  const cores = { ouro: '#d4af37', prata: '#C0C0C0', bronze: '#CD7F32' }
+  const medalha = ['\u{1F947}', '\u{1F948}', '\u{1F949}']
+  const top3 = ranking.slice(0, 3)
+  const resto = ranking.slice(3)
+  const maxValor = ranking[0]?.valor || 1
+
+  // card do pódio (usado no 1º, 2º, 3º)
+  function CardPodio({ item, rank }: { item?: RankItem; rank: 0 | 1 | 2 }) {
+    if (!item) return <div className="flex-1" />
+    const cor = rank === 0 ? cores.ouro : rank === 1 ? cores.prata : cores.bronze
+    const primeiro = rank === 0
+    const fotoSize = primeiro ? 88 : 72
+    return (
+      <div className="flex-1 flex flex-col items-center rounded-2xl px-4 text-center" style={{
+        paddingTop: primeiro ? 20 : 28, paddingBottom: primeiro ? 28 : 20,
+        marginTop: primeiro ? 0 : 20,
+        background: `linear-gradient(180deg, ${cor}14 0%, rgba(0,0,0,0.12) 60%)`,
+        border: `1px solid ${cor}${primeiro ? '66' : '40'}`,
+        boxShadow: primeiro ? `0 12px 40px ${cor}22` : 'none',
+      }}>
+        <div className="relative">
+          <Avatar nome={item.nome} foto={item.foto} size={fotoSize} borderColor={cor} />
+          <span className="absolute -bottom-1 -right-1 text-2xl" aria-hidden>{medalha[rank]}</span>
+        </div>
+        <p className="mt-3 font-semibold leading-tight text-pretty" style={{ color: 'var(--text)', fontSize: primeiro ? 16 : 14 }}>{item.nome}</p>
+        <p className="text-[11px] mt-0.5 mb-2" style={{ color: 'var(--muted-color)' }}>{fmtMoeda(item.maior_venda)} maior venda</p>
+        <p className="font-bold font-mono" style={{ color: cor, fontSize: primeiro ? 24 : 19 }}>{fmtMoeda(item.valor)}</p>
+        <p className="text-[11px] mt-1" style={{ color: 'var(--muted-color)' }}>{item.qtd} cota{item.qtd !== 1 ? 's' : ''} · ticket {fmtMoeda(item.ticket_medio)}</p>
+      </div>
+    )
+  }
 
   return (
     <div className="relative min-h-screen font-sans">
@@ -74,44 +118,37 @@ export default function RankingPage() {
       <div className="relative lg:ml-60" style={{ zIndex: 1 }}>
         <Header title="Ranking" />
         <main className="mx-auto max-w-[1100px] px-6 py-8 lg:px-8">
-          {/* Cabeçalho + período */}
-          <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.25)' }}><Trophy size={18} style={{ color: 'var(--accent)' }} /></div>
-              <div>
-                <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Ranking de Produção</h2>
-                <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Por valor vendido</p>
-              </div>
-            </div>
-            <div className="flex items-end gap-2">
-              <div><label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>De</label><input type="date" value={inicio} onChange={(e) => setInicio(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }} /></div>
-              <div><label className="block text-[10px] mb-1" style={{ color: 'var(--muted-color)' }}>Até</label><input type="date" value={fim} onChange={(e) => setFim(e.target.value)} className="rounded-lg px-2 py-1.5 text-xs outline-none" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }} /></div>
-              <button onClick={() => loadData(inicio, fim)} className="rounded-lg px-3 py-1.5 text-xs font-semibold" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)', border: '1px solid rgba(212,175,55,0.3)' }}>Aplicar</button>
+          {/* Cabeçalho */}
+          <div className="flex items-center gap-3 mb-5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.25)' }}><Trophy size={18} style={{ color: 'var(--accent)' }} /></div>
+            <div>
+              <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Ranking de Produção</h2>
+              <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Por valor vendido no período</p>
             </div>
           </div>
 
-          {/* Controles de período + empresa */}
-          <div className="flex items-center gap-2 flex-wrap mb-4">
-            <button onClick={() => aplicarPeriodo('producao')} className="rounded-lg px-3 py-1.5 text-xs font-medium" style={{ background: periodoAtivo === 'producao' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${periodoAtivo === 'producao' ? 'var(--accent)' : 'var(--border)'}`, color: periodoAtivo === 'producao' ? 'var(--accent)' : 'var(--muted-color)' }}>Produção</button>
-            <button onClick={() => aplicarPeriodo('semana')} className="rounded-lg px-3 py-1.5 text-xs font-medium" style={{ background: periodoAtivo === 'semana' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${periodoAtivo === 'semana' ? 'var(--accent)' : 'var(--border)'}`, color: periodoAtivo === 'semana' ? 'var(--accent)' : 'var(--muted-color)' }}>Semana</button>
-            <button onClick={() => aplicarPeriodo('ano')} className="rounded-lg px-3 py-1.5 text-xs font-medium" style={{ background: periodoAtivo === 'ano' ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${periodoAtivo === 'ano' ? 'var(--accent)' : 'var(--border)'}`, color: periodoAtivo === 'ano' ? 'var(--accent)' : 'var(--muted-color)' }}>Ano (acumulado)</button>
+          {/* FILTROS em pills */}
+          <div className="flex items-center gap-2 flex-wrap mb-6">
+            {producoes.length > 0 && (
+              <select value={producaoId} onChange={(e) => setProducaoId(e.target.value)} className="rounded-full px-4 py-2 text-xs font-medium outline-none cursor-pointer" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.3)', color: 'var(--accent)' }}>
+                {producoes.map(p => <option key={p.id} value={p.id} style={{ background: '#131313', color: '#fff' }}>{p.nome}</option>)}
+              </select>
+            )}
+            {abas.length > 1 && (
+              <div className="flex items-center gap-1 rounded-full p-1" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
+                {abas.map(a => {
+                  const Icon = a.icon; const ativo = modo === a.k
+                  return <button key={a.k} onClick={() => setModo(a.k as any)} className="flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all" style={{ background: ativo ? 'var(--accent)' : 'transparent', color: ativo ? '#0a0a0a' : 'var(--muted-color)' }}><Icon size={13} />{a.l}</button>
+                })}
+              </div>
+            )}
             {empresas.length > 0 && (
-              <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} className="rounded-lg px-3 py-1.5 text-xs outline-none" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+              <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} className="rounded-full px-4 py-2 text-xs outline-none cursor-pointer" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text2)' }}>
                 <option value="" style={{ background: '#131313' }}>Todas as empresas</option>
                 {empresas.map(e => <option key={e.id} value={e.id} style={{ background: '#131313' }}>{e.nome}</option>)}
               </select>
             )}
           </div>
-
-          {/* Abas */}
-          {abas.length > 1 && (
-            <div className="flex gap-2 mb-6">
-              {abas.map(a => {
-                const Icon = a.icon; const ativo = modo === a.k
-                return <button key={a.k} onClick={() => setModo(a.k as any)} className="flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium transition-all" style={{ background: ativo ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${ativo ? 'var(--accent)' : 'var(--border)'}`, color: ativo ? 'var(--accent)' : 'var(--muted-color)' }}><Icon size={14} />{a.l}</button>
-              })}
-            </div>
-          )}
 
           {loading ? (
             <div className="flex items-center justify-center py-12"><Loader2 size={20} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
@@ -119,34 +156,65 @@ export default function RankingPage() {
             <div className="flex flex-col items-center justify-center py-12 gap-2"><Trophy size={32} style={{ color: 'var(--muted-color)' }} /><p className="text-sm" style={{ color: 'var(--muted-color)' }}>Nenhuma venda no período</p></div>
           ) : (
             <>
-              {/* Pódio TOP 5 */}
-              <div className="space-y-2 mb-6">
-                {podio.map((r) => (
-                  <div key={r.posicao} className="flex items-center gap-4 rounded-xl p-4" style={{ background: r.posicao <= 3 ? `linear-gradient(90deg, ${medalCor(r.posicao)}15 0%, rgba(0,0,0,0.12) 100%)` : 'rgba(0,0,0,0.12)', backdropFilter: 'blur(4px)', border: `1px solid ${r.posicao <= 3 ? medalCor(r.posicao) + '40' : 'var(--border)'}` }}>
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-bold text-sm" style={{ background: r.posicao <= 3 ? medalCor(r.posicao) + '25' : 'rgba(255,255,255,0.05)', color: medalCor(r.posicao) }}>
-                      {r.posicao <= 3 ? <Medal size={18} style={{ color: medalCor(r.posicao) }} /> : r.posicao}
-                    </div>
-                    {r.foto ? <img src={r.foto || "/placeholder.svg"} alt="" className="h-9 w-9 rounded-full object-cover" /> : <div className="h-9 w-9 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: 'rgba(212,175,55,0.15)', color: 'var(--accent)' }}>{r.nome.charAt(0)}</div>}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{r.nome}</p>
-                      <p className="text-xs" style={{ color: 'var(--muted-color)' }}>{r.qtd} venda{r.qtd !== 1 ? 's' : ''}</p>
-                    </div>
-                    <span className="text-base font-bold" style={{ color: r.posicao <= 3 ? medalCor(r.posicao) : 'var(--text)' }}>{fmtMoeda(r.valor)}</span>
-                  </div>
-                ))}
+              {/* PÓDIO TOP 3 — ordem visual 2 | 1 | 3 */}
+              <div className="flex items-start justify-center gap-3 mb-6">
+                <CardPodio item={top3[1]} rank={1} />
+                <CardPodio item={top3[0]} rank={0} />
+                <CardPodio item={top3[2]} rank={2} />
               </div>
 
-              {/* Resto da lista */}
-              {resto.length > 0 && (
-                <div className="space-y-1">
-                  {resto.map((r) => (
-                    <div key={r.posicao} className="flex items-center gap-3 rounded-lg px-4 py-2.5" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)' }}>
-                      <span className="text-xs font-bold w-6" style={{ color: 'var(--muted-color)' }}>{r.posicao}º</span>
-                      <span className="flex-1 text-sm truncate" style={{ color: 'var(--text2)' }}>{r.nome}</span>
-                      <span className="text-xs" style={{ color: 'var(--muted-color)' }}>{r.qtd} vd</span>
-                      <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(r.valor)}</span>
+              {/* DESTAQUES */}
+              {destaques && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+                  <div className="rounded-xl p-4 flex items-center gap-3" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)' }}>
+                    <Shield size={20} style={{ color: '#22c55e' }} />
+                    <div className="min-w-0">
+                      <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted-color)' }}>Equipe da produção</p>
+                      <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{destaques.top_equipe?.nome || '—'}</p>
+                      <p className="text-xs font-mono" style={{ color: '#22c55e' }}>{destaques.top_equipe ? fmtMoeda(destaques.top_equipe.valor) : '—'}</p>
                     </div>
-                  ))}
+                  </div>
+                  <div className="rounded-xl p-4 flex items-center gap-3" style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.25)' }}>
+                    <Building2 size={20} style={{ color: '#3b82f6' }} />
+                    <div className="min-w-0">
+                      <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted-color)' }}>Representação líder</p>
+                      <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{destaques.top_empresa?.nome || '—'}</p>
+                      <p className="text-xs font-mono" style={{ color: '#3b82f6' }}>{destaques.top_empresa ? fmtMoeda(destaques.top_empresa.valor) : '—'}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-xl p-4 flex items-center gap-3" style={{ background: 'rgba(212,175,55,0.08)', border: '1px solid rgba(212,175,55,0.25)' }}>
+                    <Gem size={20} style={{ color: 'var(--accent)' }} />
+                    <div className="min-w-0">
+                      <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted-color)' }}>Maior ticket médio</p>
+                      <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{destaques.maior_ticket?.nome || '—'}</p>
+                      <p className="text-xs font-mono" style={{ color: 'var(--accent)' }}>{destaques.maior_ticket ? `${fmtMoeda(destaques.maior_ticket.ticket)} · ${destaques.maior_ticket.qtd} vd` : 'mín. 2 vendas'}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* LISTA 4º em diante */}
+              {resto.length > 0 && (
+                <div className="rounded-xl overflow-hidden" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid var(--border)' }}>
+                  {resto.map((r) => {
+                    const pct = Math.max(4, Math.round((r.valor / maxValor) * 100))
+                    return (
+                      <div key={r.posicao} className="flex items-center gap-3 px-4 py-2.5" style={{ borderBottom: '1px solid var(--border)' }}>
+                        <span className="text-xs font-bold font-mono w-7 shrink-0" style={{ color: 'var(--muted-color)' }}>{r.posicao}º</span>
+                        <Avatar nome={r.nome} foto={r.foto} size={32} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate" style={{ color: 'var(--text2)' }}>{r.nome}</p>
+                          <div className="mt-1 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
+                            <div className="h-full rounded-full" style={{ width: `${pct}%`, background: 'linear-gradient(90deg, rgba(212,175,55,0.5), var(--accent))' }} />
+                          </div>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="text-sm font-semibold font-mono" style={{ color: 'var(--text)' }}>{fmtMoeda(r.valor)}</p>
+                          <p className="text-[10px]" style={{ color: 'var(--muted-color)' }}>{r.qtd} cota{r.qtd !== 1 ? 's' : ''} · {fmtMoeda(r.ticket_medio)}</p>
+                        </div>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </>

@@ -10,37 +10,7 @@ const supabaseAdmin = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
 
-// ajusta uma data pro próximo dia útil (pula sábado/domingo)
-function proximoDiaUtil(d: Date): Date {
-  const r = new Date(d)
-  while (r.getDay() === 0 || r.getDay() === 6) r.setDate(r.getDate() + 1)
-  return r
-}
-
-// calcula o período de produção padrão (dia 21 ajustado -> dia anterior ao próximo início)
-function periodoPadrao(): { inicio: string; fim: string } {
-  const hoje = new Date()
-  const ano = hoje.getFullYear()
-  const mes = hoje.getMonth() // 0-11
-
-  // início do período corrente: dia 21 do mês anterior (ajustado pra dia útil)
-  let inicioMes = mes, inicioAno = ano
-  if (hoje.getDate() >= 21) { inicioMes = mes; } else { inicioMes = mes - 1 }
-  if (inicioMes < 0) { inicioMes = 11; inicioAno-- }
-  const inicioRaw = new Date(inicioAno, inicioMes, 21)
-  const inicio = proximoDiaUtil(inicioRaw)
-
-  // início do PRÓXIMO período: dia 21 do mês seguinte ao início (ajustado)
-  let proxMes = inicioMes + 1, proxAno = inicioAno
-  if (proxMes > 11) { proxMes = 0; proxAno++ }
-  const proxRaw = new Date(proxAno, proxMes, 21)
-  const proxInicio = proximoDiaUtil(proxRaw)
-  // fim = 1 dia antes do próximo início
-  const fim = new Date(proxInicio)
-  fim.setDate(fim.getDate() - 1)
-
-  return { inicio: inicio.toISOString().slice(0, 10), fim: fim.toISOString().slice(0, 10) }
-}
+const hojeISO = () => new Date().toISOString().slice(0, 10)
 
 export async function GET(req: NextRequest) {
   try {
@@ -58,20 +28,32 @@ export async function GET(req: NextRequest) {
     if (!me) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 403 })
 
     const { searchParams } = new URL(req.url)
-    const modo = searchParams.get('modo') || 'vendedor' // vendedor | equipe | empresa | representante
+    const modo = searchParams.get('modo') || 'vendedor' // vendedor | equipe | representante
     const filtroEmpresa = searchParams.get('empresa') || ''
-    let padrao = periodoPadrao()
-    try {
-      const { data: cfg } = await supabaseAdmin.from('config_producao').select('data_inicio, data_fim').eq('id', 1).single()
-      if (cfg?.data_inicio && cfg?.data_fim) padrao = { inicio: cfg.data_inicio, fim: cfg.data_fim }
-    } catch {}
-    const inicio = searchParams.get('inicio') || padrao.inicio
-    const fim = searchParams.get('fim') || padrao.fim
+    const producaoIdParam = searchParams.get('producao_id') || ''
+
+    // ── período vem da tabela producoes ──
+    const { data: producoesRaw } = await supabaseAdmin
+      .from('producoes')
+      .select('id, nome, data_inicio, data_fim')
+      .order('data_inicio', { ascending: false })
+    const producoes = producoesRaw || []
+    const hoje = hojeISO()
+
+    // produção escolhida: ?producao_id, senão a que contém hoje, senão a mais recente
+    let producao = producoes.find(p => p.id === producaoIdParam)
+      || producoes.find(p => p.data_inicio <= hoje && p.data_fim >= hoje)
+      || producoes[0]
+      || null
+
+    // overrides manuais opcionais
+    const inicio = searchParams.get('inicio') || producao?.data_inicio || `${new Date().getFullYear()}-01-01`
+    const fim = searchParams.get('fim') || producao?.data_fim || `${new Date().getFullYear()}-12-31`
 
     // busca vendas no período (com escopo do usuário)
     let q = supabaseAdmin
       .from('vendas')
-      .select('valor_credito, vendedor_id, equipe_id, empresa_id, criado_em, data_venda, usuarios:vendedor_id(nome, foto_url), equipes(nome), empresas(nome)')
+      .select('valor_credito, vendedor_id, equipe_id, empresa_id, data_venda, usuarios:vendedor_id(nome, foto_url), equipes(nome), empresas(nome)')
       .gte('data_venda', inicio)
       .lte('data_venda', fim)
 
@@ -79,41 +61,33 @@ export async function GET(req: NextRequest) {
     else if ((await getEscopo(me)).escopoGlobal) { /* adm matriz vê tudo */ }
     else if (['representante', 'adm'].includes(me.role)) q = q.eq('empresa_id', me.empresa_id)
     else if (me.role === 'supervisor') q = q.eq('equipe_id', me.equipe_id)
-    // vendedor vê o ranking todo da empresa dele (pra se comparar)
     else if (me.role === 'vendedor') q = q.eq('empresa_id', me.empresa_id)
 
     if (filtroEmpresa) q = q.eq('empresa_id', filtroEmpresa)
     const { data: vendas } = await q
-    const lista = vendas || []
+    const lista = (vendas || []) as any[]
 
-    // agrupa conforme o modo
-    const mapa = new Map<string, { nome: string; foto?: string; valor: number; qtd: number }>()
-    for (const v of lista as any[]) {
-      let chave = '', nome = '', foto = undefined
+    const nomeDe = (v: any, campo: string) => { const x = Array.isArray(v[campo]) ? v[campo][0] : v[campo]; return x }
+
+    // ── agrupamento principal conforme o modo ──
+    type Agg = { nome: string; foto?: string; valor: number; qtd: number; maior_venda: number }
+    const mapa = new Map<string, Agg>()
+    for (const v of lista) {
+      const cred = v.valor_credito || 0
+      let chave = '', nome = '', foto: string | undefined = undefined
       if (modo === 'vendedor') {
-        const u = Array.isArray(v.usuarios) ? v.usuarios[0] : v.usuarios
-        chave = v.vendedor_id || 'sem'; nome = u?.nome || 'Sem vendedor'; foto = u?.foto_url
+        const u = nomeDe(v, 'usuarios'); chave = v.vendedor_id || 'sem'; nome = u?.nome || 'Sem vendedor'; foto = u?.foto_url
+      } else if (modo === 'equipe') {
+        const e = nomeDe(v, 'equipes'); chave = v.equipe_id || 'sem'; nome = e?.nome || 'Sem equipe'
+      } else {
+        const emp = nomeDe(v, 'empresas'); chave = v.empresa_id || 'sem'; nome = emp?.nome || 'Sem empresa'
       }
-      else if (modo === 'equipe') {
-        const e = Array.isArray(v.equipes) ? v.equipes[0] : v.equipes
-        chave = v.equipe_id || 'sem'; nome = e?.nome || 'Sem equipe'
-      }
-      else if (modo === 'empresa') {
-        const emp = Array.isArray(v.empresas) ? v.empresas[0] : v.empresas
-        chave = v.empresa_id || 'sem'; nome = emp?.nome || 'Sem empresa'
-      }
-      else {
-        // representante: agrupa por empresa, mas mostra o nome do representante dela
-        const emp = Array.isArray(v.empresas) ? v.empresas[0] : v.empresas
-        chave = v.empresa_id || 'sem'; nome = emp?.nome || 'Sem empresa'
-      }
-      if (!mapa.has(chave)) mapa.set(chave, { nome, foto, valor: 0, qtd: 0 })
+      if (!mapa.has(chave)) mapa.set(chave, { nome, foto, valor: 0, qtd: 0, maior_venda: 0 })
       const item = mapa.get(chave)!
-      item.valor += v.valor_credito || 0
-      item.qtd += 1
+      item.valor += cred; item.qtd += 1; item.maior_venda = Math.max(item.maior_venda, cred)
     }
 
-    // modo representante: busca o nome do representante de cada empresa
+    // modo representante: troca o nome da empresa pelo nome do representante
     if (modo === 'representante') {
       const empresaIds = Array.from(mapa.keys()).filter(k => k !== 'sem')
       if (empresaIds.length > 0) {
@@ -124,11 +98,64 @@ export async function GET(req: NextRequest) {
         }
       }
     }
+
     const ranking = Array.from(mapa.values())
       .sort((a, b) => b.valor - a.valor)
-      .map((r, i) => ({ posicao: i + 1, ...r }))
+      .map((r, i) => ({
+        posicao: i + 1, nome: r.nome, foto: r.foto, valor: r.valor, qtd: r.qtd,
+        ticket_medio: r.qtd > 0 ? r.valor / r.qtd : 0,
+        maior_venda: r.maior_venda,
+      }))
 
-    return NextResponse.json({ ranking, periodo: { inicio, fim }, modo, meu_role: me.role })
+    // ── destaques (independentes do modo) ──
+    const porEquipe = new Map<string, { nome: string; valor: number; qtd: number }>()
+    const porEmpresa = new Map<string, { nome: string; valor: number; qtd: number }>()
+    const porVendedor = new Map<string, { nome: string; foto?: string; valor: number; qtd: number }>()
+    let maiorVendaUnica: { valor: number; vendedor: string; empresa: string } | null = null
+    for (const v of lista) {
+      const cred = v.valor_credito || 0
+      const eq = nomeDe(v, 'equipes'); const emp = nomeDe(v, 'empresas'); const u = nomeDe(v, 'usuarios')
+      if (v.equipe_id) {
+        const it = porEquipe.get(v.equipe_id) || { nome: eq?.nome || 'Equipe', valor: 0, qtd: 0 }
+        it.valor += cred; it.qtd += 1; porEquipe.set(v.equipe_id, it)
+      }
+      if (v.empresa_id) {
+        const it = porEmpresa.get(v.empresa_id) || { nome: emp?.nome || 'Empresa', valor: 0, qtd: 0 }
+        it.valor += cred; it.qtd += 1; porEmpresa.set(v.empresa_id, it)
+      }
+      if (v.vendedor_id) {
+        const it = porVendedor.get(v.vendedor_id) || { nome: u?.nome || 'Vendedor', foto: u?.foto_url, valor: 0, qtd: 0 }
+        it.valor += cred; it.qtd += 1; porVendedor.set(v.vendedor_id, it)
+      }
+      if (!maiorVendaUnica || cred > maiorVendaUnica.valor) {
+        maiorVendaUnica = { valor: cred, vendedor: u?.nome || '—', empresa: emp?.nome || '—' }
+      }
+    }
+    const topBy = <T extends { valor: number }>(m: Map<string, T>) =>
+      Array.from(m.values()).sort((a, b) => b.valor - a.valor)[0] || null
+    const topEquipe = topBy(porEquipe)
+    const topEmpresa = topBy(porEmpresa)
+    const maiorTicket = Array.from(porVendedor.values())
+      .filter(v => v.qtd >= 2)
+      .map(v => ({ nome: v.nome, foto: v.foto, ticket: v.valor / v.qtd, qtd: v.qtd }))
+      .sort((a, b) => b.ticket - a.ticket)[0] || null
+
+    const destaques = {
+      top_equipe: topEquipe ? { nome: topEquipe.nome, valor: topEquipe.valor, qtd: topEquipe.qtd } : null,
+      top_empresa: topEmpresa ? { nome: topEmpresa.nome, valor: topEmpresa.valor, qtd: topEmpresa.qtd } : null,
+      maior_ticket: maiorTicket,
+      maior_venda_unica: maiorVendaUnica,
+    }
+
+    return NextResponse.json({
+      ranking,
+      destaques,
+      producoes,
+      producao_ativa: producao?.id || null,
+      periodo: { inicio, fim },
+      modo,
+      meu_role: me.role,
+    })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
