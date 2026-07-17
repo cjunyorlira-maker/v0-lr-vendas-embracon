@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextRequest, NextResponse } from "next/server"
 import { getEscopo } from '@/lib/escopo'
+import { calcularGamificacao, processarUltrapassagens } from '@/lib/ranking-gamificacao'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -92,7 +93,7 @@ export async function GET(req: NextRequest) {
     // ── agrupamento principal conforme o modo ──
     // roles que NÃO são vendedores reais (usuários-representação: M Pereira, Ravi, Invest etc.)
     const ROLES_NAO_VENDEDOR = ['representante', 'adm', 'master']
-    type Agg = { nome: string; foto?: string; valor: number; qtd: number; maior_venda: number; equipe_nome?: string; empresa_nome?: string; empresa_id?: string; logo?: string }
+    type Agg = { nome: string; foto?: string; valor: number; qtd: number; maior_venda: number; equipe_nome?: string; empresa_nome?: string; empresa_id?: string; logo?: string; vendedor_id?: string }
     const mapa = new Map<string, Agg>()
     for (const v of lista) {
       const cred = v.valor_credito || 0
@@ -106,7 +107,7 @@ export async function GET(req: NextRequest) {
       } else {
         chave = v.empresa_id || 'sem'; nome = emp?.nome || 'Sem empresa'
       }
-      if (!mapa.has(chave)) mapa.set(chave, { nome, foto, valor: 0, qtd: 0, maior_venda: 0, equipe_nome: e?.nome, empresa_nome: emp?.nome, empresa_id: v.empresa_id, logo: emp?.logo_url })
+      if (!mapa.has(chave)) mapa.set(chave, { nome, foto, valor: 0, qtd: 0, maior_venda: 0, equipe_nome: e?.nome, empresa_nome: emp?.nome, empresa_id: v.empresa_id, logo: emp?.logo_url, vendedor_id: modo === 'vendedor' ? v.vendedor_id : undefined })
       const item = mapa.get(chave)!
       item.valor += cred; item.qtd += 1; item.maior_venda = Math.max(item.maior_venda, cred)
       if (!item.equipe_nome && e?.nome) item.equipe_nome = e.nome
@@ -134,6 +135,9 @@ export async function GET(req: NextRequest) {
         empresa_nome: r.empresa_nome || null,
         empresa_id: r.empresa_id || null,
         logo: r.logo || null,
+        vendedor_id: r.vendedor_id || null,
+        rei_semana: false,
+        streak_semanas: 0,
       }))
 
     // ── destaques (independentes do modo) ──
@@ -176,6 +180,29 @@ export async function GET(req: NextRequest) {
       maior_venda_unica: maiorVendaUnica,
     }
 
+    // ── gamificação: rei da semana, streak, hall de recordes ──
+    const game = await calcularGamificacao(supabaseAdmin, producoes)
+
+    // marca coroa (rei geral + reis por empresa) e streak em cada item do ranking
+    const reisSet = new Set(game.reis_ids)
+    for (const item of ranking) {
+      if (item.vendedor_id) {
+        if (reisSet.has(item.vendedor_id)) item.rei_semana = true
+        item.streak_semanas = game.streaks[item.vendedor_id] || 0
+      }
+    }
+
+    // ── ultrapassagens: só na produção corrente (período = produção que contém hoje) ──
+    const producaoCorrente = producoes.find(p => p.data_inicio <= hoje && p.data_fim >= hoje)
+    const ehProducaoCorrente = !periodoParam && producao && producaoCorrente && producao.id === producaoCorrente.id
+    if (ehProducaoCorrente && modo === 'vendedor') {
+      const rankingParaSnap = ranking
+        .filter(r => r.vendedor_id)
+        .map(r => ({ vendedor_id: r.vendedor_id as string, nome: r.nome, posicao: r.posicao, valor: r.valor }))
+      // não bloqueia a resposta se falhar
+      try { await processarUltrapassagens(supabaseAdmin, producao!.id, rankingParaSnap) } catch {}
+    }
+
     return NextResponse.json({
       ranking,
       destaques,
@@ -185,6 +212,9 @@ export async function GET(req: NextRequest) {
       periodo: { inicio, fim },
       modo,
       meu_role: me.role,
+      rei_semana: game.rei_semana,
+      semana_atual_lider: game.semana_atual_lider,
+      recordes: game.recordes,
     })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })

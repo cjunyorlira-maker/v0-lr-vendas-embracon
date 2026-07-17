@@ -1,12 +1,24 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { Trophy, Loader2, Users, Building2, User, Shield, Gem, Zap, CalendarRange, Tv, ChevronUp, ChevronDown, Minus, Home, Globe, Flame } from 'lucide-react'
+import { Trophy, Loader2, Users, Building2, User, Shield, Gem, Zap, CalendarRange, Tv, ChevronUp, ChevronDown, Minus, Home, Globe, Flame, Crown, Swords, ScrollText, ChevronRight, Medal, Timer, Award } from 'lucide-react'
 import { dispararConfete } from '@/lib/confetti'
 
-interface RankItem { posicao: number; nome: string; foto?: string; valor: number; qtd: number; ticket_medio: number; maior_venda: number; equipe_nome?: string | null; empresa_nome?: string | null; empresa_id?: string | null; logo?: string | null }
+interface RankItem { posicao: number; nome: string; foto?: string; valor: number; qtd: number; ticket_medio: number; maior_venda: number; equipe_nome?: string | null; empresa_nome?: string | null; empresa_id?: string | null; logo?: string | null; vendedor_id?: string | null; rei_semana?: boolean; streak_semanas?: number }
+
+interface ReiSemana {
+  geral: { vendedor_id: string; nome: string; foto?: string; valor: number } | null
+  por_empresa: Record<string, { vendedor_id: string; nome: string; foto?: string; valor: number }>
+  datas: { ini: string; fim: string }
+}
+interface Recordes {
+  maior_venda_unica: { vendedor: string; cliente: string; valor: number; data: string } | null
+  melhor_semana_individual: { vendedor: string; valor: number; datas: { ini: string; fim: string } } | null
+  melhor_producao_equipe: { equipe: string; producao: string; valor: number } | null
+  contemplacao_mais_rapida: { cliente: string; dias: number; data_venda: string; data_assembleia: string } | null
+}
 
 // paleta fixa (12 cores discretas) para diferenciar empresas no Ranking Geral
 const CORES_EMPRESA = ['#d4af37', '#3b82f6', '#22c55e', '#ec4899', '#f97316', '#06b6d4', '#a855f7', '#ef4444', '#14b8a6', '#eab308', '#8b5cf6', '#64748b']
@@ -25,6 +37,8 @@ interface Destaques {
 }
 
 const fmtMoeda = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
+const fmtDia = (s?: string) => { if (!s) return ''; const [a, m, d] = s.slice(0, 10).split('-'); return `${d}/${m}` }
+const diasDe = (s?: string) => { if (!s) return Infinity; return Math.floor((Date.now() - new Date(s + 'T00:00:00').getTime()) / 86400000) }
 
 const CORES_INICIAIS = ['#d4af37', '#3b82f6', '#22c55e', '#a855f7', '#ec4899', '#f97316', '#06b6d4']
 function corDoNome(nome: string) {
@@ -62,6 +76,40 @@ function Variacao({ delta }: { delta: number | null }) {
   )
 }
 
+// coroa do Rei da Semana (permanece a semana inteira)
+function Coroa({ datas }: { datas?: { ini: string; fim: string } }) {
+  const t = datas ? `Rei da Semana — melhor de ${fmtDia(datas.ini)} a ${fmtDia(datas.fim)}` : 'Rei da Semana'
+  return <span title={t} className="inline-flex shrink-0" aria-label={t}><Crown size={15} style={{ color: '#d4af37', fill: '#d4af37' }} /></span>
+}
+
+// badge de streak (>= 3 semanas)
+function StreakBadge({ n }: { n: number }) {
+  if (n < 3) return null
+  return (
+    <span title={`${n} semanas consecutivas com venda`} className="inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold shrink-0" style={{ background: 'rgba(249,115,22,0.15)', color: '#f97316', border: '1px solid rgba(249,115,22,0.35)' }}>
+      <Flame size={10} />{n} sem.
+    </span>
+  )
+}
+
+// placa de troféu do Hall de Recordes
+function PlacaRecorde({ icon: Icon, titulo, detentor, valor, sub, novo }: { icon: any; titulo: string; detentor?: string | null; valor: string | null; sub: string | null; novo?: boolean }) {
+  return (
+    <div className="relative rounded-xl p-4 flex items-center gap-3" style={{ background: 'linear-gradient(180deg, rgba(212,175,55,0.08), rgba(0,0,0,0.2))', border: '1px solid rgba(212,175,55,0.35)' }}>
+      {novo && <span className="anim-pulse-soft absolute top-2 right-2 rounded-full px-1.5 py-0.5 text-[9px] font-bold" style={{ background: '#d4af37', color: '#0a0a0a' }}>NOVO</span>}
+      <div className="flex h-11 w-11 items-center justify-center rounded-lg shrink-0" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.3)' }}>
+        <Icon size={20} style={{ color: '#d4af37' }} />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted-color)' }}>{titulo}</p>
+        <p className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{detentor || '—'}</p>
+        <p className="text-sm font-bold font-mono" style={{ color: '#d4af37' }}>{valor || '—'}</p>
+        {sub && <p className="text-[10px] truncate" style={{ color: 'var(--muted-color)' }}>{sub}</p>}
+      </div>
+    </div>
+  )
+}
+
 export default function RankingPage() {
   const [ranking, setRanking] = useState<RankItem[]>([])
   const [destaques, setDestaques] = useState<Destaques | null>(null)
@@ -76,6 +124,13 @@ export default function RankingPage() {
   const [empresas, setEmpresas] = useState<any[]>([])
   const [variacao, setVariacao] = useState<Record<string, number>>({})
   const [telao, setTelao] = useState(false)
+  const [reiSemana, setReiSemana] = useState<ReiSemana | null>(null)
+  const [semanaLider, setSemanaLider] = useState<{ nome: string; valor: number } | null>(null)
+  const [recordes, setRecordes] = useState<Recordes | null>(null)
+  const [tickerIdx, setTickerIdx] = useState(0)
+  const [tickerFade, setTickerFade] = useState(true)
+  const [hallAberto, setHallAberto] = useState(false)
+  const hallConfetou = useRef(false)
   const liderAnterior = useRef<string | null>(null)
 
   // ao voltar para "Minha operação", garante um modo permitido para o role
@@ -112,6 +167,50 @@ export default function RankingPage() {
     return () => document.removeEventListener('fullscreenchange', onFs)
   }, [])
 
+  // frases do ticker da disputa (geradas dos dados)
+  const frasesTicker = useMemo(() => {
+    const f: string[] = []
+    if (ranking.length >= 2) {
+      const dif = ranking[0].valor - ranking[1].valor
+      if (dif > 0) f.push(`🔥 ${ranking[1].nome} está a ${fmtMoeda(dif)} de assumir a liderança!`)
+    }
+    // maior subida de posições nesta produção
+    let maiorSubida: { nome: string; delta: number } | null = null
+    for (const r of ranking) {
+      const d = variacao[r.nome]
+      if (d !== undefined && d > 0 && (!maiorSubida || d > maiorSubida.delta)) maiorSubida = { nome: r.nome, delta: d }
+    }
+    if (maiorSubida) f.push(`🚀 ${maiorSubida.nome}: subiu ${maiorSubida.delta} posiç${maiorSubida.delta === 1 ? 'ão' : 'ões'} nesta produção!`)
+    if (reiSemana?.geral) f.push(`👑 ${reiSemana.geral.nome}: Rei da Semana com ${fmtMoeda(reiSemana.geral.valor)}`)
+    // maior streak do ranking
+    const comStreak = ranking.filter(r => (r.streak_semanas || 0) >= 3).sort((a, b) => (b.streak_semanas || 0) - (a.streak_semanas || 0))[0]
+    if (comStreak) f.push(`🔥 ${comStreak.nome}: ${comStreak.streak_semanas} semanas seguidas vendendo!`)
+    // recorde de melhor semana em risco (< 20%)
+    if (recordes?.melhor_semana_individual && semanaLider) {
+      const rec = recordes.melhor_semana_individual.valor
+      const falta = rec - semanaLider.valor
+      if (falta > 0 && falta < rec * 0.2) f.push(`📜 Recorde em risco: ${semanaLider.nome} está a ${fmtMoeda(falta)} do recorde de melhor semana!`)
+    }
+    return f
+  }, [ranking, variacao, reiSemana, recordes, semanaLider])
+
+  // rotação do ticker a cada 6s com fade
+  useEffect(() => {
+    setTickerIdx(0)
+    if (frasesTicker.length <= 1) return
+    const id = setInterval(() => {
+      setTickerFade(false)
+      setTimeout(() => { setTickerIdx(i => (i + 1) % frasesTicker.length); setTickerFade(true) }, 400)
+    }, 6000)
+    return () => clearInterval(id)
+  }, [frasesTicker])
+
+  // confete ao abrir o hall quando há recorde novo (últimos 7 dias)
+  const recordeNovo = useMemo(() => {
+    if (!recordes) return false
+    return diasDe(recordes.maior_venda_unica?.data) <= 7 || diasDe(recordes.contemplacao_mais_rapida?.data_assembleia) <= 7 || diasDe(recordes.melhor_semana_individual?.datas?.fim) <= 7
+  }, [recordes])
+
   async function loadData() {
     setLoading(true)
     const params = (extra: string) => {
@@ -129,6 +228,9 @@ export default function RankingPage() {
     if (data.ranking) {
       setRanking(data.ranking)
       setDestaques(data.destaques || null)
+      setReiSemana(data.rei_semana || null)
+      setSemanaLider(data.semana_atual_lider || null)
+      setRecordes(data.recordes || null)
       setRole(data.meu_role)
       if (data.producoes) setProducoes(data.producoes)
       if (data.producao_ativa && !producaoId && !periodo) setProducaoId(data.producao_ativa)
@@ -223,10 +325,12 @@ export default function RankingPage() {
           </div>
           <span className="absolute -bottom-1 -right-1 text-2xl" aria-hidden>{medalha[rank]}</span>
         </div>
-        <div className="mt-3 flex items-center gap-1.5">
+        <div className="mt-3 flex items-center justify-center gap-1.5 flex-wrap">
+          {item.rei_semana && <Coroa datas={reiSemana?.datas} />}
           <p className="font-semibold leading-tight text-pretty" style={{ color: 'var(--text)', fontSize: primeiro ? 16 : 14 }}>{item.nome}</p>
           <Variacao delta={variacao[item.nome] ?? null} />
         </div>
+        {modo === 'vendedor' && (item.streak_semanas || 0) >= 3 && <div className="mt-1"><StreakBadge n={item.streak_semanas || 0} /></div>}
         {modo === 'vendedor' && <div className="mt-0.5 max-w-full"><SubLinha item={item} center /></div>}
         <p className="text-[11px] mt-0.5 mb-2" style={{ color: 'var(--muted-color)' }}>{fmtMoeda(item.maior_venda)} maior venda</p>
         <p className="font-bold font-mono" style={{ color: cor, fontSize: primeiro ? 24 : 19 }}>{fmtMoeda(item.valor)}</p>
@@ -243,6 +347,14 @@ export default function RankingPage() {
         <div className="flex flex-col items-center justify-center py-12 gap-2"><Trophy size={32} style={{ color: 'var(--muted-color)' }} /><p className="text-sm" style={{ color: 'var(--muted-color)' }}>Nenhuma venda no período</p></div>
       ) : (
         <>
+          {frasesTicker.length > 0 && (
+            <div className="rounded-full px-4 py-2 mb-4 flex items-center gap-2 overflow-hidden anim-fade-up" style={{ background: 'linear-gradient(90deg, rgba(212,175,55,0.14), rgba(0,0,0,0.15))', border: '1px solid rgba(212,175,55,0.25)' }}>
+              <Swords size={14} style={{ color: 'var(--accent)' }} className="shrink-0" />
+              <p className="text-xs sm:text-sm font-medium truncate transition-opacity duration-300 text-pretty" style={{ color: 'var(--text2)', opacity: tickerFade ? 1 : 0 }}>
+                {frasesTicker[tickerIdx] || frasesTicker[0]}
+              </p>
+            </div>
+          )}
           {escopo === 'geral' && ranking.length >= 2 && (
             <div className="rounded-xl px-4 py-2.5 mb-5 flex items-center gap-2 anim-fade-up" style={{ background: 'linear-gradient(90deg, rgba(212,175,55,0.12), rgba(0,0,0,0.12))', border: '1px solid rgba(212,175,55,0.25)' }}>
               <Flame size={16} style={{ color: 'var(--accent)' }} className="shrink-0" />
@@ -306,8 +418,10 @@ export default function RankingPage() {
                       : <Avatar nome={r.nome} foto={r.foto} size={32} />}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5">
+                        {r.rei_semana && <Coroa datas={reiSemana?.datas} />}
                         <p className="text-sm font-medium truncate" style={{ color: 'var(--text2)' }}>{r.nome}</p>
                         <Variacao delta={variacao[r.nome] ?? null} />
+                        {modo === 'vendedor' && <StreakBadge n={r.streak_semanas || 0} />}
                       </div>
                       {modo === 'vendedor' && <SubLinha item={r} />}
                       <div className="mt-1 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
@@ -321,6 +435,30 @@ export default function RankingPage() {
                   </div>
                 )
               })}
+            </div>
+          )}
+
+          {recordes && (
+            <div className="mt-6 rounded-xl overflow-hidden" style={{ background: 'rgba(0,0,0,0.12)', border: '1px solid rgba(212,175,55,0.25)' }}>
+              <button
+                onClick={() => { const abrir = !hallAberto; setHallAberto(abrir); if (abrir && recordeNovo && !hallConfetou.current) { hallConfetou.current = true; dispararConfete() } }}
+                className="w-full flex items-center gap-3 px-4 py-3"
+              >
+                <ScrollText size={18} style={{ color: 'var(--accent)' }} />
+                <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Hall de Recordes</span>
+                {recordeNovo && (
+                  <span className="anim-pulse-soft rounded-full px-2 py-0.5 text-[10px] font-bold" style={{ background: '#d4af37', color: '#0a0a0a' }}>NOVO RECORDE!</span>
+                )}
+                <ChevronRight size={16} className="ml-auto transition-transform" style={{ color: 'var(--muted-color)', transform: hallAberto ? 'rotate(90deg)' : 'none' }} />
+              </button>
+              {hallAberto && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-4 pt-0">
+                  <PlacaRecorde icon={Trophy} titulo="Maior venda única" detentor={recordes.maior_venda_unica?.vendedor} valor={recordes.maior_venda_unica ? fmtMoeda(recordes.maior_venda_unica.valor) : null} sub={recordes.maior_venda_unica ? `${recordes.maior_venda_unica.cliente} · ${fmtDia(recordes.maior_venda_unica.data)}` : null} novo={diasDe(recordes.maior_venda_unica?.data) <= 7} />
+                  <PlacaRecorde icon={Medal} titulo="Melhor semana individual" detentor={recordes.melhor_semana_individual?.vendedor} valor={recordes.melhor_semana_individual ? fmtMoeda(recordes.melhor_semana_individual.valor) : null} sub={recordes.melhor_semana_individual ? `${fmtDia(recordes.melhor_semana_individual.datas.ini)} a ${fmtDia(recordes.melhor_semana_individual.datas.fim)}` : null} novo={diasDe(recordes.melhor_semana_individual?.datas?.fim) <= 7} />
+                  <PlacaRecorde icon={Award} titulo="Melhor produção de equipe" detentor={recordes.melhor_producao_equipe?.equipe} valor={recordes.melhor_producao_equipe ? fmtMoeda(recordes.melhor_producao_equipe.valor) : null} sub={recordes.melhor_producao_equipe?.producao || null} novo={false} />
+                  <PlacaRecorde icon={Timer} titulo="Contemplação mais rápida" detentor={recordes.contemplacao_mais_rapida?.cliente} valor={recordes.contemplacao_mais_rapida ? `${recordes.contemplacao_mais_rapida.dias} dias` : null} sub={recordes.contemplacao_mais_rapida ? `venda ${fmtDia(recordes.contemplacao_mais_rapida.data_venda)} → assembleia ${fmtDia(recordes.contemplacao_mais_rapida.data_assembleia)}` : null} novo={diasDe(recordes.contemplacao_mais_rapida?.data_assembleia) <= 7} />
+                </div>
+              )}
             </div>
           )}
         </>

@@ -196,10 +196,16 @@ export default function CampanhaPage() {
             {c.membros.length > 0 ? (
               <div className="flex flex-wrap gap-3">
                 {c.membros.map((m: any, idx: number) => (
-                  <div key={idx} className="flex flex-col items-center text-center" style={{ width: 68 }}>
-                    <Avatar nome={m.nome} foto={m.foto} size={48} borderColor={m.papel === 'supervisor' ? '#22c55e' : undefined} />
+                  <div key={idx} className="flex flex-col items-center text-center" style={{ width: 72 }}>
+                    <Avatar nome={m.nome} foto={m.foto} size={48} borderColor={m.papel === 'supervisor' ? '#22c55e' : '#d4af37'} />
                     <p className="text-[11px] font-medium mt-1 leading-tight truncate w-full" style={{ color: 'var(--text2)' }}>{m.nome.split(' ')[0]}</p>
-                    <p className="text-[9px]" style={{ color: m.papel === 'supervisor' ? '#22c55e' : 'var(--muted-color)' }}>{m.papel === 'supervisor' ? 'Supervisor' : fmt(m.valor)}</p>
+                    {m.papel === 'supervisor' ? (
+                      <p className="text-[9px] leading-tight" style={{ color: '#22c55e' }}>supervisão{m.equipe_nome ? ` · equipe ${m.equipe_nome}` : ''}</p>
+                    ) : (
+                      <p className="text-[9px] leading-tight" style={{ color: 'var(--muted-color)' }}>
+                        <span className="font-bold" style={{ color: '#d4af37' }}>{m.posicao}º</span> · {fmt(m.valor)}
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>

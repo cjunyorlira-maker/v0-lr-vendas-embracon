@@ -75,7 +75,6 @@ export async function GET(req: NextRequest) {
     EMPRESAS_CAMPANHA.forEach(e => porEmpVend.set(e, new Map()))
     // agregações auxiliares para viagem
     const porEquipe = new Map<string, { id: string; nome: string; empresa_id: string; valor: number; qtd: number }>()
-    const porEquipeVend = new Map<string, Map<string, VAgg>>() // equipe_id -> vendedores
 
     for (const v of vendas) {
       const cred = v.valor_credito || 0
@@ -92,13 +91,6 @@ export async function GET(req: NextRequest) {
         const eq = first<any>(v.equipes)
         const it = porEquipe.get(v.equipe_id) || { id: v.equipe_id, nome: eq?.nome || 'Equipe', empresa_id: v.empresa_id, valor: 0, qtd: 0 }
         it.valor += cred; it.qtd += 1; porEquipe.set(v.equipe_id, it)
-        // vendedores por equipe (sem representações)
-        if (v.vendedor_id && !ehRep) {
-          if (!porEquipeVend.has(v.equipe_id)) porEquipeVend.set(v.equipe_id, new Map())
-          const mv = porEquipeVend.get(v.equipe_id)!
-          const iv = mv.get(v.vendedor_id) || { id: v.vendedor_id, nome: u?.nome || 'Vendedor', foto: u?.foto_url, valor: 0, qtd: 0 }
-          iv.valor += cred; iv.qtd += 1; mv.set(v.vendedor_id, iv)
-        }
       }
     }
 
@@ -119,23 +111,24 @@ export async function GET(req: NextRequest) {
       .map((e, i) => ({ posicao: i + 1, id: e.id, nome: e.nome, empresa_id: e.empresa_id, empresa_nome: nomeEmpresa(e.empresa_id), valor: e.valor, qtd: e.qtd }))
 
     const comitivas = EMPRESAS_CAMPANHA.map((empId) => {
+      // vaga da SUPERVISÃO: supervisor da equipe nº 1 da empresa (disputa de equipes)
       const equipesDaEmp = equipesRank.filter(e => e.empresa_id === empId)
       const topEquipe = equipesDaEmp[0] || null
-      if (!topEquipe) return { empresa_id: empId, empresa_nome: nomeEmpresa(empId), equipe_nome: null, membros: [] as any[] }
-      const info = equipeInfo.get(topEquipe.id)
       const membros: any[] = []
-      // supervisor(es)
-      if (info?.supervisor_user_id) {
-        const s = supInfo.get(info.supervisor_user_id)
-        membros.push({ nome: s?.nome || info.supervisor_nome || 'Supervisor', foto: s?.foto_url, papel: 'supervisor', valor: null })
-      } else if (info?.supervisor_nome) {
-        membros.push({ nome: info.supervisor_nome, foto: undefined, papel: 'supervisor', valor: null })
+      if (topEquipe) {
+        const info = equipeInfo.get(topEquipe.id)
+        if (info?.supervisor_user_id) {
+          const s = supInfo.get(info.supervisor_user_id)
+          membros.push({ nome: s?.nome || info.supervisor_nome || 'Supervisor', foto: s?.foto_url, papel: 'supervisor', equipe_nome: topEquipe.nome, valor: null })
+        } else if (info?.supervisor_nome) {
+          membros.push({ nome: info.supervisor_nome, foto: undefined, papel: 'supervisor', equipe_nome: topEquipe.nome, valor: null })
+        }
       }
-      // top N vendedores da equipe
+      // vagas INDIVIDUAIS: top N vendedores da EMPRESA (independente de equipe)
       const n = TOP_VIAGEM[empId] || 3
-      const vends = Array.from((porEquipeVend.get(topEquipe.id) || new Map()).values()).sort((a, b) => b.valor - a.valor).slice(0, n)
-      for (const v of vends) membros.push({ nome: v.nome, foto: v.foto, papel: 'vendedor', valor: v.valor })
-      return { empresa_id: empId, empresa_nome: nomeEmpresa(empId), equipe_nome: topEquipe.nome, top_n: n, membros }
+      const vends = Array.from((porEmpVend.get(empId) || new Map()).values()).sort((a, b) => b.valor - a.valor).slice(0, n)
+      vends.forEach((v, i) => membros.push({ nome: v.nome, foto: v.foto, papel: 'vendedor', posicao: i + 1, valor: v.valor }))
+      return { empresa_id: empId, empresa_nome: nomeEmpresa(empId), equipe_nome: topEquipe?.nome || null, top_n: n, membros }
     })
 
     // ── 3) COUNTDOWN ──
