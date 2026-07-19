@@ -434,15 +434,16 @@ function GrupoDestaque({ bem, credito, variant }: { bem?: string; credito?: numb
             Última assembleia ({destaque.ultima_assembleia.label}): <span className="font-semibold">{destaque.ultima_assembleia.total_contemplados} contemplações</span>
           </p>
           <ul className="mt-1 space-y-0.5">
-            <li className="text-sm" style={{ color: 'var(--muted-color)' }}>🎲 {destaque.ultima_assembleia.sorteio_qt} por sorteio</li>
-            <li className="text-sm" style={{ color: 'var(--muted-color)' }}>💎 {destaque.ultima_assembleia.lance_fixo_50_qt} por lance fixo</li>
-            <li className="text-sm" style={{ color: 'var(--muted-color)' }}>💎 {destaque.ultima_assembleia.lance_fixo_25_qt} por lance fixo embutido</li>
+            {destaque.ultima_assembleia.sorteio_qt > 0 && <li className="text-sm" style={{ color: 'var(--muted-color)' }}>🎲 {destaque.ultima_assembleia.sorteio_qt} por sorteio</li>}
+            {destaque.ultima_assembleia.lance_livre_qt > 0 && <li className="text-sm" style={{ color: 'var(--muted-color)' }}>💎 {destaque.ultima_assembleia.lance_livre_qt} por lance livre</li>}
+            {destaque.ultima_assembleia.lance_fixo_50_qt > 0 && <li className="text-sm" style={{ color: 'var(--muted-color)' }}>💎 {destaque.ultima_assembleia.lance_fixo_50_qt} por lance fixo</li>}
+            {destaque.ultima_assembleia.lance_fixo_25_qt > 0 && <li className="text-sm" style={{ color: 'var(--muted-color)' }}>💎 {destaque.ultima_assembleia.lance_fixo_25_qt} por lance fixo embutido</li>}
           </ul>
         </>
       ) : (
         <p className="text-sm mt-2" style={{ color: 'var(--muted-color)' }}>Sem histórico de assembleia registrado para este grupo.</p>
       )}
-      <p className="text-sm mt-1" style={{ color: 'var(--text)' }}>Próxima assembleia: <span className="font-semibold">{fmtData(destaque.proxima_assembleia)}</span></p>
+      {destaque.proxima_assembleia && <p className="text-sm mt-1" style={{ color: 'var(--text)' }}>Próxima assembleia: <span className="font-semibold">{fmtData(destaque.proxima_assembleia)}</span></p>}
       {(destaque.tem_resultado || destaque.tem_extrato) && (
         <div className="flex flex-wrap gap-2 mt-3">
           {destaque.tem_resultado && (

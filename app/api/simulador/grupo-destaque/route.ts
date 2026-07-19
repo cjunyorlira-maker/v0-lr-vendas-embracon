@@ -66,6 +66,23 @@ export async function GET(req: NextRequest) {
       .eq('grupo', grupoId)
       .maybeSingle()
 
+    // 4) próxima assembleia pela MESMA regra da API de grupos:
+    //    1º) calendario_grupo do campeão: primeira data_assembleia >= hoje (PDF oficial Embracon)
+    //    2º) fallback: proxima_assembleia de assembleias_grupos_info APENAS se >= hoje
+    const hojeStr = new Date().toISOString().slice(0, 10)
+    const { data: calGrupo } = await supabaseAdmin
+      .from('calendario_grupo')
+      .select('data_assembleia')
+      .eq('grupo', grupoId)
+      .gte('data_assembleia', hojeStr)
+      .order('data_assembleia', { ascending: true })
+      .limit(1)
+    let proximaAssembleia: string | null = calGrupo?.[0]?.data_assembleia || null
+    if (!proximaAssembleia) {
+      const fb = escolhido.proxima_assembleia
+      if (fb && String(fb).slice(0, 10) >= hojeStr) proximaAssembleia = fb
+    }
+
     const lanceFixo = (ultima?.lance_fixo_50_qt ?? 0) + (ultima?.lance_fixo_25_qt ?? 0)
     // lance_livre_menor é fração (0.78 = 78%); converte para percentual exibível
     const menorRaw = ultima?.lance_livre_menor != null ? Number(ultima.lance_livre_menor) : null
@@ -88,7 +105,7 @@ export async function GET(req: NextRequest) {
         lance_fixo_25_qt: ultima.lance_fixo_25_qt ?? 0,
         lance_livre_menor_pct: lanceLivreMenorPct,
       } : null,
-      proxima_assembleia: escolhido.proxima_assembleia || null,
+      proxima_assembleia: proximaAssembleia,
       tem_extrato: !!ext?.arquivo_path,
       tem_resultado: !!ultima?.arquivo_path,
     })
