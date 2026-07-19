@@ -22,6 +22,12 @@ const fmtMoedaCard = (v: number) => {
   }
   return fmtMoeda(n)
 }
+// formato por extenso curto p/ o crédito gigante no mobile: "R$ 1,2 milhão" / "R$ 2,5 milhões"
+const fmtMoedaExtenso = (v: number) => {
+  const m = (v || 0) / 1_000_000
+  const s = m.toLocaleString('pt-BR', { minimumFractionDigits: m % 1 === 0 ? 0 : 1, maximumFractionDigits: 1 })
+  return `R$ ${s} ${m < 2 ? 'milhão' : 'milhões'}`
+}
 // fonte adaptativa por comprimento da string: <=10 chars 34px · 11-13 28px · 14+ 24px
 const fonteCard = (s: string, base = 34) => {
   const len = s.length
@@ -224,7 +230,7 @@ const avisoEmbracon = (
   </div>
 )
 
-// ═══════════════════════════════════���════���═══════════════════�����═
+// ═══════════════════════════════════����════���═══════════════════�����═
 // Gerador de proposta em PDF — compartilhado pelas duas abas.
 // Recebe a instância de simulação + logo/nome da empresa.
 // ══════════════════════════════════════════════════════════════
@@ -368,7 +374,7 @@ function gerarPropostaPDF(s: Sim, logoBase64: string | null, empresaNome: string
   }
 }
 
-// ════════════════════���═════════════════════════════════════════
+// ═══════════════════������═════════════════════════════════════════
 // 🏆 GRUPO EM DESTAQUE — componente compartilhado (Simulador + Atendimento)
 // Campeão = maior total_contemplados no último resultado disponível da faixa
 // ══════════════════════════════════════════════════════════════
@@ -882,8 +888,16 @@ function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, o
                 </div>
               )}
               <p className="text-sm uppercase tracking-widest" style={{ color: 'var(--muted-color)' }}>Seu crédito de</p>
-              <div className="flex items-center justify-center gap-3 mt-2">
-                <p className="font-bold leading-none" style={{ color: 'var(--accent)', fontSize: 'clamp(52px, 9vw, 88px)' }}>{fmtMoeda(faixa.credito)}</p>
+              <div className="flex items-center justify-center gap-2 sm:gap-3 mt-2">
+                <p className="font-bold leading-none text-balance text-4xl sm:text-5xl md:text-6xl" style={{ color: 'var(--accent)' }}>
+                  {/* mobile + >= 1 milhão: formato curto por extenso p/ não encostar nas bordas */}
+                  {faixa.credito >= 1_000_000 ? (
+                    <>
+                      <span className="sm:hidden">{fmtMoedaExtenso(faixa.credito)}</span>
+                      <span className="hidden sm:inline">{fmtMoeda(faixa.credito)}</span>
+                    </>
+                  ) : fmtMoeda(faixa.credito)}
+                </p>
                 <button onClick={scrollTopo} title="Alterar simulação" className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium shrink-0" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--muted-color)' }}>
                   <Pencil size={11} />alterar
                 </button>
@@ -924,38 +938,38 @@ function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, o
 
             {lanceNum <= 0 ? (
               /* SEM lance: 2 cards grandes */
-              <div className="grid gap-4 mt-8 sm:grid-cols-2 max-w-3xl mx-auto">
-                <div className="rounded-2xl px-6 py-9 flex flex-col items-center text-center min-w-0 overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                  <p className="w-full text-xs uppercase tracking-wider" style={{ color: 'var(--muted-color)' }}>Parcelas de</p>
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-8 max-w-3xl mx-auto">
+                <div className="rounded-2xl px-3 py-5 sm:px-6 sm:py-9 flex flex-col items-center text-center min-w-0 overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <p className="w-full text-[10px] sm:text-xs uppercase tracking-wider" style={{ color: 'var(--muted-color)' }}>Parcelas de</p>
                   <p className="w-full font-bold leading-tight mt-3" style={{ color: 'var(--text)', fontSize: fonteCard(fmtMoedaCard(pdProposta)) }}>{fmtMoedaCard(pdProposta)}</p>
-                  <p className="text-sm mt-1" style={{ color: 'var(--muted-color)' }}>por mês</p>
+                  <p className="text-xs sm:text-sm mt-1" style={{ color: 'var(--muted-color)' }}>por mês</p>
                 </div>
-                <div className="relative rounded-2xl px-6 py-9 flex flex-col items-center text-center min-w-0 overflow-hidden" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.4)' }}>
-                  <button onClick={() => setEntradaVisivel(v => !v)} aria-label={entradaVisivel ? 'Ocultar entrada' : 'Mostrar entrada'} className="absolute top-3 right-3" style={{ color: 'var(--accent)' }}>{entradaVisivel ? <EyeOff size={18} /> : <Eye size={18} />}</button>
-                  <p className="w-full text-xs uppercase tracking-wider" style={{ color: 'var(--accent)' }}>Entrada total</p>
+                <div className="relative rounded-2xl px-3 py-5 sm:px-6 sm:py-9 flex flex-col items-center text-center min-w-0 overflow-hidden" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.4)' }}>
+                  <button onClick={() => setEntradaVisivel(v => !v)} aria-label={entradaVisivel ? 'Ocultar entrada' : 'Mostrar entrada'} className="absolute top-2 right-2 sm:top-3 sm:right-3" style={{ color: 'var(--accent)' }}>{entradaVisivel ? <><EyeOff size={14} className="sm:hidden" /><EyeOff size={18} className="hidden sm:block" /></> : <><Eye size={14} className="sm:hidden" /><Eye size={18} className="hidden sm:block" /></>}</button>
+                  <p className="w-full text-[10px] sm:text-xs uppercase tracking-wider" style={{ color: 'var(--accent)' }}>Entrada total</p>
                   <p className="w-full font-bold leading-tight mt-3 transition-opacity duration-300" style={{ color: 'var(--accent)', opacity: entradaVisivel ? 1 : 0.85, fontSize: fonteCard(entradaVisivel ? fmtMoedaCard(entradaProposta) : 'R$ ••••••') }}>{entradaVisivel ? fmtMoedaCard(entradaProposta) : 'R$ ••••••'}</p>
                 </div>
               </div>
             ) : (
               /* COM lance embutido: 4 cards */
-              <div className="grid gap-4 mt-8 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-2xl px-5 py-7 flex flex-col items-center text-center min-w-0 overflow-hidden" style={{ background: 'rgba(212,175,55,0.16)', border: '1px solid rgba(212,175,55,0.5)' }}>
-                  <p className="w-full text-xs uppercase tracking-wider" style={{ color: 'var(--accent)' }}>💰 Crédito líquido</p>
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-8 lg:grid-cols-4">
+                <div className="rounded-2xl px-3 py-5 sm:px-5 sm:py-7 flex flex-col items-center text-center min-w-0 overflow-hidden" style={{ background: 'rgba(212,175,55,0.16)', border: '1px solid rgba(212,175,55,0.5)' }}>
+                  <p className="w-full text-[10px] sm:text-xs uppercase tracking-wider" style={{ color: 'var(--accent)' }}>💰 Crédito líquido</p>
                   <p className="w-full font-bold leading-tight mt-3" style={{ color: 'var(--accent)', fontSize: fonteCard(fmtMoedaCard(creditoLiquido), 26) }}>{fmtMoedaCard(creditoLiquido)}</p>
                 </div>
-                <div className="rounded-2xl px-5 py-7 flex flex-col items-center text-center min-w-0 overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(212,175,55,0.25)' }}>
-                  <p className="w-full text-xs uppercase tracking-wider" style={{ color: 'var(--accent)' }}>💎 Lance embutido</p>
+                <div className="rounded-2xl px-3 py-5 sm:px-5 sm:py-7 flex flex-col items-center text-center min-w-0 overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(212,175,55,0.25)' }}>
+                  <p className="w-full text-[10px] sm:text-xs uppercase tracking-wider" style={{ color: 'var(--accent)' }}>💎 Lance embutido</p>
                   <p className="w-full font-bold leading-tight mt-3" style={{ color: 'var(--text)', fontSize: fonteCard(fmtMoedaCard(lanceNum), 26) }}>{fmtMoedaCard(lanceNum)}</p>
                   <p className="text-[11px] mt-1 text-pretty" style={{ color: 'var(--muted-color)' }}>sai do próprio crédito, sem desembolso</p>
                 </div>
-                <div className="rounded-2xl px-5 py-7 flex flex-col items-center text-center min-w-0 overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                  <p className="w-full text-xs uppercase tracking-wider" style={{ color: 'var(--muted-color)' }}>Parcelas de</p>
+                <div className="rounded-2xl px-3 py-5 sm:px-5 sm:py-7 flex flex-col items-center text-center min-w-0 overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <p className="w-full text-[10px] sm:text-xs uppercase tracking-wider" style={{ color: 'var(--muted-color)' }}>Parcelas de</p>
                   <p className="w-full font-bold leading-tight mt-3" style={{ color: 'var(--text)', fontSize: fonteCard(fmtMoedaCard(pdProposta), 26) }}>{fmtMoedaCard(pdProposta)}</p>
-                  <p className="text-sm mt-1" style={{ color: 'var(--muted-color)' }}>por mês</p>
+                  <p className="text-xs sm:text-sm mt-1" style={{ color: 'var(--muted-color)' }}>por mês</p>
                 </div>
-                <div className="relative rounded-2xl px-5 py-7 flex flex-col items-center text-center min-w-0 overflow-hidden" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.4)' }}>
-                  <button onClick={() => setEntradaVisivel(v => !v)} aria-label={entradaVisivel ? 'Ocultar entrada' : 'Mostrar entrada'} className="absolute top-3 right-3" style={{ color: 'var(--accent)' }}>{entradaVisivel ? <EyeOff size={16} /> : <Eye size={16} />}</button>
-                  <p className="w-full text-xs uppercase tracking-wider" style={{ color: 'var(--accent)' }}>Entrada total</p>
+                <div className="relative rounded-2xl px-3 py-5 sm:px-5 sm:py-7 flex flex-col items-center text-center min-w-0 overflow-hidden" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.4)' }}>
+                  <button onClick={() => setEntradaVisivel(v => !v)} aria-label={entradaVisivel ? 'Ocultar entrada' : 'Mostrar entrada'} className="absolute top-2 right-2 sm:top-3 sm:right-3" style={{ color: 'var(--accent)' }}>{entradaVisivel ? <><EyeOff size={14} className="sm:hidden" /><EyeOff size={16} className="hidden sm:block" /></> : <><Eye size={14} className="sm:hidden" /><Eye size={16} className="hidden sm:block" /></>}</button>
+                  <p className="w-full text-[10px] sm:text-xs uppercase tracking-wider" style={{ color: 'var(--accent)' }}>Entrada total</p>
                   <p className="w-full font-bold leading-tight mt-3 transition-opacity duration-300" style={{ color: 'var(--accent)', opacity: entradaVisivel ? 1 : 0.85, fontSize: fonteCard(entradaVisivel ? fmtMoedaCard(entradaProposta) : 'R$ ••••••', 26) }}>{entradaVisivel ? fmtMoedaCard(entradaProposta) : 'R$ ••••••'}</p>
                 </div>
               </div>
