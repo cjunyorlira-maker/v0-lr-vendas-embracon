@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { Calculator, CreditCard, Loader2, AlertTriangle, FileText, MonitorPlay, Trophy, RotateCcw } from 'lucide-react'
+import { Calculator, CreditCard, Loader2, AlertTriangle, FileText, MonitorPlay, Trophy, RotateCcw, ChevronDown } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 
 interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number; estorno_ate_pgto: number | null; categoria_comissao: string | null; seguro_pct?: number | null; tx_adm_topo?: number | null; cheia_incremento_pct?: number | null; prazo_meses?: number | null; reduzida_25_pct?: number | null; pl_demais_50_pct?: number | null; pl_demais_25_pct?: number | null; pl_demais_int_pct?: number | null; pl_p12_50_pct?: number | null; pl_p12_25_pct?: number | null; pl_p12_int_pct?: number | null }
@@ -203,20 +203,16 @@ const avisoEmbracon = (
 )
 
 // ══════════════════════════════════════════════════════════════
-// ABA SIMULADOR — 4 seções + barra de proposta sticky
+// Gerador de proposta em PDF — compartilhado pelas duas abas.
+// Recebe a instância de simulação + logo/nome da empresa.
 // ══════════════════════════════════════════════════════════════
-function SimuladorTab({ planos, empresaNome, logoBase64 }: { planos: Plano[]; empresaNome: string; logoBase64: string | null }) {
-  const s = useSimulacao(planos)
+function gerarPropostaPDF(s: Sim, logoBase64: string | null, empresaNome: string) {
   const {
-    faixa, qtd, planoAtual, prazoPlano, comSeguro, seguroPct, seguroMensal, verCheia, setVerCheia,
-    red25Pct, cheiaInc, demais25, primeira25, demaisCheia, primeiraCheia, p1, pd, ehParcelinha,
-    pdParc25, p1Parc25, pdParcCheia, p1ParcCheia, labelPorTipo, tipoParcela, tipoAntecipacao,
-    p1PropostaSemSeg, pdPropostaSemSeg, entradaProposta, entradaPropostaSemSeg, nParcelasEntrada,
-    valorAntecipadas, totalCliente, limiteEstorno, totalNaoEstornar, lanceNum, prazoRestante, creditoLiquido,
-    nomeAmigavel, nomeCliente, setNomeCliente, lanceEmbutido, setLanceEmbutido, pdProposta,
+    faixa, planoAtual, nomeCliente, lanceNum, creditoLiquido, prazoRestante, prazoPlano,
+    p1PropostaSemSeg, pdPropostaSemSeg, entradaPropostaSemSeg, nParcelasEntrada, ehParcelinha,
+    labelPorTipo, tipoParcela,
   } = s
-
-  const gerarPDF = () => {
+  {
     if (!faixa || !planoAtual) return
     const doc = new jsPDF()
     doc.setLanguage('pt-BR')
@@ -345,6 +341,22 @@ function SimuladorTab({ planos, empresaNome, logoBase64 }: { planos: Plano[]; em
 
     doc.save('Proposta_' + (nomeCliente || 'cliente').replace(/\s+/g, '_') + '.pdf')
   }
+}
+
+// ══════════════════════════════════════════════════════════════
+// ABA SIMULADOR — 4 seções + barra de proposta sticky
+// ══════════════════════════════════════════════════════════════
+function SimuladorTab({ planos, empresaNome, logoBase64 }: { planos: Plano[]; empresaNome: string; logoBase64: string | null }) {
+  const s = useSimulacao(planos)
+  const {
+    faixa, qtd, planoAtual, prazoPlano, comSeguro, seguroPct, seguroMensal, verCheia, setVerCheia,
+    red25Pct, cheiaInc, demais25, primeira25, demaisCheia, primeiraCheia, p1, pd, ehParcelinha,
+    pdParc25, p1Parc25, pdParcCheia, p1ParcCheia, labelPorTipo, tipoParcela, tipoAntecipacao,
+    entradaProposta, valorAntecipadas, totalCliente, limiteEstorno, totalNaoEstornar, lanceNum, prazoRestante, creditoLiquido,
+    nomeAmigavel, nomeCliente, setNomeCliente, lanceEmbutido, setLanceEmbutido, pdProposta,
+  } = s
+
+  const gerarPDF = () => gerarPropostaPDF(s, logoBase64, empresaNome)
 
   return (
     <div className="space-y-5 pb-40">
@@ -478,46 +490,134 @@ function SimuladorTab({ planos, empresaNome, logoBase64 }: { planos: Plano[]; em
 // ══════════════════════════════════════════════════════════════
 // ABA ATENDIMENTO — estado próprio + apresentação pro cliente
 // ══════════════════════════════════════════════════════════════
-function AtendimentoTab({ planos, empresaNome, empresaLogo }: { planos: Plano[]; empresaNome: string; empresaLogo: string | null }) {
+function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64 }: { planos: Plano[]; empresaNome: string; empresaLogo: string | null; logoBase64: string | null }) {
   const s = useSimulacao(planos)
-  const { faixa, qtd, comSeguro, lanceNum, creditoLiquido, ehParcelinha, p1Proposta, pdProposta, entradaProposta, nParcelasEntrada, prazoRestante, nomeAmigavel } = s
+  const { faixa, qtd, planoAtual, lanceNum, creditoLiquido, ehParcelinha, p1Proposta, pdProposta, entradaProposta, prazoRestante, nomeAmigavel, red25Pct, cheiaInc, labelPorTipo, tipoParcela } = s
+
+  // 💎 lance embutido via dropdown: sem lance · 10/15/20/25% do crédito · valor livre
+  const [lanceModo, setLanceModo] = useState<'none' | '10' | '15' | '20' | '25' | 'livre'>('none')
+  useEffect(() => {
+    if (lanceModo === 'none') { if (s.lanceEmbutido) s.setLanceEmbutido(''); return }
+    if (lanceModo === 'livre') return
+    if (faixa) s.setLanceEmbutido(formatarMoeda(String(Math.round(faixa.credito * (parseInt(lanceModo) / 100)))))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lanceModo, faixa?.credito])
+
+  const limparTudo = () => { s.limpar(); setLanceModo('none') }
+
+  // 🏆 grupo em destaque desta faixa (expande e busca sob demanda)
+  const [expDestaque, setExpDestaque] = useState(false)
+  const [destaque, setDestaque] = useState<any>(null)
+  const [loadingDest, setLoadingDest] = useState(false)
+  const [extLoading, setExtLoading] = useState(false)
+  useEffect(() => { setDestaque(null); setExpDestaque(false) }, [faixa?.credito, planoAtual?.bem])
+
+  const carregarDestaque = async () => {
+    if (!faixa || !planoAtual) return
+    setLoadingDest(true)
+    try {
+      const r = await fetch(`/api/simulador/grupo-destaque?bem=${encodeURIComponent(planoAtual.bem)}&credito=${faixa.credito}`)
+      setDestaque(await r.json())
+    } catch { setDestaque({ encontrado: false }) }
+    setLoadingDest(false)
+  }
+  const toggleDestaque = () => {
+    const abrir = !expDestaque
+    setExpDestaque(abrir)
+    if (abrir && !destaque && !loadingDest) carregarDestaque()
+  }
+  const abrirExtrato = async () => {
+    if (!destaque?.grupo) return
+    setExtLoading(true)
+    try {
+      const r = await fetch(`/api/assembleias/extrato/download?grupo=${encodeURIComponent(destaque.grupo)}`)
+      const d = await r.json()
+      if (d.url) window.open(d.url, '_blank')
+    } catch {}
+    setExtLoading(false)
+  }
+  const fmtData = (iso: string | null) => iso ? new Date(iso + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
+
+  // opções de tipo de parcela disponíveis para este plano
+  const tiposParcela: { v: 'red50' | 'red25' | 'cheia'; label: string }[] = [{ v: 'red50', label: '50%' }]
+  if (red25Pct > 0 || ehParcelinha) tiposParcela.push({ v: 'red25', label: '25%' })
+  if (cheiaInc > 0 || ehParcelinha) tiposParcela.push({ v: 'cheia', label: 'Cheia' })
+
+  const pillWrap = { background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)' } as const
+  const pillSelect = 'bg-transparent text-sm font-medium outline-none cursor-pointer'
 
   return (
     <div className="space-y-5">
-      {/* Painel de montagem compacto (estado independente desta aba) */}
-      <div className="rounded-xl p-5" style={cardStyle}>
-        <SecaoTitulo n="🎬" extra={
-          <button onClick={s.limpar} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--muted-color)' }}>
+      {/* Controles: linha única de pills discretas (ordem de preenchimento livre) */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* categoria */}
+        <div className="flex items-center gap-1.5 rounded-full pl-3 pr-2.5 py-1.5" style={pillWrap}>
+          <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted-color)' }}>Tipo</span>
+          <select value={s.categoria} onChange={(e) => { s.setCategoria(e.target.value); s.setPlanoSigla(''); s.setFaixas([]) }} className={pillSelect} style={{ color: 'var(--text)' }}>
+            <option value="" style={{ background: '#131313' }}>selecione</option>
+            {Object.entries(CATEGORIAS).map(([k, v]) => <option key={k} value={k} style={{ background: '#131313' }}>{v.label}</option>)}
+          </select>
+        </div>
+        {/* plano — só nome amigável, nunca sigla */}
+        <div className="flex items-center gap-1.5 rounded-full pl-3 pr-2.5 py-1.5" style={pillWrap}>
+          <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted-color)' }}>Plano</span>
+          <select value={s.planoSigla} onChange={(e) => s.setPlanoSigla(e.target.value)} disabled={!s.planosDaCategoria.length} className={`${pillSelect} disabled:opacity-40`} style={{ color: 'var(--text)' }}>
+            <option value="" style={{ background: '#131313' }}>selecione</option>
+            {s.planosDaCategoria.map(p => <option key={p.id} value={p.sigla} style={{ background: '#131313' }}>{p.nome_completo}</option>)}
+          </select>
+        </div>
+        {/* crédito */}
+        <div className="flex items-center gap-1.5 rounded-full pl-3 pr-2.5 py-1.5" style={pillWrap}>
+          <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted-color)' }}>Crédito</span>
+          <select value={s.creditoSel} onChange={(e) => s.setCreditoSel(e.target.value)} disabled={!s.faixas.length} className={`${pillSelect} disabled:opacity-40`} style={{ color: 'var(--text)' }}>
+            <option value="" style={{ background: '#131313' }}>selecione</option>
+            {s.faixas.map(f => <option key={f.credito} value={String(f.credito)} style={{ background: '#131313' }}>{fmtMoeda(f.credito)}</option>)}
+          </select>
+        </div>
+        {/* tipo de parcela */}
+        {faixa && tiposParcela.length > 1 && (
+          <div className="flex items-center gap-1.5 rounded-full pl-3 pr-2.5 py-1.5" style={pillWrap}>
+            <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted-color)' }}>Parcela</span>
+            <select value={tipoParcela} onChange={(e) => s.setTipoParcela(e.target.value as any)} className={pillSelect} style={{ color: 'var(--accent)' }}>
+              {tiposParcela.map(t => <option key={t.v} value={t.v} style={{ background: '#131313' }}>{t.label}</option>)}
+            </select>
+          </div>
+        )}
+        {/* antecipar 0-12 */}
+        {faixa && (
+          <div className="flex items-center gap-1.5 rounded-full pl-3 pr-2.5 py-1.5" style={pillWrap}>
+            <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted-color)' }}>Antecipar</span>
+            <select value={s.qtdAntecipar} onChange={(e) => s.setQtdAntecipar(e.target.value)} className={pillSelect} style={{ color: 'var(--text)' }}>
+              {Array.from({ length: 13 }, (_, i) => <option key={i} value={String(i)} style={{ background: '#131313' }}>{i}</option>)}
+            </select>
+          </div>
+        )}
+        {/* 💎 lance embutido */}
+        {faixa && (
+          <div className="flex items-center gap-1.5 rounded-full pl-3 pr-2.5 py-1.5" style={{ background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.35)' }}>
+            <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--accent)' }}>💎 Lance</span>
+            <select value={lanceModo} onChange={(e) => setLanceModo(e.target.value as any)} className={pillSelect} style={{ color: 'var(--accent)' }}>
+              <option value="none" style={{ background: '#131313' }}>sem lance</option>
+              <option value="10" style={{ background: '#131313' }}>10%</option>
+              <option value="15" style={{ background: '#131313' }}>15%</option>
+              <option value="20" style={{ background: '#131313' }}>20%</option>
+              <option value="25" style={{ background: '#131313' }}>25%</option>
+              <option value="livre" style={{ background: '#131313' }}>valor livre</option>
+            </select>
+            {lanceModo === 'livre' && (
+              <div className="flex items-center gap-1 ml-1">
+                <span className="text-xs" style={{ color: 'var(--muted-color)' }}>R$</span>
+                <input value={s.lanceEmbutido} onChange={e => s.setLanceEmbutido(formatarMoeda(e.target.value))} placeholder="0" inputMode="numeric" className="w-24 bg-transparent text-sm font-medium outline-none" style={{ color: 'var(--accent)' }} />
+              </div>
+            )}
+          </div>
+        )}
+        {/* limpar */}
+        {(s.categoria || faixa) && (
+          <button onClick={limparTudo} className="flex items-center gap-1 rounded-full px-3 py-1.5 text-[11px] font-medium" style={{ background: 'transparent', border: '1px solid var(--border)', color: 'var(--muted-color)' }}>
             <RotateCcw size={12} />Limpar
           </button>
-        }>Configurar apresentação</SecaoTitulo>
-        <div className="space-y-3">
-          <GridMontagem s={s} />
-          {faixa && (
-            <>
-              <SeletoresTipoParcela s={s} />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Parcelas a antecipar</label>
-                  <input type="number" min="0" value={s.qtdAntecipar} onChange={(e) => s.setQtdAntecipar(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
-                </div>
-                <div>
-                  <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Lance embutido (opcional)</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--muted-color)' }}>R$</span>
-                    <input value={s.lanceEmbutido} onChange={e => s.setLanceEmbutido(formatarMoeda(e.target.value))} placeholder="0" inputMode="numeric" className="w-full rounded-lg pl-9 pr-3 py-2 text-sm outline-none" style={inputStyle} />
-                  </div>
-                </div>
-              </div>
-              {s.seguroPct > 0 && (
-                <div className="flex items-center gap-2">
-                  <button onClick={() => s.setComSeguro(false)} className="flex-1 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: !comSeguro ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.05)', border: `1px solid ${!comSeguro ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.12)'}`, color: !comSeguro ? 'var(--accent)' : 'var(--muted-color)' }}>Sem seguro</button>
-                  <button onClick={() => s.setComSeguro(true)} className="flex-1 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: comSeguro ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.05)', border: `1px solid ${comSeguro ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.12)'}`, color: comSeguro ? 'var(--accent)' : 'var(--muted-color)' }}>Com seguro</button>
-                </div>
-              )}
-            </>
-          )}
-        </div>
+        )}
       </div>
 
       {/* Tela de apresentação (virada pro cliente) */}
@@ -538,45 +638,108 @@ function AtendimentoTab({ planos, empresaNome, empresaLogo }: { planos: Plano[];
             </div>
 
             <div className="text-center mb-2">
-              <p className="text-sm uppercase tracking-widest" style={{ color: 'var(--muted-color)' }}>Seu crédito</p>
+              <p className="text-sm uppercase tracking-widest" style={{ color: 'var(--muted-color)' }}>Seu crédito de</p>
               <p className="font-bold leading-none mt-2" style={{ color: 'var(--accent)', fontSize: 'clamp(48px, 9vw, 84px)' }}>{fmtMoeda(faixa.credito)}</p>
-              <p className="text-base mt-3" style={{ color: 'var(--text)' }}>{nomeAmigavel}</p>
+              <p className="text-base mt-3" style={{ color: 'var(--text)' }}>{planoAtual?.bem} · {nomeAmigavel}</p>
             </div>
 
-            {lanceNum > 0 && (
-              <div className="mx-auto max-w-md mt-6 rounded-2xl px-6 py-4 text-center" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.4)' }}>
-                <p className="text-xs uppercase tracking-wider" style={{ color: 'var(--muted-color)' }}>Crédito líquido (após lance embutido)</p>
-                <p className="text-3xl font-bold mt-1" style={{ color: 'var(--accent)' }}>{fmtMoeda(creditoLiquido)}</p>
+            {lanceNum <= 0 ? (
+              /* SEM lance: 3 cards */
+              <div className="grid gap-4 mt-8 sm:grid-cols-3">
+                <div className="rounded-2xl px-6 py-7 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--muted-color)' }}>{ehParcelinha ? 'Parcela (1ª à 12ª)' : 'Primeira parcela'}</p>
+                  <p className="text-3xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(p1Proposta)}</p>
+                </div>
+                <div className="rounded-2xl px-6 py-7 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--muted-color)' }}>Demais parcelas</p>
+                  <p className="text-3xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(pdProposta)}</p>
+                  <p className="text-[11px] mt-1" style={{ color: 'var(--muted-color)' }}>por mês</p>
+                </div>
+                <div className="rounded-2xl px-6 py-7 text-center" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.4)' }}>
+                  <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--accent)' }}>Primeiro pagamento total</p>
+                  <p className="text-3xl font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(entradaProposta)}</p>
+                </div>
+              </div>
+            ) : (
+              /* COM lance embutido: 4 cards */
+              <div className="grid gap-4 mt-8 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="rounded-2xl px-6 py-7 text-center" style={{ background: 'rgba(212,175,55,0.16)', border: '1px solid rgba(212,175,55,0.5)' }}>
+                  <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--accent)' }}>💰 Crédito líquido</p>
+                  <p className="text-4xl font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(creditoLiquido)}</p>
+                </div>
+                <div className="rounded-2xl px-6 py-7 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(212,175,55,0.25)' }}>
+                  <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--accent)' }}>💎 Lance embutido</p>
+                  <p className="text-2xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(lanceNum)}</p>
+                  <p className="text-[11px] mt-1 text-pretty" style={{ color: 'var(--muted-color)' }}>sai do próprio crédito, sem desembolso</p>
+                </div>
+                <div className="rounded-2xl px-6 py-7 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--muted-color)' }}>{ehParcelinha ? '1ª à 12ª · demais' : '1ª · demais'}</p>
+                  <p className="text-2xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(p1Proposta)}</p>
+                  <p className="text-sm mt-1" style={{ color: 'var(--muted-color)' }}>depois {fmtMoeda(pdProposta)}/mês</p>
+                </div>
+                <div className="rounded-2xl px-6 py-7 text-center" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.4)' }}>
+                  <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--accent)' }}>Primeiro pagamento total</p>
+                  <p className="text-2xl font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(entradaProposta)}</p>
+                </div>
               </div>
             )}
 
-            <div className={`grid gap-4 mt-8 ${qtd > 0 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
-              <div className="rounded-2xl px-6 py-7 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--muted-color)' }}>{ehParcelinha ? 'Parcela (1ª à 12ª)' : 'Primeira parcela'}</p>
-                <p className="text-3xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(p1Proposta)}</p>
-              </div>
-              <div className="rounded-2xl px-6 py-7 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--muted-color)' }}>Demais parcelas</p>
-                <p className="text-3xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(pdProposta)}</p>
-              </div>
-              {qtd > 0 && (
-                <div className="rounded-2xl px-6 py-7 text-center" style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.35)' }}>
-                  <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--muted-color)' }}>Entrada ({nParcelasEntrada} parcelas)</p>
-                  <p className="text-3xl font-bold" style={{ color: '#60a5fa' }}>{fmtMoeda(entradaProposta)}</p>
+            {/* Frase da venda */}
+            <p className="text-center text-base mt-8 text-pretty" style={{ color: 'var(--text)' }}>
+              Primeiro pagamento total de <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(entradaProposta)}</span> e parcelas de <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(pdProposta)}</span> para conquistar <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(faixa.credito)}</span>
+            </p>
+            <p className="text-center text-xs mt-2" style={{ color: 'var(--muted-color)' }}>Prazo de {prazoRestante} meses</p>
+
+            {/* 🏆 Grupo em destaque desta faixa */}
+            <div className="mt-8 mx-auto max-w-xl">
+              <button onClick={toggleDestaque} className="w-full flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.3)', color: 'var(--accent)' }}>
+                <Trophy size={16} />Grupo em destaque desta faixa
+                <ChevronDown size={16} className="transition-transform" style={{ transform: expDestaque ? 'rotate(180deg)' : 'none' }} />
+              </button>
+              {expDestaque && (
+                <div className="mt-3 rounded-2xl p-5 text-left" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(212,175,55,0.25)' }}>
+                  {loadingDest ? (
+                    <div className="flex items-center justify-center py-4"><Loader2 size={18} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
+                  ) : !destaque?.encontrado ? (
+                    <p className="text-sm text-center" style={{ color: 'var(--muted-color)' }}>Nenhum grupo mapeado para esta faixa no momento.</p>
+                  ) : (
+                    <>
+                      <p className="text-lg font-bold" style={{ color: 'var(--accent)' }}>GRUPO {destaque.grupo} · {destaque.bem} · {destaque.faixa_credito}</p>
+                      {destaque.ultima_assembleia ? (
+                        <p className="text-sm mt-2" style={{ color: 'var(--text)' }}>
+                          Última assembleia ({destaque.ultima_assembleia.label}): <span className="font-semibold">{destaque.ultima_assembleia.total_contemplados} contemplações</span> (🎲 {destaque.ultima_assembleia.sorteio} sorteio · 💎 {destaque.ultima_assembleia.lance} lance)
+                        </p>
+                      ) : (
+                        <p className="text-sm mt-2" style={{ color: 'var(--muted-color)' }}>Sem histórico de assembleia registrado para este grupo.</p>
+                      )}
+                      <p className="text-sm mt-1" style={{ color: 'var(--text)' }}>Próxima assembleia: <span className="font-semibold">{fmtData(destaque.proxima_assembleia)}</span></p>
+                      {destaque.tem_extrato && (
+                        <button onClick={abrirExtrato} disabled={extLoading} className="mt-3 flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold" style={{ background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.4)', color: 'var(--accent)' }}>
+                          {extLoading ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}Ver extrato completo do grupo
+                        </button>
+                      )}
+                      <div className="flex items-start gap-2 rounded-lg p-3 mt-3" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                        <AlertTriangle size={14} style={{ color: '#f59e0b', marginTop: 1 }} />
+                        <p className="text-xs" style={{ color: '#f59e0b' }}>Grupo sujeito a disponibilidade — a adesão pode ocorrer em grupo similar da mesma faixa.</p>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
-            </div>
-
-            <p className="text-center text-xs mt-8" style={{ color: 'var(--muted-color)' }}>Prazo de {prazoRestante} meses{comSeguro ? ' · seguro incluído' : ''}</p>
-
-            <div className="flex justify-center mt-6">
-              <button disabled title="Em breve" className="flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold opacity-40 cursor-not-allowed" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.3)', color: 'var(--accent)' }}>
-                <Trophy size={16} />Grupo em destaque desta faixa
-              </button>
             </div>
           </div>
         )}
       </div>
+
+      {/* Fechamento: cliente + gerar proposta (mesmo gerador de PDF) */}
+      {faixa && (
+        <div className="rounded-xl p-3 flex flex-col sm:flex-row sm:items-center gap-3" style={{ background: 'rgba(17,18,22,0.95)', border: '1px solid rgba(212,175,55,0.25)' }}>
+          <input value={s.nomeCliente} onChange={e => s.setNomeCliente(e.target.value)} placeholder="Nome do cliente" className="flex-1 min-w-0 rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
+          <button onClick={() => gerarPropostaPDF(s, logoBase64, empresaNome)} className="rounded-lg px-4 py-2.5 text-sm font-semibold whitespace-nowrap flex items-center justify-center gap-2" style={{ background: 'linear-gradient(135deg, #d4af37, #b8941f)', border: '1px solid rgba(212,175,55,0.6)', color: '#0a0a0a', boxShadow: '0 8px 24px rgba(212,175,55,0.25)' }}>
+            <FileText size={15} />Gerar Proposta
+          </button>
+        </div>
+      )}
     </div>
   )
 }
@@ -654,7 +817,7 @@ export default function SimuladorPage() {
                 <SimuladorTab planos={planos} empresaNome={empresaNome} logoBase64={logoBase64} />
               </div>
               <div className={modo === 'atendimento' ? '' : 'hidden'}>
-                <AtendimentoTab planos={planos} empresaNome={empresaNome} empresaLogo={empresaLogo} />
+                <AtendimentoTab planos={planos} empresaNome={empresaNome} empresaLogo={empresaLogo} logoBase64={logoBase64} />
               </div>
             </>
           )}
