@@ -100,6 +100,21 @@ export async function POST(req: Request) {
       .map(l => { const m = l.match(/(\d{4}-\d{2})\s+(Sorteio|Lance Fixo|2o Lance Fixo|Lance Livre)/); return m ? { cota: m[1], modalidade: m[2] } : null })
       .filter((x): x is { cota: string; modalidade: string } => x != null && x.cota !== '0000-00')
 
+    // ── guarda o PDF do RESULTADO no storage (bucket resultados-assembleia) ──
+    // garante o bucket (idempotente: ignora erro se já existir)
+    await supabaseAdmin.storage.createBucket('resultados-assembleia', { public: false }).catch(() => {})
+    const nomeArquivo = (file.name || `resultado-${grupo}.pdf`).replace(/[^a-zA-Z0-9.\-]/g, '_')
+    const arquivoPath = `${grupo}/${(mesRef || 'sem-mes')}-${nomeArquivo}`
+    // remove versão anterior deste grupo+mês (se houver) e sobe a nova
+    const { data: antRes } = await supabaseAdmin.from('assembleias_historico')
+      .select('arquivo_path').eq('grupo', grupo).eq('mes_referencia', mesRef).maybeSingle()
+    if (antRes?.arquivo_path && antRes.arquivo_path !== arquivoPath) {
+      await supabaseAdmin.storage.from('resultados-assembleia').remove([antRes.arquivo_path])
+    }
+    const { error: upResErr } = await supabaseAdmin.storage
+      .from('resultados-assembleia').upload(arquivoPath, buffer, { contentType: 'application/pdf', upsert: true })
+    if (upResErr) return NextResponse.json({ error: 'Erro ao guardar o resultado: ' + upResErr.message }, { status: 500 })
+
     // salva no histórico (upsert por grupo+mês)
     const bem = await supabaseAdmin.from('assembleias_grupos_info').select('bem').eq('grupo', grupo).single().then(r => r.data?.bem || null)
     const { error: errHist } = await supabaseAdmin.from('assembleias_historico').upsert({
@@ -107,6 +122,7 @@ export async function POST(req: Request) {
       sorteio_qt: sorteioQt, lance_livre_qt: livreQt, lance_livre_maior: livreMaior, lance_livre_menor: livreMenor,
       lance_fixo_50_qt: fixo50Qt, lance_fixo_25_qt: fixo25Qt, total_contemplados: totalContemplados,
       prazo_inicial: prazoInicial, prazo_restante: prazoRestante,
+      arquivo_path: arquivoPath, arquivo_nome: file.name || nomeArquivo,
     }, { onConflict: 'grupo,mes_referencia' })
     if (errHist) return NextResponse.json({ error: 'Erro ao salvar histórico: ' + errHist.message }, { status: 500 })
 

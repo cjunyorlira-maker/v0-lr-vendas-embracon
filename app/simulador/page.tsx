@@ -11,6 +11,23 @@ interface Plano { id: string; sigla: string; nome_completo: string; bem: string;
 interface FaixaCredito { credito: number; primeira_parcela: number; demais_parcela: number; total_nao_estornar: number }
 
 const fmtMoeda = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+// versão compacta para caber nos cards do palco: >= 1 milhão vira "R$ 1,2M"
+const fmtMoedaCard = (v: number) => {
+  const n = v || 0
+  if (Math.abs(n) >= 1_000_000) {
+    const m = n / 1_000_000
+    const s = m.toLocaleString('pt-BR', { minimumFractionDigits: m % 1 === 0 ? 0 : 1, maximumFractionDigits: 1 })
+    return `R$ ${s}M`
+  }
+  return fmtMoeda(n)
+}
+// fonte adaptativa por comprimento da string: <=10 chars 34px · 11-13 28px · 14+ 24px
+const fonteCard = (s: string, base = 34) => {
+  const len = s.length
+  if (len <= 10) return base
+  if (len <= 13) return Math.min(base, 28)
+  return Math.min(base, 24)
+}
 
 // categorias agrupadas
 const CATEGORIAS: Record<string, { label: string; siglas: string[] }> = {
@@ -355,6 +372,7 @@ function GrupoDestaque({ bem, credito, variant }: { bem?: string; credito?: numb
   const [destaque, setDestaque] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [extLoading, setExtLoading] = useState(false)
+  const [resLoading, setResLoading] = useState(false)
   const [expandido, setExpandido] = useState(false)
   const podeCarregar = !!bem && !!credito
 
@@ -391,6 +409,16 @@ function GrupoDestaque({ bem, credito, variant }: { bem?: string; credito?: numb
     } catch {}
     setExtLoading(false)
   }
+  const abrirResultado = async () => {
+    if (!destaque?.grupo) return
+    setResLoading(true)
+    try {
+      const r = await fetch(`/api/assembleias/resultado/download?grupo=${encodeURIComponent(destaque.grupo)}`)
+      const d = await r.json()
+      if (d.url) window.open(d.url, '_blank')
+    } catch {}
+    setResLoading(false)
+  }
   const fmtData = (iso: string | null) => iso ? new Date(iso + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
 
   const corpo = loading ? (
@@ -415,10 +443,19 @@ function GrupoDestaque({ bem, credito, variant }: { bem?: string; credito?: numb
         <p className="text-sm mt-2" style={{ color: 'var(--muted-color)' }}>Sem histórico de assembleia registrado para este grupo.</p>
       )}
       <p className="text-sm mt-1" style={{ color: 'var(--text)' }}>Próxima assembleia: <span className="font-semibold">{fmtData(destaque.proxima_assembleia)}</span></p>
-      {destaque.tem_extrato && (
-        <button onClick={abrirExtrato} disabled={extLoading} className="mt-3 flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold" style={{ background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.4)', color: 'var(--accent)' }}>
-          {extLoading ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}📊 Ver último resultado
-        </button>
+      {(destaque.tem_resultado || destaque.tem_extrato) && (
+        <div className="flex flex-wrap gap-2 mt-3">
+          {destaque.tem_resultado && (
+            <button onClick={abrirResultado} disabled={resLoading} className="flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold" style={{ background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.4)', color: 'var(--accent)' }}>
+              {resLoading ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}📊 Ver último resultado
+            </button>
+          )}
+          {destaque.tem_extrato && (
+            <button onClick={abrirExtrato} disabled={extLoading} className="flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+              {extLoading ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}📄 Ver extrato do grupo
+            </button>
+          )}
+        </div>
       )}
       <div className="flex items-start gap-2 rounded-lg p-3 mt-3" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
         <AlertTriangle size={14} style={{ color: '#f59e0b', marginTop: 1 }} />
@@ -783,15 +820,15 @@ function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, o
             {lanceNum <= 0 ? (
               /* SEM lance: 2 cards grandes */
               <div className="grid gap-4 mt-8 sm:grid-cols-2 max-w-3xl mx-auto">
-                <div className="rounded-2xl px-6 py-9 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <div className="rounded-2xl px-6 py-9 text-center min-w-0 overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
                   <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--muted-color)' }}>Parcelas de</p>
-                  <p className="text-4xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(pdProposta)}</p>
+                  <p className="font-bold leading-tight" style={{ color: 'var(--text)', fontSize: fonteCard(fmtMoedaCard(pdProposta)) }}>{fmtMoedaCard(pdProposta)}</p>
                   <p className="text-sm mt-1" style={{ color: 'var(--muted-color)' }}>por mês</p>
                 </div>
-                <div className="rounded-2xl px-6 py-9 text-center" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.4)' }}>
+                <div className="rounded-2xl px-6 py-9 text-center min-w-0 overflow-hidden" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.4)' }}>
                   <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--accent)' }}>Entrada total</p>
-                  <div className="flex items-center justify-center gap-2">
-                    <p className="text-4xl font-bold transition-opacity duration-300" style={{ color: 'var(--accent)', opacity: entradaVisivel ? 1 : 0.85 }}>{entradaVisivel ? fmtMoeda(entradaProposta) : 'R$ ••••••'}</p>
+                  <div className="flex items-center justify-center gap-2 min-w-0">
+                    <p className="font-bold leading-tight transition-opacity duration-300 truncate" style={{ color: 'var(--accent)', opacity: entradaVisivel ? 1 : 0.85, fontSize: fonteCard(entradaVisivel ? fmtMoedaCard(entradaProposta) : 'R$ ••••••') }}>{entradaVisivel ? fmtMoedaCard(entradaProposta) : 'R$ ••••••'}</p>
                     <button onClick={() => setEntradaVisivel(v => !v)} aria-label={entradaVisivel ? 'Ocultar entrada' : 'Mostrar entrada'} className="shrink-0" style={{ color: 'var(--accent)' }}>{entradaVisivel ? <EyeOff size={20} /> : <Eye size={20} />}</button>
                   </div>
                 </div>
@@ -799,25 +836,25 @@ function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, o
             ) : (
               /* COM lance embutido: 4 cards */
               <div className="grid gap-4 mt-8 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-2xl px-6 py-7 text-center" style={{ background: 'rgba(212,175,55,0.16)', border: '1px solid rgba(212,175,55,0.5)' }}>
+                <div className="rounded-2xl px-5 py-7 text-center min-w-0 overflow-hidden" style={{ background: 'rgba(212,175,55,0.16)', border: '1px solid rgba(212,175,55,0.5)' }}>
                   <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--accent)' }}>💰 Crédito líquido</p>
-                  <p className="text-4xl font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(creditoLiquido)}</p>
+                  <p className="font-bold leading-tight" style={{ color: 'var(--accent)', fontSize: fonteCard(fmtMoedaCard(creditoLiquido)) }}>{fmtMoedaCard(creditoLiquido)}</p>
                 </div>
-                <div className="rounded-2xl px-6 py-7 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(212,175,55,0.25)' }}>
+                <div className="rounded-2xl px-5 py-7 text-center min-w-0 overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(212,175,55,0.25)' }}>
                   <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--accent)' }}>💎 Lance embutido</p>
-                  <p className="text-2xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(lanceNum)}</p>
+                  <p className="font-bold leading-tight" style={{ color: 'var(--text)', fontSize: fonteCard(fmtMoedaCard(lanceNum), 24) }}>{fmtMoedaCard(lanceNum)}</p>
                   <p className="text-[11px] mt-1 text-pretty" style={{ color: 'var(--muted-color)' }}>sai do próprio crédito, sem desembolso</p>
                 </div>
-                <div className="rounded-2xl px-6 py-7 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <div className="rounded-2xl px-5 py-7 text-center min-w-0 overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
                   <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--muted-color)' }}>Parcelas de</p>
-                  <p className="text-2xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(pdProposta)}</p>
+                  <p className="font-bold leading-tight" style={{ color: 'var(--text)', fontSize: fonteCard(fmtMoedaCard(pdProposta), 24) }}>{fmtMoedaCard(pdProposta)}</p>
                   <p className="text-sm mt-1" style={{ color: 'var(--muted-color)' }}>por mês</p>
                 </div>
-                <div className="rounded-2xl px-6 py-7 text-center" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.4)' }}>
+                <div className="rounded-2xl px-5 py-7 text-center min-w-0 overflow-hidden" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.4)' }}>
                   <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--accent)' }}>Entrada total</p>
-                  <div className="flex items-center justify-center gap-2">
-                    <p className="text-2xl font-bold transition-opacity duration-300" style={{ color: 'var(--accent)', opacity: entradaVisivel ? 1 : 0.85 }}>{entradaVisivel ? fmtMoeda(entradaProposta) : 'R$ ••••••'}</p>
-                    <button onClick={() => setEntradaVisivel(v => !v)} aria-label={entradaVisivel ? 'Ocultar entrada' : 'Mostrar entrada'} className="shrink-0" style={{ color: 'var(--accent)' }}>{entradaVisivel ? <EyeOff size={18} /> : <Eye size={18} />}</button>
+                  <div className="flex items-center justify-center gap-1.5 min-w-0">
+                    <p className="font-bold leading-tight transition-opacity duration-300" style={{ color: 'var(--accent)', opacity: entradaVisivel ? 1 : 0.85, fontSize: fonteCard(entradaVisivel ? fmtMoedaCard(entradaProposta) : 'R$ ••••••', 20) }}>{entradaVisivel ? fmtMoedaCard(entradaProposta) : 'R$ ••••••'}</p>
+                    <button onClick={() => setEntradaVisivel(v => !v)} aria-label={entradaVisivel ? 'Ocultar entrada' : 'Mostrar entrada'} className="shrink-0" style={{ color: 'var(--accent)' }}>{entradaVisivel ? <EyeOff size={16} /> : <Eye size={16} />}</button>
                   </div>
                 </div>
               </div>
@@ -827,7 +864,9 @@ function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, o
             <p className="text-center text-base mt-8 text-pretty" style={{ color: 'var(--text)' }}>
               {lanceNum > 0
                 ? <>Com <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(lanceNum)}</span> de lance embutido, você conquista <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(faixa.credito)}</span> e recebe <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(creditoLiquido)}</span> líquidos</>
-                : <>Entrada total de <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(entradaProposta)}</span> e parcelas de <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(pdProposta)}</span> para conquistar <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(faixa.credito)}</span></>}
+                : entradaVisivel
+                  ? <>Entrada total de <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(entradaProposta)}</span> e parcelas de <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(pdProposta)}</span> para conquistar <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(faixa.credito)}</span></>
+                  : <>Parcelas de <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(pdProposta)}</span> para conquistar <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(faixa.credito)}</span></>}
             </p>
             <p className="text-center text-xs mt-2" style={{ color: 'var(--muted-color)' }}>Prazo de {prazoRestante} meses</p>
 

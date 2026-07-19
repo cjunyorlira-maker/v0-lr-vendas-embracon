@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
     // 2) resultado de assembleia mais recente de cada candidato (por mes_referencia desc)
     const { data: hist } = await supabaseAdmin
       .from('assembleias_historico')
-      .select('grupo, mes_referencia, mes_label, numero_assembleia, sorteio_qt, lance_livre_qt, lance_fixo_50_qt, lance_fixo_25_qt, lance_livre_menor, total_contemplados')
+      .select('grupo, mes_referencia, mes_label, numero_assembleia, sorteio_qt, lance_livre_qt, lance_fixo_50_qt, lance_fixo_25_qt, lance_livre_menor, total_contemplados, arquivo_path')
       .in('grupo', gruposIds)
       .order('mes_referencia', { ascending: false })
 
@@ -90,6 +90,7 @@ export async function GET(req: NextRequest) {
       } : null,
       proxima_assembleia: escolhido.proxima_assembleia || null,
       tem_extrato: !!ext?.arquivo_path,
+      tem_resultado: !!ultima?.arquivo_path,
     })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
