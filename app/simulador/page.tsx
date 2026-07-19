@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { Calculator, CreditCard, Loader2, AlertTriangle } from 'lucide-react'
+import { Calculator, CreditCard, Loader2, AlertTriangle, FileText, MonitorPlay, Trophy } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 
 interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number; estorno_ate_pgto: number | null; categoria_comissao: string | null; seguro_pct?: number | null; tx_adm_topo?: number | null; cheia_incremento_pct?: number | null; prazo_meses?: number | null; reduzida_25_pct?: number | null; pl_demais_50_pct?: number | null; pl_demais_25_pct?: number | null; pl_demais_int_pct?: number | null; pl_p12_50_pct?: number | null; pl_p12_25_pct?: number | null; pl_p12_int_pct?: number | null }
@@ -25,6 +25,7 @@ const CATEGORIAS: Record<string, { label: string; siglas: string[] }> = {
 export default function SimuladorPage() {
   const [planos, setPlanos] = useState<Plano[]>([])
   const [loading, setLoading] = useState(true)
+  const [modo, setModo] = useState<'simulador' | 'atendimento' | 'proposta'>('simulador')
   const [categoria, setCategoria] = useState('')
   const [planoSigla, setPlanoSigla] = useState('')
   const [faixas, setFaixas] = useState<FaixaCredito[]>([])
@@ -289,157 +290,274 @@ export default function SimuladorPage() {
     doc.save('Proposta_' + (nomeCliente || 'cliente').replace(/\s+/g, '_') + '.pdf')
   }
 
+  const nomeAmigavel = planoAtual?.nome_completo || ''
+
+  // Seletores compartilhados (plano, crédito, seguro, antecipação) — mesmo estado nas abas Simulador e Gerar Proposta
+  const gridSeletores = (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div>
+        <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Tipo de tabela</label>
+        <select value={categoria} onChange={(e) => { setCategoria(e.target.value); setPlanoSigla(''); setFaixas([]) }} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle}>
+          <option value="" style={{ background: '#131313' }}>Selecione</option>
+          {Object.entries(CATEGORIAS).map(([k, v]) => <option key={k} value={k} style={{ background: '#131313' }}>{v.label}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Plano</label>
+        <select value={planoSigla} onChange={(e) => setPlanoSigla(e.target.value)} disabled={!planosDaCategoria.length} className="w-full rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" style={inputStyle}>
+          <option value="" style={{ background: '#131313' }}>Selecione</option>
+          {planosDaCategoria.map(p => <option key={p.id} value={p.sigla} style={{ background: '#131313' }}>{p.nome_completo}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Valor do crédito</label>
+        <select value={creditoSel} onChange={(e) => setCreditoSel(e.target.value)} disabled={!faixas.length} className="w-full rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" style={inputStyle}>
+          <option value="" style={{ background: '#131313' }}>Selecione</option>
+          {faixas.map(f => <option key={f.credito} value={String(f.credito)} style={{ background: '#131313' }}>{fmtMoeda(f.credito)}</option>)}
+        </select>
+        {faixa && seguroPct > 0 && (
+          <div className="flex items-center gap-2 mt-3">
+            <button onClick={() => setComSeguro(false)} className="flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-colors" style={{ background: !comSeguro ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', border: `1px solid ${!comSeguro ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.12)'}`, color: !comSeguro ? 'var(--accent)' : 'var(--muted-color)' }}>Sem seguro</button>
+            <button onClick={() => setComSeguro(true)} className="flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-colors" style={{ background: comSeguro ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', border: `1px solid ${comSeguro ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.12)'}`, color: comSeguro ? 'var(--accent)' : 'var(--muted-color)' }}>Com seguro</button>
+          </div>
+        )}
+        {comSeguro && seguroMensal > 0 && (
+          <p className="text-[11px] mt-2" style={{ color: 'var(--muted-color)' }}>Seguro de R$ {seguroMensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês incluído em cada parcela.</p>
+        )}
+      </div>
+      <div>
+        <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Parcelas a antecipar</label>
+        <input type="number" min="0" value={qtdAntecipar} onChange={(e) => setQtdAntecipar(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
+      </div>
+    </div>
+  )
+
+  // Botões de tipo de parcela / base de antecipação (compartilhados)
+  const seletoresTipoParcela = (red25Pct > 0 || cheiaInc > 0 || ehParcelinha) ? (
+    <>
+      <div>
+        <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Parcela mostrada na proposta</label>
+        <div className="flex gap-2">
+          <button onClick={() => setTipoParcela('red50')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoParcela === 'red50' ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoParcela === 'red50' ? 'var(--accent)' : 'var(--border)'}`, color: tipoParcela === 'red50' ? 'var(--accent)' : 'var(--muted-color)' }}>50%</button>
+          {(red25Pct > 0 || ehParcelinha) && <button onClick={() => setTipoParcela('red25')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoParcela === 'red25' ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoParcela === 'red25' ? 'var(--accent)' : 'var(--border)'}`, color: tipoParcela === 'red25' ? 'var(--accent)' : 'var(--muted-color)' }}>25%</button>}
+          {(cheiaInc > 0 || ehParcelinha) && <button onClick={() => setTipoParcela('cheia')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoParcela === 'cheia' ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoParcela === 'cheia' ? 'var(--accent)' : 'var(--border)'}`, color: tipoParcela === 'cheia' ? 'var(--accent)' : 'var(--muted-color)' }}>Cheia</button>}
+        </div>
+      </div>
+      <div>
+        <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Base da antecipação (entrada)</label>
+        <div className="flex gap-2">
+          <button onClick={() => setTipoAntecipacao('red50')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoAntecipacao === 'red50' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoAntecipacao === 'red50' ? '#3b82f6' : 'var(--border)'}`, color: tipoAntecipacao === 'red50' ? '#3b82f6' : 'var(--muted-color)' }}>50%</button>
+          {(red25Pct > 0 || ehParcelinha) && <button onClick={() => setTipoAntecipacao('red25')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoAntecipacao === 'red25' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoAntecipacao === 'red25' ? '#3b82f6' : 'var(--border)'}`, color: tipoAntecipacao === 'red25' ? '#3b82f6' : 'var(--muted-color)' }}>25%</button>}
+          {(cheiaInc > 0 || ehParcelinha) && <button onClick={() => setTipoAntecipacao('cheia')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoAntecipacao === 'cheia' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoAntecipacao === 'cheia' ? '#3b82f6' : 'var(--border)'}`, color: tipoAntecipacao === 'cheia' ? '#3b82f6' : 'var(--muted-color)' }}>Cheia</button>}
+        </div>
+      </div>
+    </>
+  ) : null
+
+  const avisoEmbracon = (
+    <div className="flex items-start gap-2 rounded-lg p-3" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
+      <AlertTriangle size={15} style={{ color: '#f59e0b', marginTop: 1 }} />
+      <p className="text-xs" style={{ color: '#f59e0b' }}>Se a venda for gerada em menos meses no sistema da Embracon, o valor das parcelas pode mudar. Confira a proposta final.</p>
+    </div>
+  )
+
+  const abas: { id: typeof modo; label: string; icon: typeof Calculator }[] = [
+    { id: 'simulador', label: 'Simulador', icon: Calculator },
+    { id: 'atendimento', label: 'Atendimento', icon: MonitorPlay },
+    { id: 'proposta', label: 'Gerar Proposta', icon: FileText },
+  ]
+
   return (
     <div className="relative min-h-screen font-sans">
       <Sidebar />
       <div className="relative lg:ml-60" style={{ zIndex: 1 }}>
         <Header title="Simulador" />
-        <main className="mx-auto max-w-3xl px-6 py-8 lg:px-8">
-          <div className="flex items-center gap-3 mb-6">
+        <main className={`mx-auto ${modo === 'atendimento' ? 'max-w-4xl' : 'max-w-3xl'} px-6 py-8 lg:px-8`}>
+          <div className="flex items-center gap-3 mb-5">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.25)' }}><Calculator size={18} style={{ color: 'var(--accent)' }} /></div>
             <div>
               <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Simulador de Venda</h2>
-              <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Simule quanto o cliente paga</p>
+              <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Simule, apresente ao cliente e emita a proposta</p>
             </div>
+          </div>
+
+          {/* Abas dos 3 modos (estado único) */}
+          <div className="flex gap-2 mb-6 p-1 rounded-xl" style={{ background: 'rgba(17,18,22,0.6)', border: '1px solid var(--border)' }}>
+            {abas.map(a => {
+              const Icon = a.icon; const ativo = modo === a.id
+              return (
+                <button key={a.id} onClick={() => setModo(a.id)} className="flex-1 flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-colors" style={{ background: ativo ? 'rgba(212,175,55,0.18)' : 'transparent', border: `1px solid ${ativo ? 'rgba(212,175,55,0.5)' : 'transparent'}`, color: ativo ? 'var(--accent)' : 'var(--muted-color)' }}>
+                  <Icon size={15} />{a.label}
+                </button>
+              )
+            })}
           </div>
 
           {loading ? (
             <div className="flex items-center justify-center py-12"><Loader2 size={20} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
           ) : (
-            <div className="space-y-5">
-              <div className="rounded-xl p-5" style={{ background: 'rgba(17,18,22,0.92)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', border: '1px solid var(--border)' }}>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Tipo de tabela</label>
-                    <select value={categoria} onChange={(e) => { setCategoria(e.target.value); setPlanoSigla(''); setFaixas([]) }} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle}>
-                      <option value="" style={{ background: '#131313' }}>Selecione</option>
-                      {Object.entries(CATEGORIAS).map(([k, v]) => <option key={k} value={k} style={{ background: '#131313' }}>{v.label}</option>)}
-                    </select>
+            <>
+              {/* ═══════════ MODO SIMULADOR ═══════════ */}
+              {modo === 'simulador' && (
+                <div className="space-y-5">
+                  <div className="rounded-xl p-5" style={{ background: 'rgba(17,18,22,0.92)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', border: '1px solid var(--border)' }}>
+                    {gridSeletores}
                   </div>
-                  <div>
-                    <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Plano</label>
-                    <select value={planoSigla} onChange={(e) => setPlanoSigla(e.target.value)} disabled={!planosDaCategoria.length} className="w-full rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" style={inputStyle}>
-                      <option value="" style={{ background: '#131313' }}>Selecione</option>
-                      {planosDaCategoria.map(p => <option key={p.id} value={p.sigla} style={{ background: '#131313' }}>{p.sigla} — {p.nome_completo}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Valor do crédito</label>
-                    <select value={creditoSel} onChange={(e) => setCreditoSel(e.target.value)} disabled={!faixas.length} className="w-full rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" style={inputStyle}>
-                      <option value="" style={{ background: '#131313' }}>Selecione</option>
-                      {faixas.map(f => <option key={f.credito} value={String(f.credito)} style={{ background: '#131313' }}>{fmtMoeda(f.credito)}</option>)}
-                    </select>
-                    {faixa && seguroPct > 0 && (
-                      <div className="flex items-center gap-2 mt-3">
-                        <button onClick={() => setComSeguro(false)} className="flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-colors" style={{ background: !comSeguro ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', border: `1px solid ${!comSeguro ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.12)'}`, color: !comSeguro ? 'var(--accent)' : 'var(--muted-color)' }}>Sem seguro</button>
-                        <button onClick={() => setComSeguro(true)} className="flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-colors" style={{ background: comSeguro ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', border: `1px solid ${comSeguro ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.12)'}`, color: comSeguro ? 'var(--accent)' : 'var(--muted-color)' }}>Com seguro</button>
+
+                  {faixa && (
+                    <div className="rounded-xl p-5" style={{ background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}>
+                      <div className="flex items-center gap-3 mb-4"><CreditCard size={18} style={{ color: '#3b82f6' }} /><h3 className="text-sm font-semibold" style={{ color: '#3b82f6' }}>Quanto o cliente paga</h3></div>
+                      <div className="grid grid-cols-2 gap-4 text-sm">
+                        <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>{ehParcelinha ? 'Parcela (1ª a 12ª)' : '1ª parcela'}</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(p1)}</p></div>
+                        <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Demais (cada)</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(pd)}</p></div>
+                        <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>+ {qtd} antecipadas</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(valorAntecipadas)}</p></div>
+                        {!ehParcelinha && <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Total p/ não estornar{limiteEstorno > 0 ? ` (1ª + ${limiteEstorno - 1})` : ''}</p><p className="text-lg font-semibold" style={{ color: '#f59e0b' }}>{fmtMoeda(totalNaoEstornar)}</p></div>}
                       </div>
-                    )}
-                    {comSeguro && seguroMensal > 0 && (
-                      <p className="text-[11px] mt-2" style={{ color: 'var(--muted-color)' }}>Seguro de R$ {seguroMensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês incluído em cada parcela.</p>
-                    )}
-                  </div>
-                  <div>
-                    <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Parcelas a antecipar</label>
-                    <input type="number" min="0" value={qtdAntecipar} onChange={(e) => setQtdAntecipar(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
-                  </div>
-                </div>
+                      <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
+                        <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Total que o cliente desembolsa (1ª + {qtd})</p>
+                        <p className="text-2xl font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(totalCliente)}</p>
+                      </div>
 
-                {faixa && (
-                  <div className="mt-4 pt-4 space-y-2" style={{ borderTop: '1px solid var(--border)' }}>
-                    <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Gerar PDF da proposta</label>
-                    <input value={nomeCliente} onChange={e => setNomeCliente(e.target.value)} placeholder="Nome do cliente" className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
-                    <div className="relative">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--muted-color)' }}>R$</span>
-                      <input value={lanceEmbutido} onChange={e => setLanceEmbutido(formatarMoeda(e.target.value))} placeholder="Lance embutido (opcional)" inputMode="numeric" className="w-full rounded-lg pl-9 pr-3 py-2 text-sm outline-none" style={inputStyle} />
+                      <p className="text-xs mt-3" style={{ color: 'var(--muted-color)' }}>Prazo: {prazoPlano} meses {planoAtual?.tx_adm_topo ? `· Taxa adm. total: ${planoAtual.tx_adm_topo}%` : ''}</p>
+                      {(red25Pct > 0 || cheiaInc > 0 || ehParcelinha) && faixa && (
+                        <button onClick={() => setVerCheia(v => !v)} className={`mt-3 rounded-lg px-3 py-2 text-xs font-semibold transition-colors w-full ${verCheia ? '' : 'animate-pulse'}`} style={{
+                          background: verCheia ? 'rgba(212,175,55,0.18)' : 'linear-gradient(135deg, rgba(200,32,46,0.85), rgba(160,20,34,0.85))',
+                          border: `1px solid ${verCheia ? 'rgba(212,175,55,0.5)' : 'rgba(255,120,130,0.5)'}`,
+                          color: verCheia ? 'var(--accent)' : '#fff',
+                          boxShadow: verCheia ? 'none' : '0 4px 16px rgba(200,32,46,0.35)',
+                          backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
+                        }}>
+                          {verCheia ? 'Ocultar outras reduções' : '🔥 Ver 25% e parcela cheia'}
+                        </button>
+                      )}
+                      {verCheia && faixa && (
+                        <div className="mt-3 space-y-2">
+                          {(red25Pct > 0 || ehParcelinha) && (
+                            <div className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
+                              <p className="text-xs mb-2" style={{ color: 'var(--muted-color)' }}>Redução de 25%{comSeguro ? ' · com seguro' : ''}:</p>
+                              <div className="flex justify-between text-sm"><span style={{ color: 'var(--muted-color)' }}>{ehParcelinha ? '1ª a 12ª' : '1ª parcela'}</span><span style={{ color: 'var(--text)' }}>R$ {(ehParcelinha ? p1Parc25 : primeira25).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                              <div className="flex justify-between text-sm mt-1"><span style={{ color: 'var(--muted-color)' }}>Demais</span><span style={{ color: 'var(--text)' }}>R$ {(ehParcelinha ? pdParc25 : demais25).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                            </div>
+                          )}
+                          {(cheiaInc > 0 || ehParcelinha) && (
+                            <div className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
+                              <p className="text-xs mb-2" style={{ color: 'var(--muted-color)' }}>Parcela cheia (sem redução){comSeguro ? ' · com seguro' : ''}:</p>
+                              <div className="flex justify-between text-sm"><span style={{ color: 'var(--muted-color)' }}>{ehParcelinha ? '1ª a 12ª cheia' : '1ª parcela cheia'}</span><span style={{ color: 'var(--text)' }}>R$ {(ehParcelinha ? p1ParcCheia : primeiraCheia).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                              <div className="flex justify-between text-sm mt-1"><span style={{ color: 'var(--muted-color)' }}>Demais cheias</span><span style={{ color: 'var(--text)' }}>R$ {(ehParcelinha ? pdParcCheia : demaisCheia).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                              <p className="text-[10px] mt-2" style={{ color: 'var(--muted-color)' }}>Cobrada após a contemplação (devolução integral do crédito).</p>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    <p className="text-[11px]" style={{ color: 'var(--muted-color)' }}>Prazo da proposta: {prazoRestante} meses</p>
-                    {(red25Pct > 0 || cheiaInc > 0 || ehParcelinha) && (
-                      <>
-                        <div>
-                          <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Parcela mostrada na proposta</label>
-                          <div className="flex gap-2">
-                            <button onClick={() => setTipoParcela('red50')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoParcela === 'red50' ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoParcela === 'red50' ? 'var(--accent)' : 'var(--border)'}`, color: tipoParcela === 'red50' ? 'var(--accent)' : 'var(--muted-color)' }}>50%</button>
-                            {(red25Pct > 0 || ehParcelinha) && <button onClick={() => setTipoParcela('red25')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoParcela === 'red25' ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoParcela === 'red25' ? 'var(--accent)' : 'var(--border)'}`, color: tipoParcela === 'red25' ? 'var(--accent)' : 'var(--muted-color)' }}>25%</button>}
-                            {(cheiaInc > 0 || ehParcelinha) && <button onClick={() => setTipoParcela('cheia')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoParcela === 'cheia' ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoParcela === 'cheia' ? 'var(--accent)' : 'var(--border)'}`, color: tipoParcela === 'cheia' ? 'var(--accent)' : 'var(--muted-color)' }}>Cheia</button>}
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Base da antecipação (entrada)</label>
-                          <div className="flex gap-2">
-                            <button onClick={() => setTipoAntecipacao('red50')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoAntecipacao === 'red50' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoAntecipacao === 'red50' ? '#3b82f6' : 'var(--border)'}`, color: tipoAntecipacao === 'red50' ? '#3b82f6' : 'var(--muted-color)' }}>50%</button>
-                            {(red25Pct > 0 || ehParcelinha) && <button onClick={() => setTipoAntecipacao('red25')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoAntecipacao === 'red25' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoAntecipacao === 'red25' ? '#3b82f6' : 'var(--border)'}`, color: tipoAntecipacao === 'red25' ? '#3b82f6' : 'var(--muted-color)' }}>25%</button>}
-                            {(cheiaInc > 0 || ehParcelinha) && <button onClick={() => setTipoAntecipacao('cheia')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoAntecipacao === 'cheia' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoAntecipacao === 'cheia' ? '#3b82f6' : 'var(--border)'}`, color: tipoAntecipacao === 'cheia' ? '#3b82f6' : 'var(--muted-color)' }}>Cheia</button>}
-                          </div>
-                        </div>
-                      </>
-                    )}
-                    <button onClick={gerarPDF} className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors" style={{ background: 'linear-gradient(135deg, rgba(200,32,46,0.85), rgba(160,20,34,0.85))', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.18)', color: '#fff', boxShadow: '0 8px 24px rgba(200,32,46,0.25)' }}>Gerar PDF da proposta</button>
-                  </div>
-                )}
-              </div>
-
-              {faixa && (
-                <div className="rounded-xl p-5" style={{ background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}>
-                  <div className="flex items-center gap-3 mb-4"><CreditCard size={18} style={{ color: '#3b82f6' }} /><h3 className="text-sm font-semibold" style={{ color: '#3b82f6' }}>Quanto o cliente paga</h3></div>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>{ehParcelinha ? 'Parcela (1ª a 12ª)' : '1ª parcela'}</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(p1)}</p></div>
-                    <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Demais (cada)</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(pd)}</p></div>
-                    <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>+ {qtd} antecipadas</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(valorAntecipadas)}</p></div>
-                    {!ehParcelinha && <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Total p/ não estornar{limiteEstorno > 0 ? ` (1ª + ${limiteEstorno - 1})` : ''}</p><p className="text-lg font-semibold" style={{ color: '#f59e0b' }}>{fmtMoeda(totalNaoEstornar)}</p></div>}
-                  </div>
-                  <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
-                    <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Total que o cliente desembolsa (1ª + {qtd})</p>
-                    <p className="text-2xl font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(totalCliente)}</p>
-                  </div>
-
-                  <p className="text-xs mt-3" style={{ color: 'var(--muted-color)' }}>Prazo: {prazoPlano} meses {planoAtual?.tx_adm_topo ? `· Taxa adm. total: ${planoAtual.tx_adm_topo}%` : ''}</p>
-                  {(red25Pct > 0 || cheiaInc > 0 || ehParcelinha) && faixa && (
-                    <button onClick={() => setVerCheia(v => !v)} className={`mt-3 rounded-lg px-3 py-2 text-xs font-semibold transition-colors w-full ${verCheia ? '' : 'animate-pulse'}`} style={{
-                      background: verCheia ? 'rgba(212,175,55,0.18)' : 'linear-gradient(135deg, rgba(200,32,46,0.85), rgba(160,20,34,0.85))',
-                      border: `1px solid ${verCheia ? 'rgba(212,175,55,0.5)' : 'rgba(255,120,130,0.5)'}`,
-                      color: verCheia ? 'var(--accent)' : '#fff',
-                      boxShadow: verCheia ? 'none' : '0 4px 16px rgba(200,32,46,0.35)',
-                      backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-                    }}>
-                      {verCheia ? 'Ocultar outras reduções' : '🔥 Ver 25% e parcela cheia'}
-                    </button>
                   )}
-                  {verCheia && faixa && (
-                    <div className="mt-3 space-y-2">
-                      {(red25Pct > 0 || ehParcelinha) && (
-                        <div className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
-                          <p className="text-xs mb-2" style={{ color: 'var(--muted-color)' }}>Redução de 25%{comSeguro ? ' · com seguro' : ''}:</p>
-                          <div className="flex justify-between text-sm"><span style={{ color: 'var(--muted-color)' }}>{ehParcelinha ? '1ª a 12ª' : '1ª parcela'}</span><span style={{ color: 'var(--text)' }}>R$ {(ehParcelinha ? p1Parc25 : primeira25).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
-                          <div className="flex justify-between text-sm mt-1"><span style={{ color: 'var(--muted-color)' }}>Demais</span><span style={{ color: 'var(--text)' }}>R$ {(ehParcelinha ? pdParc25 : demais25).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+
+                  {planoAtual?.bem === 'Imóvel' && faixa && (
+                    <div className="rounded-xl p-4 animate-pulse" style={{ background: 'rgba(212,175,55,0.1)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(212,175,55,0.35)', boxShadow: '0 4px 16px rgba(212,175,55,0.15)' }}>
+                      <p className="text-sm font-medium text-center" style={{ color: 'var(--accent)' }}>
+                        😮 Dica de venda: nos planos de imóvel, vendendo com 2% de adesão em vez de 1%, a taxa de administração total cai de 26% para 22%! Melhor pro cliente e mais comissão pra você.
+                      </p>
+                    </div>
+                  )}
+
+                  {avisoEmbracon}
+                </div>
+              )}
+
+              {/* ═══════════ MODO ATENDIMENTO (virado pro cliente) ═══════════ */}
+              {modo === 'atendimento' && (
+                <div className="rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(160deg, #0d0e12 0%, #14151b 100%)', border: '1px solid rgba(212,175,55,0.25)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}>
+                  {!faixa ? (
+                    <div className="flex flex-col items-center justify-center gap-3 py-20 px-6 text-center">
+                      <MonitorPlay size={32} style={{ color: 'var(--accent)' }} />
+                      <p className="text-sm" style={{ color: 'var(--muted-color)' }}>Escolha o plano e o crédito na aba Simulador para apresentar ao cliente.</p>
+                      <button onClick={() => setModo('simulador')} className="mt-1 rounded-lg px-4 py-2 text-xs font-semibold" style={{ background: 'rgba(212,175,55,0.18)', border: '1px solid rgba(212,175,55,0.5)', color: 'var(--accent)' }}>Ir para o Simulador</button>
+                    </div>
+                  ) : (
+                    <div className="px-6 py-10 sm:px-10">
+                      {/* Logo da empresa */}
+                      <div className="flex items-center justify-center mb-8">
+                        {empresaLogo ? (
+                          <img src={empresaLogo || "/placeholder.svg"} alt={empresaNome || 'Empresa'} className="h-16 w-auto object-contain" crossOrigin="anonymous" />
+                        ) : (
+                          <p className="text-lg font-bold tracking-wide" style={{ color: 'var(--accent)' }}>{empresaNome || 'LR MULTIMARCAS'}</p>
+                        )}
+                      </div>
+
+                      {/* Crédito gigante */}
+                      <div className="text-center mb-2">
+                        <p className="text-sm uppercase tracking-widest" style={{ color: 'var(--muted-color)' }}>Seu crédito</p>
+                        <p className="font-bold leading-none mt-2" style={{ color: 'var(--accent)', fontSize: 'clamp(48px, 9vw, 84px)' }}>{fmtMoeda(faixa.credito)}</p>
+                        <p className="text-base mt-3" style={{ color: 'var(--text)' }}>{nomeAmigavel}</p>
+                      </div>
+
+                      {/* Crédito líquido (se houver lance embutido) */}
+                      {lanceNum > 0 && (
+                        <div className="mx-auto max-w-md mt-6 rounded-2xl px-6 py-4 text-center" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.4)' }}>
+                          <p className="text-xs uppercase tracking-wider" style={{ color: 'var(--muted-color)' }}>Crédito líquido (após lance embutido)</p>
+                          <p className="text-3xl font-bold mt-1" style={{ color: 'var(--accent)' }}>{fmtMoeda(creditoLiquido)}</p>
                         </div>
                       )}
-                      {(cheiaInc > 0 || ehParcelinha) && (
-                        <div className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
-                          <p className="text-xs mb-2" style={{ color: 'var(--muted-color)' }}>Parcela cheia (sem redução){comSeguro ? ' · com seguro' : ''}:</p>
-                          <div className="flex justify-between text-sm"><span style={{ color: 'var(--muted-color)' }}>{ehParcelinha ? '1ª a 12ª cheia' : '1ª parcela cheia'}</span><span style={{ color: 'var(--text)' }}>R$ {(ehParcelinha ? p1ParcCheia : primeiraCheia).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
-                          <div className="flex justify-between text-sm mt-1"><span style={{ color: 'var(--muted-color)' }}>Demais cheias</span><span style={{ color: 'var(--text)' }}>R$ {(ehParcelinha ? pdParcCheia : demaisCheia).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
-                          <p className="text-[10px] mt-2" style={{ color: 'var(--muted-color)' }}>Cobrada após a contemplação (devolução integral do crédito).</p>
+
+                      {/* Cards grandes de parcelas */}
+                      <div className={`grid gap-4 mt-8 ${qtd > 0 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+                        <div className="rounded-2xl px-6 py-7 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                          <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--muted-color)' }}>{ehParcelinha ? 'Parcela (1ª à 12ª)' : 'Primeira parcela'}</p>
+                          <p className="text-3xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(p1Proposta)}</p>
                         </div>
-                      )}
+                        <div className="rounded-2xl px-6 py-7 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                          <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--muted-color)' }}>Demais parcelas</p>
+                          <p className="text-3xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(pdProposta)}</p>
+                        </div>
+                        {qtd > 0 && (
+                          <div className="rounded-2xl px-6 py-7 text-center" style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.35)' }}>
+                            <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--muted-color)' }}>Entrada ({nParcelasEntrada} parcelas)</p>
+                            <p className="text-3xl font-bold" style={{ color: '#60a5fa' }}>{fmtMoeda(entradaProposta)}</p>
+                          </div>
+                        )}
+                      </div>
+
+                      <p className="text-center text-xs mt-8" style={{ color: 'var(--muted-color)' }}>Prazo de {prazoRestante} meses{comSeguro ? ' · seguro incluído' : ''}</p>
+
+                      {/* Reservado para a Fase 2 (desabilitado) */}
+                      <div className="flex justify-center mt-6">
+                        <button disabled title="Em breve" className="flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold opacity-40 cursor-not-allowed" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.3)', color: 'var(--accent)' }}>
+                          <Trophy size={16} />Grupo em destaque desta faixa
+                        </button>
+                      </div>
                     </div>
                   )}
                 </div>
               )}
 
-              {planoAtual?.bem === 'Imóvel' && faixa && (
-                <div className="rounded-xl p-4 animate-pulse" style={{ background: 'rgba(212,175,55,0.1)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(212,175,55,0.35)', boxShadow: '0 4px 16px rgba(212,175,55,0.15)' }}>
-                  <p className="text-sm font-medium text-center" style={{ color: 'var(--accent)' }}>
-                    😮 Dica de venda: nos planos de imóvel, vendendo com 2% de adesão em vez de 1%, a taxa de administração total cai de 26% para 22%! Melhor pro cliente e mais comissão pra você.
-                  </p>
+              {/* ═══════════ MODO GERAR PROPOSTA ═══════════ */}
+              {modo === 'proposta' && (
+                <div className="space-y-5">
+                  <div className="rounded-xl p-5" style={{ background: 'rgba(17,18,22,0.92)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', border: '1px solid var(--border)' }}>
+                    <div className="flex items-center gap-3 mb-4"><FileText size={18} style={{ color: 'var(--accent)' }} /><h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Gerar proposta em PDF</h3></div>
+                    {gridSeletores}
+
+                    {faixa ? (
+                      <div className="mt-4 pt-4 space-y-2" style={{ borderTop: '1px solid var(--border)' }}>
+                        <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Dados do cliente</label>
+                        <input value={nomeCliente} onChange={e => setNomeCliente(e.target.value)} placeholder="Nome do cliente" className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--muted-color)' }}>R$</span>
+                          <input value={lanceEmbutido} onChange={e => setLanceEmbutido(formatarMoeda(e.target.value))} placeholder="Lance embutido (opcional)" inputMode="numeric" className="w-full rounded-lg pl-9 pr-3 py-2 text-sm outline-none" style={inputStyle} />
+                        </div>
+                        <p className="text-[11px]" style={{ color: 'var(--muted-color)' }}>Prazo da proposta: {prazoRestante} meses</p>
+                        {seletoresTipoParcela}
+                        <button onClick={gerarPDF} className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors" style={{ background: 'linear-gradient(135deg, rgba(200,32,46,0.85), rgba(160,20,34,0.85))', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.18)', color: '#fff', boxShadow: '0 8px 24px rgba(200,32,46,0.25)' }}>Gerar PDF da proposta</button>
+                      </div>
+                    ) : (
+                      <p className="mt-4 pt-4 text-xs" style={{ borderTop: '1px solid var(--border)', color: 'var(--muted-color)' }}>Selecione o plano e o valor do crédito acima para emitir a proposta.</p>
+                    )}
+                  </div>
+
+                  {avisoEmbracon}
                 </div>
               )}
-
-              <div className="flex items-start gap-2 rounded-lg p-3" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
-                <AlertTriangle size={15} style={{ color: '#f59e0b', marginTop: 1 }} />
-                <p className="text-xs" style={{ color: '#f59e0b' }}>Se a venda for gerada em menos meses no sistema da Embracon, o valor das parcelas pode mudar. Confira a proposta final.</p>
-              </div>
-            </div>
+            </>
           )}
         </main>
       </div>
