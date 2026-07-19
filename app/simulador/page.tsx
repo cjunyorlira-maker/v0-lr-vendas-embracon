@@ -224,7 +224,7 @@ const avisoEmbracon = (
   </div>
 )
 
-// ════════════════════════════════════════���═══════════════════�����═
+// ═══════════════════════════════════��════���═══════════════════�����═
 // Gerador de proposta em PDF — compartilhado pelas duas abas.
 // Recebe a instância de simulação + logo/nome da empresa.
 // ══════════════════════════════════════════════════════════════
@@ -276,9 +276,12 @@ function gerarPropostaPDF(s: Sim, logoBase64: string | null, empresaNome: string
     if (logoBase64) {
       try {
         const fmtImg = logoBase64.includes('image/png') ? 'PNG' : 'JPEG'
-        doc.setFillColor(255, 255, 255)
-        doc.roundedRect(W - 60, 4, 50, 22, 2, 2, 'F')
-        doc.addImage(logoBase64, fmtImg, W - 58, 6, 46, 18, undefined, 'FAST')
+        // encaixa o PNG com a proporção real (sem fundo, sem esticar)
+        const props = doc.getImageProperties(logoBase64)
+        const maxW = 40, maxH = 24
+        const ratio = Math.min(maxW / props.width, maxH / props.height)
+        const lw = props.width * ratio, lh = props.height * ratio
+        doc.addImage(logoBase64, fmtImg, W - 14 - lw, 3 + (maxH - lh) / 2, lw, lh, undefined, 'FAST')
       } catch (e) {
         doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(255,255,255)
         doc.text(empresaNome || 'LR MULTIMARCAS', W - 14, 16, { align: 'right' })
