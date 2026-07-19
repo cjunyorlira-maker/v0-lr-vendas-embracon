@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
     // 2) resultado de assembleia mais recente de cada candidato (por mes_referencia desc)
     const { data: hist } = await supabaseAdmin
       .from('assembleias_historico')
-      .select('grupo, mes_referencia, mes_label, numero_assembleia, sorteio_qt, lance_livre_qt, lance_fixo_50_qt, lance_fixo_25_qt, lance_livre_menor, total_contemplados, arquivo_path')
+      .select('grupo, mes_referencia, mes_label, numero_assembleia, sorteio_qt, lance_livre_qt, lance_fixo_50_qt, lance_fixo_25_qt, lance_livre_menor, total_contemplados, prazo_restante, arquivo_path')
       .in('grupo', gruposIds)
       .order('mes_referencia', { ascending: false })
 
@@ -104,9 +104,13 @@ export async function GET(req: NextRequest) {
         lance_fixo_50_qt: ultima.lance_fixo_50_qt ?? 0,
         lance_fixo_25_qt: ultima.lance_fixo_25_qt ?? 0,
         lance_livre_menor_pct: lanceLivreMenorPct,
+        prazo_restante: ultima.prazo_restante ?? null,
       } : null,
       proxima_assembleia: proximaAssembleia,
       tem_extrato: !!ext?.arquivo_path,
+      // botão "Ver último resultado" aparece sempre que há histórico
+      tem_historico: !!ultima,
+      // arquivo oficial subido (signed URL); sem ele, o card monta modal a partir dos dados
       tem_resultado: !!ultima?.arquivo_path,
     })
   } catch (err) {

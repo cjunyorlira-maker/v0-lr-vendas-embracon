@@ -223,7 +223,7 @@ const avisoEmbracon = (
   </div>
 )
 
-// ══════════════════════════════════════════════════════════════
+// ════════════════════════════════════════════════════════════���═
 // Gerador de proposta em PDF — compartilhado pelas duas abas.
 // Recebe a instância de simulação + logo/nome da empresa.
 // ══════════════════════════════════════════════════════════════
@@ -374,7 +374,18 @@ function GrupoDestaque({ bem, credito, variant }: { bem?: string; credito?: numb
   const [extLoading, setExtLoading] = useState(false)
   const [resLoading, setResLoading] = useState(false)
   const [expandido, setExpandido] = useState(false)
+  const [modalResultado, setModalResultado] = useState(false)
   const podeCarregar = !!bem && !!credito
+
+  // ESC fecha o modal antes de qualquer outro handler (tela cheia do Atendimento)
+  useEffect(() => {
+    if (!modalResultado) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.stopImmediatePropagation(); e.preventDefault(); setModalResultado(false) }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [modalResultado])
 
   const carregar = async () => {
     if (!podeCarregar) return
@@ -411,12 +422,15 @@ function GrupoDestaque({ bem, credito, variant }: { bem?: string; credito?: numb
   }
   const abrirResultado = async () => {
     if (!destaque?.grupo) return
+    // sem arquivo oficial: monta o modal a partir dos dados do histórico
+    if (!destaque.tem_resultado) { setModalResultado(true); return }
     setResLoading(true)
     try {
       const r = await fetch(`/api/assembleias/resultado/download?grupo=${encodeURIComponent(destaque.grupo)}`)
       const d = await r.json()
       if (d.url) window.open(d.url, '_blank')
-    } catch {}
+      else setModalResultado(true) // arquivo indisponível: cai no modal
+    } catch { setModalResultado(true) }
     setResLoading(false)
   }
   const fmtData = (iso: string | null) => iso ? new Date(iso + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
@@ -444,9 +458,9 @@ function GrupoDestaque({ bem, credito, variant }: { bem?: string; credito?: numb
         <p className="text-sm mt-2" style={{ color: 'var(--muted-color)' }}>Sem histórico de assembleia registrado para este grupo.</p>
       )}
       {destaque.proxima_assembleia && <p className="text-sm mt-1" style={{ color: 'var(--text)' }}>Próxima assembleia: <span className="font-semibold">{fmtData(destaque.proxima_assembleia)}</span></p>}
-      {(destaque.tem_resultado || destaque.tem_extrato) && (
+      {(destaque.tem_historico || destaque.tem_extrato) && (
         <div className="flex flex-wrap gap-2 mt-3">
-          {destaque.tem_resultado && (
+          {destaque.tem_historico && (
             <button onClick={abrirResultado} disabled={resLoading} className="flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold" style={{ background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.4)', color: 'var(--accent)' }}>
               {resLoading ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}📊 Ver último resultado
             </button>
@@ -462,6 +476,40 @@ function GrupoDestaque({ bem, credito, variant }: { bem?: string; credito?: numb
         <AlertTriangle size={14} style={{ color: '#f59e0b', marginTop: 1 }} />
         <p className="text-xs" style={{ color: '#f59e0b' }}>Grupo sujeito a disponibilidade — a adesão pode ocorrer em grupo similar da mesma faixa.</p>
       </div>
+
+      {/* MODAL: resultado montado a partir do histórico (grupos sem PDF oficial) */}
+      {modalResultado && destaque.ultima_assembleia && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }} onClick={() => setModalResultado(false)}>
+          <div className="relative w-full max-w-md rounded-2xl p-6 text-left" style={{ background: 'linear-gradient(180deg, #16130b 0%, #0d0d0d 100%)', border: '1px solid rgba(212,175,55,0.45)', boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }} onClick={e => e.stopPropagation()}>
+            <button onClick={() => setModalResultado(false)} aria-label="Fechar" className="absolute top-4 right-4 rounded-full p-1.5" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--muted-color)' }}><X size={16} /></button>
+
+            <p className="text-xs font-semibold uppercase" style={{ letterSpacing: '2px', color: 'var(--accent)' }}>Resultado oficial</p>
+            <p className="text-lg font-bold mt-0.5" style={{ color: 'var(--text)' }}>GRUPO {destaque.grupo}</p>
+            <p className="text-sm mt-0.5" style={{ color: 'var(--muted-color)' }}>
+              Assembleia {destaque.ultima_assembleia.label}{destaque.ultima_assembleia.numero ? ` · nº ${destaque.ultima_assembleia.numero}` : ''}
+            </p>
+
+            <div className="mt-5 rounded-xl p-4 text-center" style={{ background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.3)' }}>
+              <p className="text-3xl font-bold" style={{ color: 'var(--accent)' }}>{destaque.ultima_assembleia.total_contemplados}</p>
+              <p className="text-xs uppercase tracking-wider mt-0.5" style={{ color: 'var(--accent)' }}>contemplações</p>
+            </div>
+
+            <ul className="mt-4 space-y-1.5">
+              {destaque.ultima_assembleia.sorteio_qt > 0 && <li className="text-sm flex items-center gap-2" style={{ color: 'var(--text)' }}><span>🎲</span> <span className="font-semibold">{destaque.ultima_assembleia.sorteio_qt}</span> por sorteio</li>}
+              {destaque.ultima_assembleia.lance_livre_qt > 0 && <li className="text-sm flex items-center gap-2" style={{ color: 'var(--text)' }}><span>💎</span> <span className="font-semibold">{destaque.ultima_assembleia.lance_livre_qt}</span> por lance livre</li>}
+              {destaque.ultima_assembleia.lance_fixo_50_qt > 0 && <li className="text-sm flex items-center gap-2" style={{ color: 'var(--text)' }}><span>💎</span> <span className="font-semibold">{destaque.ultima_assembleia.lance_fixo_50_qt}</span> por lance fixo</li>}
+              {destaque.ultima_assembleia.lance_fixo_25_qt > 0 && <li className="text-sm flex items-center gap-2" style={{ color: 'var(--text)' }}><span>💎</span> <span className="font-semibold">{destaque.ultima_assembleia.lance_fixo_25_qt}</span> por lance fixo embutido</li>}
+            </ul>
+
+            {destaque.ultima_assembleia.prazo_restante != null && (
+              <p className="text-sm mt-4 pt-4" style={{ color: 'var(--text)', borderTop: '1px solid var(--border)' }}>
+                Prazo restante do grupo: <span className="font-semibold">{destaque.ultima_assembleia.prazo_restante} meses</span>
+              </p>
+            )}
+            <p className="text-[11px] mt-3" style={{ color: 'var(--muted-color)' }}>fonte: resultado oficial Embracon</p>
+          </div>
+        </div>
+      )}
     </>
   )
 
