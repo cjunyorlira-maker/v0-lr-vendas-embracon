@@ -15,7 +15,7 @@ function faixaContem(faixa: string | null, credito: number): boolean {
   const nums = (faixa.match(/[\d.]+/g) || []).map(x => parseInt(x.replace(/\./g, ''), 10)).filter(n => !isNaN(n))
   if (nums.length < 2) return false
   const [min, max] = nums
-  if (min > max) return false // faixa com dado inconsistente
+  if (min > max) return false
   return credito >= min && credito <= max
 }
 
@@ -26,30 +26,29 @@ export async function GET(req: NextRequest) {
     if (!bem || !credito) return NextResponse.json({ error: "bem e crédito obrigatórios" }, { status: 400 })
 
     // 1) grupos do mesmo bem cuja faixa de crédito contém o valor simulado
-    const { data: grupos } = await supabaseAdmin
-      .from('grupos_embracon')
-      .select('grupo, bem, faixa_credito')
+    const { data: infos } = await supabaseAdmin
+      .from('assembleias_grupos_info')
+      .select('grupo, bem, faixa_credito, proxima_assembleia')
       .eq('bem', bem)
-    const candidatos = (grupos || []).filter(g => faixaContem(g.faixa_credito, credito))
+    const candidatos = (infos || []).filter(g => faixaContem(g.faixa_credito, credito))
     if (candidatos.length === 0) return NextResponse.json({ encontrado: false })
 
     const gruposIds = candidatos.map(g => String(g.grupo).trim())
 
-    // 2) resultado de assembleia mais recente de cada candidato (mais contemplações vence)
+    // 2) resultado de assembleia mais recente de cada candidato (por mes_referencia desc)
     const { data: hist } = await supabaseAdmin
       .from('assembleias_historico')
-      .select('grupo, mes_referencia, mes_label, numero_assembleia, sorteio_qt, lance_livre_qt, lance_fixo_50_qt, lance_fixo_25_qt, total_contemplados')
+      .select('grupo, mes_referencia, mes_label, numero_assembleia, sorteio_qt, lance_livre_qt, lance_fixo_50_qt, lance_fixo_25_qt, lance_livre_menor, total_contemplados')
       .in('grupo', gruposIds)
       .order('mes_referencia', { ascending: false })
 
     const ultimaPorGrupo: Record<string, any> = {}
     for (const h of (hist || [])) {
       const g = String(h.grupo).trim()
-      if (!ultimaPorGrupo[g]) ultimaPorGrupo[g] = h // primeira = mais recente (ordenado desc)
+      if (!ultimaPorGrupo[g]) ultimaPorGrupo[g] = h // primeira = mais recente
     }
 
-    // escolhe o grupo com MAIS contemplações na última assembleia; se nenhum
-    // tiver histórico, cai no primeiro candidato (ainda mostra próxima assembleia)
+    // campeão = maior total_contemplados na última assembleia; sem histórico cai no 1º candidato
     let escolhido = candidatos[0]
     let melhor = -1
     for (const c of candidatos) {
@@ -60,30 +59,17 @@ export async function GET(req: NextRequest) {
     const grupoId = String(escolhido.grupo).trim()
     const ultima = ultimaPorGrupo[grupoId] || null
 
-    // 3) próxima assembleia (mesma regra das outras telas: 1º vencimento futuro)
-    const { data: cal } = await supabaseAdmin
-      .from('calendario_grupo')
-      .select('data_assembleia, data_vencimento')
-      .eq('grupo', grupoId)
-      .order('data_assembleia')
-    const hojeStr = new Date().toISOString().slice(0, 10)
-    let proxima: any = null
-    for (const c of (cal || [])) {
-      const corte = c.data_vencimento || c.data_assembleia
-      if (corte >= hojeStr) { proxima = c; break }
-    }
-    if (!proxima && (cal || []).length > 0) proxima = cal![cal!.length - 1]
-
-    // 4) extrato disponível no storage?
+    // 3) extrato disponível no storage?
     const { data: ext } = await supabaseAdmin
       .from('extratos_grupo')
       .select('arquivo_path')
       .eq('grupo', grupoId)
       .maybeSingle()
 
-    const sorteio = ultima?.sorteio_qt ?? 0
-    const totalContempl = ultima?.total_contemplados ?? 0
-    const lance = Math.max(0, totalContempl - sorteio)
+    const lanceFixo = (ultima?.lance_fixo_50_qt ?? 0) + (ultima?.lance_fixo_25_qt ?? 0)
+    // lance_livre_menor é fração (0.78 = 78%); converte para percentual exibível
+    const menorRaw = ultima?.lance_livre_menor != null ? Number(ultima.lance_livre_menor) : null
+    const lanceLivreMenorPct = menorRaw != null && !isNaN(menorRaw) ? Math.round(menorRaw * 100 * 10) / 10 : null
 
     return NextResponse.json({
       encontrado: true,
@@ -94,11 +80,13 @@ export async function GET(req: NextRequest) {
       ultima_assembleia: ultima ? {
         label: ultima.mes_label,
         numero: ultima.numero_assembleia,
-        total_contemplados: totalContempl,
-        sorteio,
-        lance,
+        total_contemplados: ultima.total_contemplados ?? 0,
+        sorteio_qt: ultima.sorteio_qt ?? 0,
+        lance_livre_qt: ultima.lance_livre_qt ?? 0,
+        lance_fixo_qt: lanceFixo,
+        lance_livre_menor_pct: lanceLivreMenorPct,
       } : null,
-      proxima_assembleia: proxima?.data_assembleia || null,
+      proxima_assembleia: escolhido.proxima_assembleia || null,
       tem_extrato: !!ext?.arquivo_path,
     })
   } catch (err) {
