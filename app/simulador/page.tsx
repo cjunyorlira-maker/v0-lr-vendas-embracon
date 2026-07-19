@@ -185,7 +185,7 @@ function SeletoresTipoParcela({ s }: { s: Sim }) {
   )
 }
 
-const SecaoTitulo = ({ n, children, extra }: { n: string; children: React.ReactNode; extra?: React.ReactNode }) => (
+const SecaoTitulo = ({ n, children, extra }: { n: React.ReactNode; children: React.ReactNode; extra?: React.ReactNode }) => (
   <div className="mb-4">
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2.5">
@@ -348,6 +348,112 @@ function gerarPropostaPDF(s: Sim, logoBase64: string | null, empresaNome: string
 }
 
 // ══════════════════════════════════════════════════════════════
+// 🏆 GRUPO EM DESTAQUE — componente compartilhado (Simulador + Atendimento)
+// Campeão = maior total_contemplados no último resultado disponível da faixa
+// ══════════════════════════════════════════════════════════════
+function GrupoDestaque({ bem, credito, variant }: { bem?: string; credito?: number; variant: 'simulador' | 'atendimento' }) {
+  const [destaque, setDestaque] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [extLoading, setExtLoading] = useState(false)
+  const [expandido, setExpandido] = useState(false)
+  const podeCarregar = !!bem && !!credito
+
+  const carregar = async () => {
+    if (!podeCarregar) return
+    setLoading(true)
+    try {
+      const r = await fetch(`/api/simulador/grupo-destaque?bem=${encodeURIComponent(bem!)}&credito=${credito}`)
+      setDestaque(await r.json())
+    } catch { setDestaque({ encontrado: false }) }
+    setLoading(false)
+  }
+
+  // reativo: nova faixa/categoria → recalcula o campeão na hora (simulador auto; atendimento sob demanda)
+  useEffect(() => {
+    setDestaque(null)
+    if (variant === 'simulador') { if (podeCarregar) carregar() }
+    else setExpandido(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bem, credito])
+
+  const toggle = () => {
+    const abrir = !expandido
+    setExpandido(abrir)
+    if (abrir && !destaque && !loading) carregar()
+  }
+  const abrirExtrato = async () => {
+    if (!destaque?.grupo) return
+    setExtLoading(true)
+    try {
+      const r = await fetch(`/api/assembleias/extrato/download?grupo=${encodeURIComponent(destaque.grupo)}`)
+      const d = await r.json()
+      if (d.url) window.open(d.url, '_blank')
+    } catch {}
+    setExtLoading(false)
+  }
+  const fmtData = (iso: string | null) => iso ? new Date(iso + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
+
+  const corpo = loading ? (
+    <div className="flex items-center justify-center py-4"><Loader2 size={18} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
+  ) : !destaque?.encontrado ? (
+    <p className="text-sm text-center" style={{ color: 'var(--muted-color)' }}>Nenhum grupo mapeado para esta faixa no momento.</p>
+  ) : (
+    <>
+      <p className="text-lg font-bold" style={{ color: 'var(--accent)' }}>GRUPO {destaque.grupo} · {destaque.faixa_credito}</p>
+      {destaque.ultima_assembleia ? (
+        <>
+          <p className="text-sm mt-2" style={{ color: 'var(--text)' }}>
+            Última assembleia ({destaque.ultima_assembleia.label}): <span className="font-semibold">{destaque.ultima_assembleia.total_contemplados} contemplações</span>
+          </p>
+          <ul className="mt-1 space-y-0.5">
+            <li className="text-sm" style={{ color: 'var(--muted-color)' }}>🎲 {destaque.ultima_assembleia.sorteio_qt} por sorteio</li>
+            <li className="text-sm" style={{ color: 'var(--muted-color)' }}>💎 {destaque.ultima_assembleia.lance_fixo_50_qt} por lance fixo</li>
+            <li className="text-sm" style={{ color: 'var(--muted-color)' }}>💎 {destaque.ultima_assembleia.lance_fixo_25_qt} por lance fixo embutido</li>
+          </ul>
+        </>
+      ) : (
+        <p className="text-sm mt-2" style={{ color: 'var(--muted-color)' }}>Sem histórico de assembleia registrado para este grupo.</p>
+      )}
+      <p className="text-sm mt-1" style={{ color: 'var(--text)' }}>Próxima assembleia: <span className="font-semibold">{fmtData(destaque.proxima_assembleia)}</span></p>
+      {destaque.tem_extrato && (
+        <button onClick={abrirExtrato} disabled={extLoading} className="mt-3 flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold" style={{ background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.4)', color: 'var(--accent)' }}>
+          {extLoading ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}📊 Ver último resultado
+        </button>
+      )}
+      <div className="flex items-start gap-2 rounded-lg p-3 mt-3" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
+        <AlertTriangle size={14} style={{ color: '#f59e0b', marginTop: 1 }} />
+        <p className="text-xs" style={{ color: '#f59e0b' }}>Grupo sujeito a disponibilidade — a adesão pode ocorrer em grupo similar da mesma faixa.</p>
+      </div>
+    </>
+  )
+
+  // seção própria no Simulador (cabeçalho padrão badge + título)
+  if (variant === 'simulador') {
+    return (
+      <div className="rounded-xl p-5" style={cardStyle}>
+        <SecaoTitulo n={<Trophy size={13} />}>Grupo em destaque</SecaoTitulo>
+        {corpo}
+      </div>
+    )
+  }
+
+  // toggle colapsável no Atendimento
+  return (
+    <div className="mt-8 mx-auto max-w-xl">
+      <button onClick={toggle} className="w-full flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.3)', color: 'var(--accent)' }}>
+        <Trophy size={16} />Grupo em destaque desta faixa
+        <ChevronDown size={16} className="transition-transform" style={{ transform: expandido ? 'rotate(180deg)' : 'none' }} />
+      </button>
+      {expandido && (
+        <div className="mt-3 rounded-2xl p-5 text-left" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(212,175,55,0.25)' }}>
+          {corpo}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════
 // ABA SIMULADOR — 4 seções + barra de proposta sticky
 // ══════════════════════════════════════════════════════════════
 function SimuladorTab({ planos, empresaNome, logoBase64 }: { planos: Plano[]; empresaNome: string; logoBase64: string | null }) {
@@ -457,6 +563,9 @@ function SimuladorTab({ planos, empresaNome, logoBase64 }: { planos: Plano[]; em
         </div>
       )}
 
+      {/* 🏆 GRUPO EM DESTAQUE (mesma seção do Atendimento) */}
+      {faixa && <GrupoDestaque bem={planoAtual?.bem} credito={faixa.credito} variant="simulador" />}
+
       {planoAtual?.bem === 'Imóvel' && faixa && (
         <div className="rounded-xl p-4" style={{ background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.35)' }}>
           <p className="text-sm font-medium text-center" style={{ color: 'var(--accent)' }}>
@@ -539,39 +648,6 @@ function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, o
   // moeda compacta (sem centavos) p/ caber no botão de lance
   const fmtCompacto = (v: number) => 'R$ ' + Math.round(v || 0).toLocaleString('pt-BR')
   const labelChip = (t: string) => t === 'cheia' ? 'Cheia' : t === 'red25' ? 'Reduzida 25%' : 'Reduzida 50%'
-
-  // 🏆 grupo em destaque desta faixa (expande e busca sob demanda)
-  const [expDestaque, setExpDestaque] = useState(false)
-  const [destaque, setDestaque] = useState<any>(null)
-  const [loadingDest, setLoadingDest] = useState(false)
-  const [extLoading, setExtLoading] = useState(false)
-  useEffect(() => { setDestaque(null); setExpDestaque(false) }, [faixa?.credito, planoAtual?.bem])
-
-  const carregarDestaque = async () => {
-    if (!faixa || !planoAtual) return
-    setLoadingDest(true)
-    try {
-      const r = await fetch(`/api/simulador/grupo-destaque?bem=${encodeURIComponent(planoAtual.bem)}&credito=${faixa.credito}`)
-      setDestaque(await r.json())
-    } catch { setDestaque({ encontrado: false }) }
-    setLoadingDest(false)
-  }
-  const toggleDestaque = () => {
-    const abrir = !expDestaque
-    setExpDestaque(abrir)
-    if (abrir && !destaque && !loadingDest) carregarDestaque()
-  }
-  const abrirExtrato = async () => {
-    if (!destaque?.grupo) return
-    setExtLoading(true)
-    try {
-      const r = await fetch(`/api/assembleias/extrato/download?grupo=${encodeURIComponent(destaque.grupo)}`)
-      const d = await r.json()
-      if (d.url) window.open(d.url, '_blank')
-    } catch {}
-    setExtLoading(false)
-  }
-  const fmtData = (iso: string | null) => iso ? new Date(iso + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
 
   // opções de tipo de parcela disponíveis para este plano
   const tiposParcela: { v: 'red50' | 'red25' | 'cheia'; label: string }[] = [{ v: 'red50', label: '50%' }]
@@ -755,50 +831,8 @@ function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, o
             </p>
             <p className="text-center text-xs mt-2" style={{ color: 'var(--muted-color)' }}>Prazo de {prazoRestante} meses</p>
 
-            {/* 🏆 Grupo em destaque desta faixa */}
-            <div className="mt-8 mx-auto max-w-xl">
-              <button onClick={toggleDestaque} className="w-full flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.3)', color: 'var(--accent)' }}>
-                <Trophy size={16} />Grupo em destaque desta faixa
-                <ChevronDown size={16} className="transition-transform" style={{ transform: expDestaque ? 'rotate(180deg)' : 'none' }} />
-              </button>
-              {expDestaque && (
-                <div className="mt-3 rounded-2xl p-5 text-left" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(212,175,55,0.25)' }}>
-                  {loadingDest ? (
-                    <div className="flex items-center justify-center py-4"><Loader2 size={18} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
-                  ) : !destaque?.encontrado ? (
-                    <p className="text-sm text-center" style={{ color: 'var(--muted-color)' }}>Nenhum grupo mapeado para esta faixa no momento.</p>
-                  ) : (
-                    <>
-                      <p className="text-lg font-bold" style={{ color: 'var(--accent)' }}>GRUPO {destaque.grupo} · {destaque.faixa_credito}</p>
-                      {destaque.ultima_assembleia ? (
-                        <>
-                          <p className="text-sm mt-2" style={{ color: 'var(--text)' }}>
-                            Última assembleia ({destaque.ultima_assembleia.label}): <span className="font-semibold">{destaque.ultima_assembleia.total_contemplados} contemplações</span>
-                          </p>
-                          <ul className="mt-1 space-y-0.5">
-                            <li className="text-sm" style={{ color: 'var(--muted-color)' }}>🎲 {destaque.ultima_assembleia.sorteio_qt} por sorteio</li>
-                            <li className="text-sm" style={{ color: 'var(--muted-color)' }}>💎 {destaque.ultima_assembleia.lance_fixo_50_qt} por lance fixo</li>
-                            <li className="text-sm" style={{ color: 'var(--muted-color)' }}>💎 {destaque.ultima_assembleia.lance_fixo_25_qt} por lance fixo embutido</li>
-                          </ul>
-                        </>
-                      ) : (
-                        <p className="text-sm mt-2" style={{ color: 'var(--muted-color)' }}>Sem histórico de assembleia registrado para este grupo.</p>
-                      )}
-                      <p className="text-sm mt-1" style={{ color: 'var(--text)' }}>Próxima assembleia: <span className="font-semibold">{fmtData(destaque.proxima_assembleia)}</span></p>
-                      {destaque.tem_extrato && (
-                        <button onClick={abrirExtrato} disabled={extLoading} className="mt-3 flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold" style={{ background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.4)', color: 'var(--accent)' }}>
-                          {extLoading ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}📊 Ver último resultado
-                        </button>
-                      )}
-                      <div className="flex items-start gap-2 rounded-lg p-3 mt-3" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
-                        <AlertTriangle size={14} style={{ color: '#f59e0b', marginTop: 1 }} />
-                        <p className="text-xs" style={{ color: '#f59e0b' }}>Grupo sujeito a disponibilidade — a adesão pode ocorrer em grupo similar da mesma faixa.</p>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
+            {/* 🏆 Grupo em destaque desta faixa (componente compartilhado) */}
+            <GrupoDestaque bem={planoAtual?.bem} credito={faixa.credito} variant="atendimento" />
           </div>
         )}
       </div>
