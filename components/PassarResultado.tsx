@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { X, Download, Loader2 } from 'lucide-react'
+import { X, Download, Loader2, Paperclip } from 'lucide-react'
 import html2canvas from 'html2canvas'
 
 interface HistMes {
@@ -15,9 +15,16 @@ interface Props {
   bem: string
   mes: HistMes
   onClose: () => void
+  // modo travado usado no card "Grupo em Destaque" — esconde os toggles e fixa a configuração
+  modoFixo?: 'simulador' | 'atendimento'
+  // acesso secundário ao PDF oficial (quando o registro tem arquivo_path)
+  onAbrirArquivoOficial?: () => void
 }
 
-export default function PassarResultado({ grupo, bem, mes, onClose }: Props) {
+export default function PassarResultado({ grupo, bem, mes, onClose, modoFixo, onAbrirArquivoOficial }: Props) {
+  // configuração inicial: no modo travado, define exatamente o que cada aba mostra
+  //  · simulador: fixo 50%/25% separados e COM percentual visível
+  //  · atendimento: fixo 50%/25% separados, rótulos SEM percentual ("Lance Fixo" / "Lance Fixo Embutido")
   const [mostrar, setMostrar] = useState({
     total: true,
     sorteio: true,
@@ -27,6 +34,8 @@ export default function PassarResultado({ grupo, bem, mes, onClose }: Props) {
     ocultarFixo: false,  // quando true, junta fixo 50% + 25% em "Lance Fixo: total"
     ocultarLivrePct: true, // quando true, esconde o maior/menor % do lance livre (padrão seguro)
   })
+  // no modo travado o lance livre nunca exibe %; o fixo mantém % apenas no simulador
+  const esconderFixoPct = modoFixo === 'atendimento'
   const [gerando, setGerando] = useState(false)
   const arteRef = useRef<HTMLDivElement>(null)
 
@@ -58,23 +67,27 @@ export default function PassarResultado({ grupo, bem, mes, onClose }: Props) {
         </div>
 
         <div className="p-4">
-          <p className="text-xs mb-3" style={{ color: 'var(--muted-color)' }}>Escolha o que mostrar ao cliente:</p>
-          <div className="flex flex-col gap-2 mb-4">
-            {[
-              { k: 'total', label: `Total de contemplados (${mes.total_contemplados})` },
-              { k: 'sorteio', label: `Sorteio (${mes.sorteio_qt})` },
-              { k: 'fixo50', label: `Lance Fixo 50% (${mes.lance_fixo_50_qt})` },
-              { k: 'fixo25', label: `Lance Fixo 25% (${mes.lance_fixo_25_qt})` },
-              { k: 'livre', label: `Lance Livre (${mes.lance_livre_qt})` },
-              { k: 'ocultarFixo', label: `Ocultar % do lance fixo (juntar 50% e 25%)` },
-              { k: 'ocultarLivrePct', label: `Ocultar % do lance livre (maior/menor)` },
-            ].map(item => (
-              <label key={item.k} className="flex items-center gap-2 cursor-pointer text-sm" style={{ color: 'var(--text2)' }}>
-                <input type="checkbox" checked={mostrar[item.k as keyof typeof mostrar]} onChange={() => toggle(item.k as keyof typeof mostrar)} className="accent-yellow-600" />
-                {item.label}
-              </label>
-            ))}
-          </div>
+          {!modoFixo && (
+            <>
+              <p className="text-xs mb-3" style={{ color: 'var(--muted-color)' }}>Escolha o que mostrar ao cliente:</p>
+              <div className="flex flex-col gap-2 mb-4">
+                {[
+                  { k: 'total', label: `Total de contemplados (${mes.total_contemplados})` },
+                  { k: 'sorteio', label: `Sorteio (${mes.sorteio_qt})` },
+                  { k: 'fixo50', label: `Lance Fixo 50% (${mes.lance_fixo_50_qt})` },
+                  { k: 'fixo25', label: `Lance Fixo 25% (${mes.lance_fixo_25_qt})` },
+                  { k: 'livre', label: `Lance Livre (${mes.lance_livre_qt})` },
+                  { k: 'ocultarFixo', label: `Ocultar % do lance fixo (juntar 50% e 25%)` },
+                  { k: 'ocultarLivrePct', label: `Ocultar % do lance livre (maior/menor)` },
+                ].map(item => (
+                  <label key={item.k} className="flex items-center gap-2 cursor-pointer text-sm" style={{ color: 'var(--text2)' }}>
+                    <input type="checkbox" checked={mostrar[item.k as keyof typeof mostrar]} onChange={() => toggle(item.k as keyof typeof mostrar)} className="accent-yellow-600" />
+                    {item.label}
+                  </label>
+                ))}
+              </div>
+            </>
+          )}
 
           {/* PREVIEW DA ARTE (é isso que vira imagem) */}
           <div className="mb-4 flex justify-center">
@@ -117,13 +130,13 @@ export default function PassarResultado({ grupo, bem, mes, onClose }: Props) {
                   <>
                     {mostrar.fixo50 && (
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#fff', borderRadius: 10, border: '1px solid #eee' }}>
-                        <span style={{ fontSize: 14, color: '#333' }}>🎯 Lance Fixo 50%</span>
+                        <span style={{ fontSize: 14, color: '#333' }}>🎯 {esconderFixoPct ? 'Lance Fixo' : 'Lance Fixo 50%'}</span>
                         <span style={{ fontSize: 16, fontWeight: 800, color: '#e8870b' }}>{mes.lance_fixo_50_qt}</span>
                       </div>
                     )}
                     {mostrar.fixo25 && (
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: '#fff', borderRadius: 10, border: '1px solid #eee' }}>
-                        <span style={{ fontSize: 14, color: '#333' }}>🎯 Lance Fixo 25%</span>
+                        <span style={{ fontSize: 14, color: '#333' }}>🎯 {esconderFixoPct ? 'Lance Fixo Embutido' : 'Lance Fixo 25%'}</span>
                         <span style={{ fontSize: 16, fontWeight: 800, color: '#9333ea' }}>{mes.lance_fixo_25_qt}</span>
                       </div>
                     )}
@@ -153,6 +166,11 @@ export default function PassarResultado({ grupo, bem, mes, onClose }: Props) {
             {gerando ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
             {gerando ? 'Gerando...' : 'Baixar Imagem'}
           </button>
+          {onAbrirArquivoOficial && (
+            <button onClick={onAbrirArquivoOficial} className="w-full flex items-center justify-center gap-2 rounded-lg py-2.5 mt-2 text-sm font-medium" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+              <Paperclip size={15} />Abrir arquivo oficial
+            </button>
+          )}
           <p className="text-[10px] text-center mt-2" style={{ color: 'var(--muted-color)' }}>Baixe e compartilhe no WhatsApp com o cliente</p>
         </div>
       </div>

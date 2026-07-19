@@ -4,8 +4,9 @@ import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { Calculator, CreditCard, Loader2, AlertTriangle, FileText, MonitorPlay, Trophy, RotateCcw, ChevronDown, X, Pencil, Plus, Eye, EyeOff, Shield } from 'lucide-react'
+import { Calculator, CreditCard, Loader2, AlertTriangle, FileText, MonitorPlay, Trophy, RotateCcw, ChevronDown, X, Pencil, Plus, Eye, EyeOff, Shield, User, Search } from 'lucide-react'
 import { jsPDF } from 'jspdf'
+import PassarResultado from '@/components/PassarResultado'
 
 interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number; estorno_ate_pgto: number | null; categoria_comissao: string | null; seguro_pct?: number | null; tx_adm_topo?: number | null; cheia_incremento_pct?: number | null; prazo_meses?: number | null; reduzida_25_pct?: number | null; pl_demais_50_pct?: number | null; pl_demais_25_pct?: number | null; pl_demais_int_pct?: number | null; pl_p12_50_pct?: number | null; pl_p12_25_pct?: number | null; pl_p12_int_pct?: number | null }
 interface FaixaCredito { credito: number; primeira_parcela: number; demais_parcela: number; total_nao_estornar: number }
@@ -223,7 +224,7 @@ const avisoEmbracon = (
   </div>
 )
 
-// ══════════════════════════════════════════════════════════════
+// ════════════════════════════════════════���═══════════════════�����═
 // Gerador de proposta em PDF — compartilhado pelas duas abas.
 // Recebe a instância de simulação + logo/nome da empresa.
 // ══════════════════════════════════════════════════════════════
@@ -368,13 +369,27 @@ function gerarPropostaPDF(s: Sim, logoBase64: string | null, empresaNome: string
 // 🏆 GRUPO EM DESTAQUE — componente compartilhado (Simulador + Atendimento)
 // Campeão = maior total_contemplados no último resultado disponível da faixa
 // ══════════════════════════════════════════════════════════════
-function GrupoDestaque({ bem, credito, variant }: { bem?: string; credito?: number; variant: 'simulador' | 'atendimento' }) {
+function GrupoDestaque({ bem, credito, variant, mostrarPercentuais = false }: { bem?: string; credito?: number; variant: 'simulador' | 'atendimento'; mostrarPercentuais?: boolean }) {
+  // percentuais do lance fixo só aparecem na visão interna do vendedor (Simulador)
+  const pct50 = mostrarPercentuais ? ' de 50%' : ''
+  const pct25 = mostrarPercentuais ? ' de 25%' : ''
   const [destaque, setDestaque] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [extLoading, setExtLoading] = useState(false)
   const [resLoading, setResLoading] = useState(false)
   const [expandido, setExpandido] = useState(false)
+  const [modalResultado, setModalResultado] = useState(false)
   const podeCarregar = !!bem && !!credito
+
+  // ESC fecha o modal antes de qualquer outro handler (tela cheia do Atendimento)
+  useEffect(() => {
+    if (!modalResultado) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.stopImmediatePropagation(); e.preventDefault(); setModalResultado(false) }
+    }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [modalResultado])
 
   const carregar = async () => {
     if (!podeCarregar) return
@@ -409,7 +424,13 @@ function GrupoDestaque({ bem, credito, variant }: { bem?: string; credito?: numb
     } catch {}
     setExtLoading(false)
   }
-  const abrirResultado = async () => {
+  // a apresentação principal é sempre a arte do PassarResultado (modo travado)
+  const abrirResultado = () => {
+    if (!destaque?.grupo) return
+    setModalResultado(true)
+  }
+  // ação secundária dentro do modal: abre o PDF oficial quando existe arquivo_path
+  const abrirArquivoOficial = async () => {
     if (!destaque?.grupo) return
     setResLoading(true)
     try {
@@ -436,17 +457,17 @@ function GrupoDestaque({ bem, credito, variant }: { bem?: string; credito?: numb
           <ul className="mt-1 space-y-0.5">
             {destaque.ultima_assembleia.sorteio_qt > 0 && <li className="text-sm" style={{ color: 'var(--muted-color)' }}>🎲 {destaque.ultima_assembleia.sorteio_qt} por sorteio</li>}
             {destaque.ultima_assembleia.lance_livre_qt > 0 && <li className="text-sm" style={{ color: 'var(--muted-color)' }}>💎 {destaque.ultima_assembleia.lance_livre_qt} por lance livre</li>}
-            {destaque.ultima_assembleia.lance_fixo_50_qt > 0 && <li className="text-sm" style={{ color: 'var(--muted-color)' }}>💎 {destaque.ultima_assembleia.lance_fixo_50_qt} por lance fixo</li>}
-            {destaque.ultima_assembleia.lance_fixo_25_qt > 0 && <li className="text-sm" style={{ color: 'var(--muted-color)' }}>💎 {destaque.ultima_assembleia.lance_fixo_25_qt} por lance fixo embutido</li>}
+            {destaque.ultima_assembleia.lance_fixo_50_qt > 0 && <li className="text-sm" style={{ color: 'var(--muted-color)' }}>💎 {destaque.ultima_assembleia.lance_fixo_50_qt} por lance fixo{pct50}</li>}
+            {destaque.ultima_assembleia.lance_fixo_25_qt > 0 && <li className="text-sm" style={{ color: 'var(--muted-color)' }}>💎 {destaque.ultima_assembleia.lance_fixo_25_qt} por lance fixo embutido{pct25}</li>}
           </ul>
         </>
       ) : (
         <p className="text-sm mt-2" style={{ color: 'var(--muted-color)' }}>Sem histórico de assembleia registrado para este grupo.</p>
       )}
       {destaque.proxima_assembleia && <p className="text-sm mt-1" style={{ color: 'var(--text)' }}>Próxima assembleia: <span className="font-semibold">{fmtData(destaque.proxima_assembleia)}</span></p>}
-      {(destaque.tem_resultado || destaque.tem_extrato) && (
+      {(destaque.tem_historico || destaque.tem_extrato) && (
         <div className="flex flex-wrap gap-2 mt-3">
-          {destaque.tem_resultado && (
+          {destaque.tem_historico && (
             <button onClick={abrirResultado} disabled={resLoading} className="flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold" style={{ background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.4)', color: 'var(--accent)' }}>
               {resLoading ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}📊 Ver último resultado
             </button>
@@ -462,6 +483,29 @@ function GrupoDestaque({ bem, credito, variant }: { bem?: string; credito?: numb
         <AlertTriangle size={14} style={{ color: '#f59e0b', marginTop: 1 }} />
         <p className="text-xs" style={{ color: '#f59e0b' }}>Grupo sujeito a disponibilidade — a adesão pode ocorrer em grupo similar da mesma faixa.</p>
       </div>
+
+      {/* MODAL: MESMA arte do PassarResultado (Assembleias), em modo travado por aba */}
+      {modalResultado && destaque.ultima_assembleia && (
+        <PassarResultado
+          grupo={String(destaque.grupo)}
+          bem={destaque.bem || bem || ''}
+          mes={{
+            mes_referencia: destaque.ultima_assembleia.mes_referencia || '',
+            mes_label: destaque.ultima_assembleia.label || '',
+            numero_assembleia: destaque.ultima_assembleia.numero ?? null,
+            sorteio_qt: destaque.ultima_assembleia.sorteio_qt ?? 0,
+            lance_livre_qt: destaque.ultima_assembleia.lance_livre_qt ?? 0,
+            lance_livre_maior: destaque.ultima_assembleia.lance_livre_maior ?? null,
+            lance_livre_menor: destaque.ultima_assembleia.lance_livre_menor ?? null,
+            lance_fixo_50_qt: destaque.ultima_assembleia.lance_fixo_50_qt ?? 0,
+            lance_fixo_25_qt: destaque.ultima_assembleia.lance_fixo_25_qt ?? 0,
+            total_contemplados: destaque.ultima_assembleia.total_contemplados ?? 0,
+          }}
+          modoFixo={variant}
+          onAbrirArquivoOficial={destaque.tem_resultado ? abrirArquivoOficial : undefined}
+          onClose={() => setModalResultado(false)}
+        />
+      )}
     </>
   )
 
@@ -602,7 +646,7 @@ function SimuladorTab({ planos, empresaNome, logoBase64 }: { planos: Plano[]; em
       )}
 
       {/* 🏆 GRUPO EM DESTAQUE (mesma seção do Atendimento) */}
-      {faixa && <GrupoDestaque bem={planoAtual?.bem} credito={faixa.credito} variant="simulador" />}
+      {faixa && <GrupoDestaque bem={planoAtual?.bem} credito={faixa.credito} variant="simulador" mostrarPercentuais />}
 
       {planoAtual?.bem === 'Imóvel' && faixa && (
         <div className="rounded-xl p-4" style={{ background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.35)' }}>
@@ -634,7 +678,7 @@ function SimuladorTab({ planos, empresaNome, logoBase64 }: { planos: Plano[]; em
   )
 }
 
-// ══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════��══════════════════════════
 // ABA ATENDIMENTO — estado próprio + apresentação pro cliente
 // ══════════════════════════════════════════════════════════════
 function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, onSair }: { planos: Plano[]; empresaNome: string; empresaLogo: string | null; logoBase64: string | null; ativo: boolean; onSair: () => void }) {
@@ -649,6 +693,11 @@ function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, o
   const [lanceMenu, setLanceMenu] = useState(false)
   // 👁 entrada total oculta por padrão (revela sob comando do vendedor)
   const [entradaVisivel, setEntradaVisivel] = useState(false)
+  // 👤 nome do cliente (mesmo estado do rodapé): popover inline no topo
+  const [clienteMenu, setClienteMenu] = useState(false)
+  const clienteRef = useRef<HTMLDivElement>(null)
+  // 🔍 consulta de disponibilidade (controlada pelo vendedor)
+  const [disp, setDisp] = useState<'idle' | 'loading' | 'shown'>('idle')
 
   // ESC fecha o menu de lance (se aberto) ou sai da tela cheia; trava o scroll do body
   useEffect(() => {
@@ -668,6 +717,14 @@ function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, o
     return () => document.removeEventListener('mousedown', onDown)
   }, [lanceMenu])
 
+  // fecha o popover do cliente ao clicar fora
+  useEffect(() => {
+    if (!clienteMenu) return
+    const onDown = (e: MouseEvent) => { if (clienteRef.current && !clienteRef.current.contains(e.target as Node)) setClienteMenu(false) }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [clienteMenu])
+
   useEffect(() => {
     if (lanceModo === 'none') { if (s.lanceEmbutido) s.setLanceEmbutido(''); return }
     if (lanceModo === 'livre') return
@@ -677,11 +734,23 @@ function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, o
 
   const aplicarLance = (m: typeof lanceModo) => { setLanceModo(m); if (m !== 'livre') setLanceMenu(false) }
   const removerLance = () => { setLanceModo('none'); setLanceMenu(false) }
-  const limparTudo = () => { s.limpar(); setLanceModo('none'); setLanceMenu(false); setEntradaVisivel(false) }
+  const limparTudo = () => { s.limpar(); setLanceModo('none'); setLanceMenu(false); setEntradaVisivel(false); setDisp('idle') }
   const scrollTopo = () => scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
 
-  // ao trocar de crédito/plano é uma nova simulação: re-oculta a entrada
-  useEffect(() => { setEntradaVisivel(false) }, [faixa?.credito, planoAtual?.sigla])
+  // ao trocar de crédito/plano é uma nova simulação: re-oculta a entrada e reseta a disponibilidade
+  useEffect(() => { setEntradaVisivel(false); setDisp('idle') }, [faixa?.credito, planoAtual?.sigla])
+
+  // consulta de disponibilidade: spinner ~1,5s e depois a badge
+  const consultarDisponibilidade = () => {
+    setDisp('loading')
+    setTimeout(() => setDisp('shown'), 1500)
+  }
+
+  // primeiro nome capitalizado para a saudação personalizada
+  const primeiroNome = (s.nomeCliente || '').trim().split(/\s+/)[0]
+  const primeiroNomeCap = primeiroNome ? primeiroNome.charAt(0).toUpperCase() + primeiroNome.slice(1).toLowerCase() : ''
+  // categoria base (só o tipo do bem) em pill discreta — frase única p/ todas as categorias
+  const catBase = s.categoria.startsWith('imovel') ? '🏠 Imóvel' : s.categoria.startsWith('auto') ? '🚗 Auto' : s.categoria.startsWith('pesados') ? '🚛 Pesados' : (planoAtual?.bem || '')
 
   // moeda compacta (sem centavos) p/ caber no botão de lance
   const fmtCompacto = (v: number) => 'R$ ' + Math.round(v || 0).toLocaleString('pt-BR')
@@ -705,6 +774,32 @@ function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, o
       <div className="mx-auto w-full max-w-5xl px-5 pt-6 pb-32 sm:px-8">
       {/* PILLS DO VENDEDOR (discretas, sem lance) */}
       <div className="flex flex-wrap items-center gap-2 mb-6">
+        {/* 👤 cliente — mesmo estado do rodapé (PROPOSTA) */}
+        <div ref={clienteRef} className="relative">
+          {clienteMenu ? (
+            <div className="flex items-center gap-1.5 rounded-full pl-3 pr-1.5 py-1" style={{ ...pillWrap, borderColor: 'rgba(212,175,55,0.4)' }}>
+              <User size={13} style={{ color: 'var(--accent)' }} className="shrink-0" />
+              <input
+                autoFocus
+                value={s.nomeCliente}
+                onChange={e => s.setNomeCliente(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) setClienteMenu(false) }}
+                placeholder="Nome do cliente"
+                className="w-40 bg-transparent text-sm font-medium outline-none"
+                style={{ color: 'var(--text)' }}
+              />
+              <button onClick={() => setClienteMenu(false)} aria-label="Confirmar" className="flex h-6 w-6 items-center justify-center rounded-full shrink-0" style={{ color: 'var(--accent)' }}>
+                <X size={13} />
+              </button>
+            </div>
+          ) : (
+            <button onClick={() => setClienteMenu(true)} className="flex items-center gap-1.5 rounded-full pl-3 pr-2.5 py-1.5" style={{ ...pillWrap, borderColor: s.nomeCliente ? 'rgba(212,175,55,0.4)' : 'var(--border)' }}>
+              <User size={13} style={{ color: s.nomeCliente ? 'var(--accent)' : 'var(--muted-color)' }} />
+              <span className="text-sm font-medium max-w-[10rem] truncate" style={{ color: s.nomeCliente ? 'var(--text)' : 'var(--muted-color)' }}>{s.nomeCliente || 'Cliente'}</span>
+              <Pencil size={11} style={{ color: 'var(--muted-color)' }} />
+            </button>
+          )}
+        </div>
         {/* categoria */}
         <div className="flex items-center gap-1.5 rounded-full pl-3 pr-2.5 py-1.5" style={pillWrap}>
           <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted-color)' }}>Tipo</span>
@@ -779,8 +874,14 @@ function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, o
               )}
             </div>
 
-            {/* crédito gigante + alterar + linha bem·plano */}
+            {/* saudação personalizada (só com nome) + crédito gigante + pill da categoria */}
             <div className="text-center">
+              {primeiroNomeCap && (
+                <div className="mb-6">
+                  <p className="font-bold text-balance leading-tight" style={{ color: 'var(--accent)', fontSize: 26 }}>{primeiroNomeCap},</p>
+                  <p className="text-pretty mx-auto max-w-xl leading-snug" style={{ color: 'var(--text)', fontSize: 20 }}>será um prazer te ajudar na realização da sua conquista.</p>
+                </div>
+              )}
               <p className="text-sm uppercase tracking-widest" style={{ color: 'var(--muted-color)' }}>Seu crédito de</p>
               <div className="flex items-center justify-center gap-3 mt-2">
                 <p className="font-bold leading-none" style={{ color: 'var(--accent)', fontSize: 'clamp(52px, 9vw, 88px)' }}>{fmtMoeda(faixa.credito)}</p>
@@ -788,7 +889,11 @@ function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, o
                   <Pencil size={11} />alterar
                 </button>
               </div>
-              <p className="text-base mt-3" style={{ color: 'var(--text)' }}>{planoAtual?.bem} · {nomeAmigavel}</p>
+              {catBase && (
+                <div className="flex justify-center mt-4">
+                  <span className="rounded-full px-3 py-1 text-sm font-medium" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid var(--border)', color: 'var(--text)' }}>{catBase}</span>
+                </div>
+              )}
             </div>
 
             {/* 💎 botão de lance embutido (abaixo do crédito) */}
@@ -821,42 +926,38 @@ function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, o
             {lanceNum <= 0 ? (
               /* SEM lance: 2 cards grandes */
               <div className="grid gap-4 mt-8 sm:grid-cols-2 max-w-3xl mx-auto">
-                <div className="rounded-2xl px-6 py-9 text-center min-w-0 overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                  <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--muted-color)' }}>Parcelas de</p>
-                  <p className="font-bold leading-tight" style={{ color: 'var(--text)', fontSize: fonteCard(fmtMoedaCard(pdProposta)) }}>{fmtMoedaCard(pdProposta)}</p>
+                <div className="rounded-2xl px-6 py-9 flex flex-col items-center text-center min-w-0 overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <p className="w-full text-xs uppercase tracking-wider" style={{ color: 'var(--muted-color)' }}>Parcelas de</p>
+                  <p className="w-full font-bold leading-tight mt-3" style={{ color: 'var(--text)', fontSize: fonteCard(fmtMoedaCard(pdProposta)) }}>{fmtMoedaCard(pdProposta)}</p>
                   <p className="text-sm mt-1" style={{ color: 'var(--muted-color)' }}>por mês</p>
                 </div>
-                <div className="rounded-2xl px-6 py-9 text-center min-w-0 overflow-hidden" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.4)' }}>
-                  <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--accent)' }}>Entrada total</p>
-                  <div className="flex items-center justify-center gap-2 min-w-0">
-                    <p className="font-bold leading-tight transition-opacity duration-300 truncate" style={{ color: 'var(--accent)', opacity: entradaVisivel ? 1 : 0.85, fontSize: fonteCard(entradaVisivel ? fmtMoedaCard(entradaProposta) : 'R$ ••••••') }}>{entradaVisivel ? fmtMoedaCard(entradaProposta) : 'R$ ••••••'}</p>
-                    <button onClick={() => setEntradaVisivel(v => !v)} aria-label={entradaVisivel ? 'Ocultar entrada' : 'Mostrar entrada'} className="shrink-0" style={{ color: 'var(--accent)' }}>{entradaVisivel ? <EyeOff size={20} /> : <Eye size={20} />}</button>
-                  </div>
+                <div className="relative rounded-2xl px-6 py-9 flex flex-col items-center text-center min-w-0 overflow-hidden" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.4)' }}>
+                  <button onClick={() => setEntradaVisivel(v => !v)} aria-label={entradaVisivel ? 'Ocultar entrada' : 'Mostrar entrada'} className="absolute top-3 right-3" style={{ color: 'var(--accent)' }}>{entradaVisivel ? <EyeOff size={18} /> : <Eye size={18} />}</button>
+                  <p className="w-full text-xs uppercase tracking-wider" style={{ color: 'var(--accent)' }}>Entrada total</p>
+                  <p className="w-full font-bold leading-tight mt-3 transition-opacity duration-300" style={{ color: 'var(--accent)', opacity: entradaVisivel ? 1 : 0.85, fontSize: fonteCard(entradaVisivel ? fmtMoedaCard(entradaProposta) : 'R$ ••••••') }}>{entradaVisivel ? fmtMoedaCard(entradaProposta) : 'R$ ••••••'}</p>
                 </div>
               </div>
             ) : (
               /* COM lance embutido: 4 cards */
               <div className="grid gap-4 mt-8 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-2xl px-5 py-7 text-center min-w-0 overflow-hidden" style={{ background: 'rgba(212,175,55,0.16)', border: '1px solid rgba(212,175,55,0.5)' }}>
-                  <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--accent)' }}>💰 Crédito líquido</p>
-                  <p className="font-bold leading-tight" style={{ color: 'var(--accent)', fontSize: fonteCard(fmtMoedaCard(creditoLiquido)) }}>{fmtMoedaCard(creditoLiquido)}</p>
+                <div className="rounded-2xl px-5 py-7 flex flex-col items-center text-center min-w-0 overflow-hidden" style={{ background: 'rgba(212,175,55,0.16)', border: '1px solid rgba(212,175,55,0.5)' }}>
+                  <p className="w-full text-xs uppercase tracking-wider" style={{ color: 'var(--accent)' }}>💰 Crédito líquido</p>
+                  <p className="w-full font-bold leading-tight mt-3" style={{ color: 'var(--accent)', fontSize: fonteCard(fmtMoedaCard(creditoLiquido), 26) }}>{fmtMoedaCard(creditoLiquido)}</p>
                 </div>
-                <div className="rounded-2xl px-5 py-7 text-center min-w-0 overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(212,175,55,0.25)' }}>
-                  <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--accent)' }}>💎 Lance embutido</p>
-                  <p className="font-bold leading-tight" style={{ color: 'var(--text)', fontSize: fonteCard(fmtMoedaCard(lanceNum), 24) }}>{fmtMoedaCard(lanceNum)}</p>
+                <div className="rounded-2xl px-5 py-7 flex flex-col items-center text-center min-w-0 overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(212,175,55,0.25)' }}>
+                  <p className="w-full text-xs uppercase tracking-wider" style={{ color: 'var(--accent)' }}>💎 Lance embutido</p>
+                  <p className="w-full font-bold leading-tight mt-3" style={{ color: 'var(--text)', fontSize: fonteCard(fmtMoedaCard(lanceNum), 26) }}>{fmtMoedaCard(lanceNum)}</p>
                   <p className="text-[11px] mt-1 text-pretty" style={{ color: 'var(--muted-color)' }}>sai do próprio crédito, sem desembolso</p>
                 </div>
-                <div className="rounded-2xl px-5 py-7 text-center min-w-0 overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                  <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--muted-color)' }}>Parcelas de</p>
-                  <p className="font-bold leading-tight" style={{ color: 'var(--text)', fontSize: fonteCard(fmtMoedaCard(pdProposta), 24) }}>{fmtMoedaCard(pdProposta)}</p>
+                <div className="rounded-2xl px-5 py-7 flex flex-col items-center text-center min-w-0 overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                  <p className="w-full text-xs uppercase tracking-wider" style={{ color: 'var(--muted-color)' }}>Parcelas de</p>
+                  <p className="w-full font-bold leading-tight mt-3" style={{ color: 'var(--text)', fontSize: fonteCard(fmtMoedaCard(pdProposta), 26) }}>{fmtMoedaCard(pdProposta)}</p>
                   <p className="text-sm mt-1" style={{ color: 'var(--muted-color)' }}>por mês</p>
                 </div>
-                <div className="rounded-2xl px-5 py-7 text-center min-w-0 overflow-hidden" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.4)' }}>
-                  <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--accent)' }}>Entrada total</p>
-                  <div className="flex items-center justify-center gap-1.5 min-w-0">
-                    <p className="font-bold leading-tight transition-opacity duration-300" style={{ color: 'var(--accent)', opacity: entradaVisivel ? 1 : 0.85, fontSize: fonteCard(entradaVisivel ? fmtMoedaCard(entradaProposta) : 'R$ ••••••', 20) }}>{entradaVisivel ? fmtMoedaCard(entradaProposta) : 'R$ ••••••'}</p>
-                    <button onClick={() => setEntradaVisivel(v => !v)} aria-label={entradaVisivel ? 'Ocultar entrada' : 'Mostrar entrada'} className="shrink-0" style={{ color: 'var(--accent)' }}>{entradaVisivel ? <EyeOff size={16} /> : <Eye size={16} />}</button>
-                  </div>
+                <div className="relative rounded-2xl px-5 py-7 flex flex-col items-center text-center min-w-0 overflow-hidden" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.4)' }}>
+                  <button onClick={() => setEntradaVisivel(v => !v)} aria-label={entradaVisivel ? 'Ocultar entrada' : 'Mostrar entrada'} className="absolute top-3 right-3" style={{ color: 'var(--accent)' }}>{entradaVisivel ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+                  <p className="w-full text-xs uppercase tracking-wider" style={{ color: 'var(--accent)' }}>Entrada total</p>
+                  <p className="w-full font-bold leading-tight mt-3 transition-opacity duration-300" style={{ color: 'var(--accent)', opacity: entradaVisivel ? 1 : 0.85, fontSize: fonteCard(entradaVisivel ? fmtMoedaCard(entradaProposta) : 'R$ ••••••', 26) }}>{entradaVisivel ? fmtMoedaCard(entradaProposta) : 'R$ ••••••'}</p>
                 </div>
               </div>
             )}
@@ -864,7 +965,7 @@ function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, o
             {/* Frase da venda */}
             <p className="text-center text-base mt-8 text-pretty" style={{ color: 'var(--text)' }}>
               {lanceNum > 0
-                ? <>Com <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(lanceNum)}</span> de lance embutido, você conquista <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(faixa.credito)}</span> e recebe <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(creditoLiquido)}</span> líquidos</>
+                ? <>Crédito de <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(faixa.credito)}</span> · <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(lanceNum)}</span> de lance embutido · <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(creditoLiquido)}</span> líquidos para você após a contemplação{entradaVisivel && <> · entrada total de <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(entradaProposta)}</span></>}</>
                 : entradaVisivel
                   ? <>Entrada total de <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(entradaProposta)}</span> e parcelas de <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(pdProposta)}</span> para conquistar <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(faixa.credito)}</span></>
                   : <>Parcelas de <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(pdProposta)}</span> para conquistar <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(faixa.credito)}</span></>}
@@ -873,6 +974,30 @@ function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, o
 
             {/* 🏆 Grupo em destaque desta faixa (componente compartilhado) */}
             <GrupoDestaque bem={planoAtual?.bem} credito={faixa.credito} variant="atendimento" />
+
+            {/* 🔍 consulta de disponibilidade (controlada pelo vendedor) */}
+            <style>{`@keyframes vagaPulse{0%,100%{opacity:1}50%{opacity:.55}}`}</style>
+            <div className="flex justify-center mt-8">
+              {disp === 'shown' ? (
+                <button
+                  onClick={() => setDisp('idle')}
+                  title="Clique para ocultar"
+                  className="flex items-center gap-2 rounded-full px-4 py-2"
+                  style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.4)', color: '#f59e0b', fontSize: 12, animation: 'vagaPulse 1.6s ease-in-out infinite' }}
+                >
+                  <AlertTriangle size={13} />Última vaga nessas condições
+                </button>
+              ) : (
+                <button
+                  onClick={consultarDisponibilidade}
+                  disabled={disp === 'loading'}
+                  className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium disabled:opacity-70"
+                  style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--muted-color)' }}
+                >
+                  {disp === 'loading' ? <><Loader2 size={14} className="animate-spin" />consultando...</> : <><Search size={14} />Consultar disponibilidade</>}
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
