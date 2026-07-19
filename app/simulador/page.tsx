@@ -165,7 +165,7 @@ function SeletoresTipoParcela({ s }: { s: Sim }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       <div>
-        <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Parcela mostrada na proposta</label>
+        <label className="block text-xs mb-1" style={{ color: 'var(--accent)' }}>Parcela (1ª e demais)</label>
         <div className="flex gap-2">
           <button onClick={() => s.setTipoParcela('red50')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: s.tipoParcela === 'red50' ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${s.tipoParcela === 'red50' ? 'var(--accent)' : 'var(--border)'}`, color: s.tipoParcela === 'red50' ? 'var(--accent)' : 'var(--muted-color)' }}>50%</button>
           {(s.red25Pct > 0 || s.ehParcelinha) && <button onClick={() => s.setTipoParcela('red25')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: s.tipoParcela === 'red25' ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${s.tipoParcela === 'red25' ? 'var(--accent)' : 'var(--border)'}`, color: s.tipoParcela === 'red25' ? 'var(--accent)' : 'var(--muted-color)' }}>25%</button>}
@@ -173,7 +173,7 @@ function SeletoresTipoParcela({ s }: { s: Sim }) {
         </div>
       </div>
       <div>
-        <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Base da antecipação (entrada)</label>
+        <label className="block text-xs mb-1" style={{ color: '#60a5fa' }}>Entrada (antecipação)</label>
         <div className="flex gap-2">
           <button onClick={() => s.setTipoAntecipacao('red50')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: s.tipoAntecipacao === 'red50' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${s.tipoAntecipacao === 'red50' ? '#3b82f6' : 'var(--border)'}`, color: s.tipoAntecipacao === 'red50' ? '#3b82f6' : 'var(--muted-color)' }}>50%</button>
           {(s.red25Pct > 0 || s.ehParcelinha) && <button onClick={() => s.setTipoAntecipacao('red25')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: s.tipoAntecipacao === 'red25' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${s.tipoAntecipacao === 'red25' ? '#3b82f6' : 'var(--border)'}`, color: s.tipoAntecipacao === 'red25' ? '#3b82f6' : 'var(--muted-color)' }}>25%</button>}
@@ -185,12 +185,15 @@ function SeletoresTipoParcela({ s }: { s: Sim }) {
 }
 
 const SecaoTitulo = ({ n, children, extra }: { n: string; children: React.ReactNode; extra?: React.ReactNode }) => (
-  <div className="flex items-center justify-between mb-3">
-    <div className="flex items-center gap-2">
-      <span className="text-base">{n}</span>
-      <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--muted-color)' }}>{children}</h3>
+  <div className="mb-4">
+    <div className="flex items-center justify-between">
+      <div className="flex items-center gap-2.5">
+        <span className="flex shrink-0 items-center justify-center rounded-full font-semibold" style={{ width: 26, height: 26, border: '1.5px solid rgba(212,175,55,0.6)', background: 'rgba(212,175,55,0.10)', color: 'var(--accent)', fontSize: 13 }}>{n}</span>
+        <h3 className="font-semibold uppercase" style={{ letterSpacing: '2px', fontSize: 14, color: 'var(--text)' }}>{children}</h3>
+      </div>
+      {extra}
     </div>
-    {extra}
+    <div className="mt-3" style={{ borderTop: '1px solid var(--border)' }} />
   </div>
 )
 
@@ -352,8 +355,8 @@ function SimuladorTab({ planos, empresaNome, logoBase64 }: { planos: Plano[]; em
     faixa, qtd, planoAtual, prazoPlano, comSeguro, seguroPct, seguroMensal, verCheia, setVerCheia,
     red25Pct, cheiaInc, demais25, primeira25, demaisCheia, primeiraCheia, p1, pd, ehParcelinha,
     pdParc25, p1Parc25, pdParcCheia, p1ParcCheia, labelPorTipo, tipoParcela, tipoAntecipacao,
-    entradaProposta, valorAntecipadas, totalCliente, limiteEstorno, totalNaoEstornar, lanceNum, prazoRestante, creditoLiquido,
-    nomeAmigavel, nomeCliente, setNomeCliente, lanceEmbutido, setLanceEmbutido, pdProposta,
+    entradaProposta, limiteEstorno, totalNaoEstornar, lanceNum, prazoRestante, creditoLiquido,
+    nomeAmigavel, nomeCliente, setNomeCliente, lanceEmbutido, setLanceEmbutido, p1Proposta, pdProposta, p1Antecip, pdAntecip,
   } = s
 
   const gerarPDF = () => gerarPropostaPDF(s, logoBase64, empresaNome)
@@ -362,18 +365,18 @@ function SimuladorTab({ planos, empresaNome, logoBase64 }: { planos: Plano[]; em
     <div className="space-y-5 pb-40">
       {/* 1️⃣ MONTAGEM */}
       <div className="rounded-xl p-5" style={cardStyle}>
-        <SecaoTitulo n="1️⃣" extra={
+        <SecaoTitulo n="1" extra={
           <button onClick={s.limpar} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium transition-colors" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--muted-color)' }}>
             <RotateCcw size={12} />Limpar
           </button>
-        }>Montagem</SecaoTitulo>
+        }>Simule</SecaoTitulo>
         <GridMontagem s={s} />
       </div>
 
       {/* 2️⃣ CONDIÇÕES */}
       {faixa && (
         <div className="rounded-xl p-5" style={cardStyle}>
-          <SecaoTitulo n="2️⃣">Condições</SecaoTitulo>
+          <SecaoTitulo n="2">Condições</SecaoTitulo>
           <div className="space-y-3">
             <SeletoresTipoParcela s={s} />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -406,19 +409,19 @@ function SimuladorTab({ planos, empresaNome, logoBase64 }: { planos: Plano[]; em
       {/* 3️⃣ RESULTADO (visão interna) */}
       {faixa && (
         <div className="rounded-xl p-5" style={{ background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}>
-          <SecaoTitulo n="3️⃣">Resultado (visão interna)</SecaoTitulo>
+          <SecaoTitulo n="3">Resultado</SecaoTitulo>
           <div className="flex items-center gap-3 mb-4"><CreditCard size={18} style={{ color: '#3b82f6' }} /><h3 className="text-sm font-semibold" style={{ color: '#3b82f6' }}>Quanto o cliente paga</h3></div>
           <div className="grid grid-cols-2 gap-4 text-sm">
-            <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>{ehParcelinha ? 'Parcela (1ª a 12ª)' : '1ª parcela'}</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(p1)}</p></div>
-            <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Demais (cada)</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(pd)}</p></div>
-            <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>+ {qtd} antecipadas</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(valorAntecipadas)}</p></div>
+            <div><p className="text-xs" style={{ color: 'var(--accent)' }}>{ehParcelinha ? 'Parcela (1ª a 12ª)' : '1ª parcela'} · {labelPorTipo(tipoParcela)}</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(p1Proposta)}</p></div>
+            <div><p className="text-xs" style={{ color: 'var(--accent)' }}>Demais (cada) · {labelPorTipo(tipoParcela)}</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(pdProposta)}</p></div>
+            <div><p className="text-xs" style={{ color: '#60a5fa' }}>+ {qtd} antecipadas · {labelPorTipo(tipoAntecipacao)}</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda((ehParcelinha ? p1Antecip : pdAntecip) * qtd)}</p></div>
             {!ehParcelinha && <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Total p/ não estornar{limiteEstorno > 0 ? ` (1ª + ${limiteEstorno - 1})` : ''}</p><p className="text-lg font-semibold" style={{ color: '#f59e0b' }}>{fmtMoeda(totalNaoEstornar)}</p></div>}
             <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Crédito líquido{lanceNum > 0 ? ' (após lance)' : ''}</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(creditoLiquido)}</p></div>
             {seguroMensal > 0 && <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Seguro / mês</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(seguroMensal)}</p></div>}
           </div>
           <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
-            <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Total que o cliente desembolsa (1ª + {qtd})</p>
-            <p className="text-2xl font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(totalCliente)}</p>
+            <p className="text-xs" style={{ color: '#60a5fa' }}>Entrada total · 1ª + {qtd} antecipadas · {labelPorTipo(tipoAntecipacao)}</p>
+            <p className="text-2xl font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(entradaProposta)}</p>
           </div>
           <p className="text-xs mt-3" style={{ color: 'var(--muted-color)' }}>Prazo: {prazoPlano} meses {planoAtual?.tx_adm_topo ? `· Taxa adm. total: ${planoAtual.tx_adm_topo}%` : ''}</p>
           {(red25Pct > 0 || cheiaInc > 0 || ehParcelinha) && (
@@ -466,16 +469,12 @@ function SimuladorTab({ planos, empresaNome, logoBase64 }: { planos: Plano[]; em
       {/* 4️⃣ BARRA DE PROPOSTA (sticky) */}
       {faixa && (
         <div className="sticky bottom-0 -mx-6 px-6 pt-3 pb-4 lg:-mx-8 lg:px-8" style={{ background: 'linear-gradient(to top, rgba(10,11,14,0.98) 70%, rgba(10,11,14,0))' }}>
-          {/* Resumo-frase */}
+          {/* Resumo-frase: reflete exatamente as escolhas da seção 2 */}
           <p className="text-[11px] mb-2 text-pretty" style={{ color: 'var(--muted-color)' }}>
-            <span style={{ color: 'var(--text)' }}>{nomeAmigavel}</span> · {fmtMoeda(faixa.credito)} · parcela {labelPorTipo(tipoParcela)} · primeiro pagamento total de <span style={{ color: 'var(--accent)' }}>{fmtMoeda(entradaProposta)}</span> + {prazoRestante}× de {fmtMoeda(pdProposta)}
+            <span style={{ color: 'var(--text)' }}>{nomeAmigavel}</span> · {fmtMoeda(faixa.credito)} · parcela {labelPorTipo(tipoParcela)} · entrada {labelPorTipo(tipoAntecipacao)} · primeiro pagamento total de <span style={{ color: 'var(--accent)' }}>{fmtMoeda(entradaProposta)}</span> + {prazoRestante}× de {fmtMoeda(pdProposta)}
           </p>
           <div className="rounded-xl p-3 flex flex-col sm:flex-row sm:items-center gap-3" style={{ background: 'rgba(17,18,22,0.95)', border: '1px solid rgba(212,175,55,0.25)', boxShadow: '0 -4px 24px rgba(0,0,0,0.4)' }}>
-            {/* chips do que sai no PDF */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="rounded-full px-2.5 py-1 text-[10px] font-semibold" style={{ background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.4)', color: 'var(--accent)' }}>Parcela: {labelPorTipo(tipoParcela)}</span>
-              <span className="rounded-full px-2.5 py-1 text-[10px] font-semibold" style={{ background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.4)', color: '#60a5fa' }}>Entrada: {labelPorTipo(tipoAntecipacao)}</span>
-            </div>
+            <span className="flex shrink-0 items-center justify-center rounded-full font-semibold" style={{ width: 26, height: 26, border: '1.5px solid rgba(212,175,55,0.6)', background: 'rgba(212,175,55,0.10)', color: 'var(--accent)', fontSize: 13 }}>4</span>
             <input value={nomeCliente} onChange={e => setNomeCliente(e.target.value)} placeholder="Nome do cliente" className="flex-1 min-w-0 rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
             <button onClick={gerarPDF} className="rounded-lg px-4 py-2.5 text-sm font-semibold whitespace-nowrap flex items-center justify-center gap-2" style={{ background: 'linear-gradient(135deg, #d4af37, #b8941f)', border: '1px solid rgba(212,175,55,0.6)', color: '#0a0a0a', boxShadow: '0 8px 24px rgba(212,175,55,0.25)' }}>
               <FileText size={15} />Gerar Proposta
