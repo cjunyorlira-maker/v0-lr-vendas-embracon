@@ -4,13 +4,30 @@ import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { Calculator, CreditCard, Loader2, AlertTriangle, FileText, MonitorPlay, Trophy, RotateCcw, ChevronDown, X, Pencil, Plus } from 'lucide-react'
+import { Calculator, CreditCard, Loader2, AlertTriangle, FileText, MonitorPlay, Trophy, RotateCcw, ChevronDown, X, Pencil, Plus, Eye, EyeOff, Shield } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 
 interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number; estorno_ate_pgto: number | null; categoria_comissao: string | null; seguro_pct?: number | null; tx_adm_topo?: number | null; cheia_incremento_pct?: number | null; prazo_meses?: number | null; reduzida_25_pct?: number | null; pl_demais_50_pct?: number | null; pl_demais_25_pct?: number | null; pl_demais_int_pct?: number | null; pl_p12_50_pct?: number | null; pl_p12_25_pct?: number | null; pl_p12_int_pct?: number | null }
 interface FaixaCredito { credito: number; primeira_parcela: number; demais_parcela: number; total_nao_estornar: number }
 
 const fmtMoeda = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+// versão compacta para caber nos cards do palco: >= 1 milhão vira "R$ 1,2M"
+const fmtMoedaCard = (v: number) => {
+  const n = v || 0
+  if (Math.abs(n) >= 1_000_000) {
+    const m = n / 1_000_000
+    const s = m.toLocaleString('pt-BR', { minimumFractionDigits: m % 1 === 0 ? 0 : 1, maximumFractionDigits: 1 })
+    return `R$ ${s}M`
+  }
+  return fmtMoeda(n)
+}
+// fonte adaptativa por comprimento da string: <=10 chars 34px · 11-13 28px · 14+ 24px
+const fonteCard = (s: string, base = 34) => {
+  const len = s.length
+  if (len <= 10) return base
+  if (len <= 13) return Math.min(base, 28)
+  return Math.min(base, 24)
+}
 
 // categorias agrupadas
 const CATEGORIAS: Record<string, { label: string; siglas: string[] }> = {
@@ -109,7 +126,8 @@ function useSimulacao(planos: Plano[]) {
   const valorAntecipadas = ehParcelinha ? p1 * qtd : pd * qtd
   const totalCliente = ehParcelinha ? p1 * (1 + qtd) : p1 + pd * qtd
   const limiteEstorno = planoAtual?.estorno_ate_pgto || 0
-  const totalNaoEstornar = limiteEstorno > 0 ? p1 + pd * (limiteEstorno - 1) : (faixa?.total_nao_estornar || 0)
+  // acompanha o tipo de parcela selecionado (1ª + (N-1) demais do mesmo tipo)
+  const totalNaoEstornar = limiteEstorno > 0 ? p1Proposta + pdProposta * (limiteEstorno - 1) : (faixa?.total_nao_estornar || 0)
   const lanceNum = parseFloat((lanceEmbutido || '').replace(/\./g, '').replace(',', '.')) || 0
   const prazoRestante = Math.max(0, prazoPlano - (1 + qtd))
   const creditoLiquido = faixa ? faixa.credito - lanceNum : 0
@@ -184,7 +202,7 @@ function SeletoresTipoParcela({ s }: { s: Sim }) {
   )
 }
 
-const SecaoTitulo = ({ n, children, extra }: { n: string; children: React.ReactNode; extra?: React.ReactNode }) => (
+const SecaoTitulo = ({ n, children, extra }: { n: React.ReactNode; children: React.ReactNode; extra?: React.ReactNode }) => (
   <div className="mb-4">
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2.5">
@@ -347,6 +365,133 @@ function gerarPropostaPDF(s: Sim, logoBase64: string | null, empresaNome: string
 }
 
 // ══════════════════════════════════════════════════════════════
+// 🏆 GRUPO EM DESTAQUE — componente compartilhado (Simulador + Atendimento)
+// Campeão = maior total_contemplados no último resultado disponível da faixa
+// ══════════════════════════════════════════════════════════════
+function GrupoDestaque({ bem, credito, variant }: { bem?: string; credito?: number; variant: 'simulador' | 'atendimento' }) {
+  const [destaque, setDestaque] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [extLoading, setExtLoading] = useState(false)
+  const [resLoading, setResLoading] = useState(false)
+  const [expandido, setExpandido] = useState(false)
+  const podeCarregar = !!bem && !!credito
+
+  const carregar = async () => {
+    if (!podeCarregar) return
+    setLoading(true)
+    try {
+      const r = await fetch(`/api/simulador/grupo-destaque?bem=${encodeURIComponent(bem!)}&credito=${credito}`)
+      setDestaque(await r.json())
+    } catch { setDestaque({ encontrado: false }) }
+    setLoading(false)
+  }
+
+  // reativo: nova faixa/categoria → recalcula o campeão na hora (simulador auto; atendimento sob demanda)
+  useEffect(() => {
+    setDestaque(null)
+    if (variant === 'simulador') { if (podeCarregar) carregar() }
+    else setExpandido(false)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bem, credito])
+
+  const toggle = () => {
+    const abrir = !expandido
+    setExpandido(abrir)
+    if (abrir && !destaque && !loading) carregar()
+  }
+  const abrirExtrato = async () => {
+    if (!destaque?.grupo) return
+    setExtLoading(true)
+    try {
+      const r = await fetch(`/api/assembleias/extrato/download?grupo=${encodeURIComponent(destaque.grupo)}`)
+      const d = await r.json()
+      if (d.url) window.open(d.url, '_blank')
+    } catch {}
+    setExtLoading(false)
+  }
+  const abrirResultado = async () => {
+    if (!destaque?.grupo) return
+    setResLoading(true)
+    try {
+      const r = await fetch(`/api/assembleias/resultado/download?grupo=${encodeURIComponent(destaque.grupo)}`)
+      const d = await r.json()
+      if (d.url) window.open(d.url, '_blank')
+    } catch {}
+    setResLoading(false)
+  }
+  const fmtData = (iso: string | null) => iso ? new Date(iso + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
+
+  const corpo = loading ? (
+    <div className="flex items-center justify-center py-4"><Loader2 size={18} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
+  ) : !destaque?.encontrado ? (
+    <p className="text-sm text-center" style={{ color: 'var(--muted-color)' }}>Nenhum grupo mapeado para esta faixa no momento.</p>
+  ) : (
+    <>
+      <p className="text-lg font-bold" style={{ color: 'var(--accent)' }}>GRUPO {destaque.grupo} · {destaque.faixa_credito}</p>
+      {destaque.ultima_assembleia ? (
+        <>
+          <p className="text-sm mt-2" style={{ color: 'var(--text)' }}>
+            Última assembleia ({destaque.ultima_assembleia.label}): <span className="font-semibold">{destaque.ultima_assembleia.total_contemplados} contemplações</span>
+          </p>
+          <ul className="mt-1 space-y-0.5">
+            {destaque.ultima_assembleia.sorteio_qt > 0 && <li className="text-sm" style={{ color: 'var(--muted-color)' }}>🎲 {destaque.ultima_assembleia.sorteio_qt} por sorteio</li>}
+            {destaque.ultima_assembleia.lance_livre_qt > 0 && <li className="text-sm" style={{ color: 'var(--muted-color)' }}>💎 {destaque.ultima_assembleia.lance_livre_qt} por lance livre</li>}
+            {destaque.ultima_assembleia.lance_fixo_50_qt > 0 && <li className="text-sm" style={{ color: 'var(--muted-color)' }}>💎 {destaque.ultima_assembleia.lance_fixo_50_qt} por lance fixo</li>}
+            {destaque.ultima_assembleia.lance_fixo_25_qt > 0 && <li className="text-sm" style={{ color: 'var(--muted-color)' }}>💎 {destaque.ultima_assembleia.lance_fixo_25_qt} por lance fixo embutido</li>}
+          </ul>
+        </>
+      ) : (
+        <p className="text-sm mt-2" style={{ color: 'var(--muted-color)' }}>Sem histórico de assembleia registrado para este grupo.</p>
+      )}
+      {destaque.proxima_assembleia && <p className="text-sm mt-1" style={{ color: 'var(--text)' }}>Próxima assembleia: <span className="font-semibold">{fmtData(destaque.proxima_assembleia)}</span></p>}
+      {(destaque.tem_resultado || destaque.tem_extrato) && (
+        <div className="flex flex-wrap gap-2 mt-3">
+          {destaque.tem_resultado && (
+            <button onClick={abrirResultado} disabled={resLoading} className="flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold" style={{ background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.4)', color: 'var(--accent)' }}>
+              {resLoading ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}📊 Ver último resultado
+            </button>
+          )}
+          {destaque.tem_extrato && (
+            <button onClick={abrirExtrato} disabled={extLoading} className="flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+              {extLoading ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}📄 Ver extrato do grupo
+            </button>
+          )}
+        </div>
+      )}
+      <div className="flex items-start gap-2 rounded-lg p-3 mt-3" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
+        <AlertTriangle size={14} style={{ color: '#f59e0b', marginTop: 1 }} />
+        <p className="text-xs" style={{ color: '#f59e0b' }}>Grupo sujeito a disponibilidade — a adesão pode ocorrer em grupo similar da mesma faixa.</p>
+      </div>
+    </>
+  )
+
+  // seção própria no Simulador (cabeçalho padrão badge + título)
+  if (variant === 'simulador') {
+    return (
+      <div className="rounded-xl p-5" style={cardStyle}>
+        <SecaoTitulo n={<Trophy size={13} />}>Grupo em destaque</SecaoTitulo>
+        {corpo}
+      </div>
+    )
+  }
+
+  // toggle colapsável no Atendimento
+  return (
+    <div className="mt-8 mx-auto max-w-xl">
+      <button onClick={toggle} className="w-full flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.3)', color: 'var(--accent)' }}>
+        <Trophy size={16} />Grupo em destaque desta faixa
+        <ChevronDown size={16} className="transition-transform" style={{ transform: expandido ? 'rotate(180deg)' : 'none' }} />
+      </button>
+      {expandido && (
+        <div className="mt-3 rounded-2xl p-5 text-left" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(212,175,55,0.25)' }}>
+          {corpo}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════
 // ABA SIMULADOR — 4 seções + barra de proposta sticky
 // ══════════════════════════════════════════════════════════════
 function SimuladorTab({ planos, empresaNome, logoBase64 }: { planos: Plano[]; empresaNome: string; logoBase64: string | null }) {
@@ -415,7 +560,7 @@ function SimuladorTab({ planos, empresaNome, logoBase64 }: { planos: Plano[]; em
             <div><p className="text-xs" style={{ color: 'var(--accent)' }}>{ehParcelinha ? 'Parcela (1ª a 12ª)' : '1ª parcela'} · {labelPorTipo(tipoParcela)}</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(p1Proposta)}</p></div>
             <div><p className="text-xs" style={{ color: 'var(--accent)' }}>Demais (cada) · {labelPorTipo(tipoParcela)}</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(pdProposta)}</p></div>
             <div><p className="text-xs" style={{ color: '#60a5fa' }}>+ {qtd} antecipadas · {labelPorTipo(tipoAntecipacao)}</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda((ehParcelinha ? p1Antecip : pdAntecip) * qtd)}</p></div>
-            {!ehParcelinha && <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Total p/ não estornar{limiteEstorno > 0 ? ` (1ª + ${limiteEstorno - 1})` : ''}</p><p className="text-lg font-semibold" style={{ color: '#f59e0b' }}>{fmtMoeda(totalNaoEstornar)}</p></div>}
+            {!ehParcelinha && <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Total p/ não estornar{limiteEstorno > 0 ? ` (1ª + ${limiteEstorno - 1})` : ''} · {labelPorTipo(tipoParcela)}</p><p className="text-lg font-semibold" style={{ color: '#f59e0b' }}>{fmtMoeda(totalNaoEstornar)}</p></div>}
             <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Crédito líquido{lanceNum > 0 ? ' (após lance)' : ''}</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(creditoLiquido)}</p></div>
             {seguroMensal > 0 && <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Seguro / mês</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(seguroMensal)}</p></div>}
           </div>
@@ -456,6 +601,9 @@ function SimuladorTab({ planos, empresaNome, logoBase64 }: { planos: Plano[]; em
         </div>
       )}
 
+      {/* 🏆 GRUPO EM DESTAQUE (mesma seção do Atendimento) */}
+      {faixa && <GrupoDestaque bem={planoAtual?.bem} credito={faixa.credito} variant="simulador" />}
+
       {planoAtual?.bem === 'Imóvel' && faixa && (
         <div className="rounded-xl p-4" style={{ background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.35)' }}>
           <p className="text-sm font-medium text-center" style={{ color: 'var(--accent)' }}>
@@ -491,23 +639,35 @@ function SimuladorTab({ planos, empresaNome, logoBase64 }: { planos: Plano[]; em
 // ══════════════════════════════════════════════════════════════
 function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, onSair }: { planos: Plano[]; empresaNome: string; empresaLogo: string | null; logoBase64: string | null; ativo: boolean; onSair: () => void }) {
   const s = useSimulacao(planos)
-  const { faixa, qtd, planoAtual, lanceNum, creditoLiquido, ehParcelinha, p1Proposta, pdProposta, entradaProposta, prazoRestante, nomeAmigavel, red25Pct, cheiaInc, labelPorTipo, tipoParcela } = s
+  const { faixa, qtd, planoAtual, lanceNum, creditoLiquido, ehParcelinha, pdProposta, entradaProposta, prazoRestante, nomeAmigavel, red25Pct, cheiaInc, tipoParcela } = s
 
   const scrollRef = useRef<HTMLDivElement>(null)
-
-  // ESC sai da tela cheia; trava o scroll do body enquanto ativo
-  useEffect(() => {
-    if (!ativo) return
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onSair() }
-    window.addEventListener('keydown', onKey)
-    const prev = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
-  }, [ativo, onSair])
+  const lanceRef = useRef<HTMLDivElement>(null)
 
   // 💎 lance embutido: menu com 10/15/20/25% do crédito · valor livre
   const [lanceModo, setLanceModo] = useState<'none' | '10' | '15' | '20' | '25' | 'livre'>('none')
   const [lanceMenu, setLanceMenu] = useState(false)
+  // 👁 entrada total oculta por padrão (revela sob comando do vendedor)
+  const [entradaVisivel, setEntradaVisivel] = useState(false)
+
+  // ESC fecha o menu de lance (se aberto) ou sai da tela cheia; trava o scroll do body
+  useEffect(() => {
+    if (!ativo) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { if (lanceMenu) setLanceMenu(false); else onSair() } }
+    window.addEventListener('keydown', onKey)
+    const prev = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
+  }, [ativo, onSair, lanceMenu])
+
+  // fecha o menu de lance ao clicar fora
+  useEffect(() => {
+    if (!lanceMenu) return
+    const onDown = (e: MouseEvent) => { if (lanceRef.current && !lanceRef.current.contains(e.target as Node)) setLanceMenu(false) }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [lanceMenu])
+
   useEffect(() => {
     if (lanceModo === 'none') { if (s.lanceEmbutido) s.setLanceEmbutido(''); return }
     if (lanceModo === 'livre') return
@@ -517,41 +677,15 @@ function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, o
 
   const aplicarLance = (m: typeof lanceModo) => { setLanceModo(m); if (m !== 'livre') setLanceMenu(false) }
   const removerLance = () => { setLanceModo('none'); setLanceMenu(false) }
-  const limparTudo = () => { s.limpar(); setLanceModo('none'); setLanceMenu(false) }
+  const limparTudo = () => { s.limpar(); setLanceModo('none'); setLanceMenu(false); setEntradaVisivel(false) }
   const scrollTopo = () => scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
 
-  // 🏆 grupo em destaque desta faixa (expande e busca sob demanda)
-  const [expDestaque, setExpDestaque] = useState(false)
-  const [destaque, setDestaque] = useState<any>(null)
-  const [loadingDest, setLoadingDest] = useState(false)
-  const [extLoading, setExtLoading] = useState(false)
-  useEffect(() => { setDestaque(null); setExpDestaque(false) }, [faixa?.credito, planoAtual?.bem])
+  // ao trocar de crédito/plano é uma nova simulação: re-oculta a entrada
+  useEffect(() => { setEntradaVisivel(false) }, [faixa?.credito, planoAtual?.sigla])
 
-  const carregarDestaque = async () => {
-    if (!faixa || !planoAtual) return
-    setLoadingDest(true)
-    try {
-      const r = await fetch(`/api/simulador/grupo-destaque?bem=${encodeURIComponent(planoAtual.bem)}&credito=${faixa.credito}`)
-      setDestaque(await r.json())
-    } catch { setDestaque({ encontrado: false }) }
-    setLoadingDest(false)
-  }
-  const toggleDestaque = () => {
-    const abrir = !expDestaque
-    setExpDestaque(abrir)
-    if (abrir && !destaque && !loadingDest) carregarDestaque()
-  }
-  const abrirExtrato = async () => {
-    if (!destaque?.grupo) return
-    setExtLoading(true)
-    try {
-      const r = await fetch(`/api/assembleias/extrato/download?grupo=${encodeURIComponent(destaque.grupo)}`)
-      const d = await r.json()
-      if (d.url) window.open(d.url, '_blank')
-    } catch {}
-    setExtLoading(false)
-  }
-  const fmtData = (iso: string | null) => iso ? new Date(iso + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
+  // moeda compacta (sem centavos) p/ caber no botão de lance
+  const fmtCompacto = (v: number) => 'R$ ' + Math.round(v || 0).toLocaleString('pt-BR')
+  const labelChip = (t: string) => t === 'cheia' ? 'Cheia' : t === 'red25' ? 'Reduzida 25%' : 'Reduzida 50%'
 
   // opções de tipo de parcela disponíveis para este plano
   const tiposParcela: { v: 'red50' | 'red25' | 'cheia'; label: string }[] = [{ v: 'red50', label: '50%' }]
@@ -595,11 +729,11 @@ function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, o
             {s.faixas.map(f => <option key={f.credito} value={String(f.credito)} style={{ background: '#131313' }}>{fmtMoeda(f.credito)}</option>)}
           </select>
         </div>
-        {/* tipo de parcela */}
+        {/* tipo de parcela — comanda PARCELAS e ENTRADA juntas */}
         {faixa && tiposParcela.length > 1 && (
           <div className="flex items-center gap-1.5 rounded-full pl-3 pr-2.5 py-1.5" style={pillWrap}>
             <span className="text-[10px] uppercase tracking-wide" style={{ color: 'var(--muted-color)' }}>Parcela</span>
-            <select value={tipoParcela} onChange={(e) => s.setTipoParcela(e.target.value as any)} className={pillSelect} style={{ color: 'var(--accent)' }}>
+            <select value={tipoParcela} onChange={(e) => { const v = e.target.value as any; s.setTipoParcela(v); s.setTipoAntecipacao(v) }} className={pillSelect} style={{ color: 'var(--accent)' }}>
               {tiposParcela.map(t => <option key={t.v} value={t.v} style={{ background: '#131313' }}>{t.label}</option>)}
             </select>
           </div>
@@ -612,6 +746,12 @@ function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, o
               {Array.from({ length: 13 }, (_, i) => <option key={i} value={String(i)} style={{ background: '#131313' }}>{i}</option>)}
             </select>
           </div>
+        )}
+        {/* 🛡 seguro (recalcula parcelas e entrada) */}
+        {faixa && s.seguroPct > 0 && (
+          <button onClick={() => s.setComSeguro(!s.comSeguro)} className="flex items-center gap-1.5 rounded-full pl-3 pr-3 py-1.5 text-sm font-medium" style={{ background: s.comSeguro ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.04)', border: `1px solid ${s.comSeguro ? 'rgba(212,175,55,0.4)' : 'var(--border)'}`, color: s.comSeguro ? 'var(--accent)' : 'var(--muted-color)' }}>
+            <Shield size={13} />{s.comSeguro ? 'Com seguro' : 'Sem seguro'}
+          </button>
         )}
         {/* limpar */}
         {(s.categoria || faixa) && (
@@ -652,25 +792,28 @@ function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, o
             </div>
 
             {/* 💎 botão de lance embutido (abaixo do crédito) */}
-            <div className="flex justify-center mt-5 relative">
-              <button onClick={() => setLanceMenu(v => !v)} className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold" style={{ background: lanceNum > 0 ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.05)', border: `1px solid ${lanceNum > 0 ? 'rgba(212,175,55,0.5)' : 'var(--border)'}`, color: lanceNum > 0 ? 'var(--accent)' : 'var(--muted-color)' }}>
-                {lanceNum > 0 ? <>💎 Lance: {fmtMoeda(lanceNum)} <Pencil size={13} /></> : <><Plus size={15} />💎 Adicionar lance embutido</>}
+            <div ref={lanceRef} className="flex justify-center mt-5 relative">
+              <button onClick={() => setLanceMenu(v => !v)} className="flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold max-w-full" style={{ background: lanceNum > 0 ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.05)', border: `1px solid ${lanceNum > 0 ? 'rgba(212,175,55,0.5)' : 'var(--border)'}`, color: lanceNum > 0 ? 'var(--accent)' : 'var(--muted-color)' }}>
+                {lanceNum > 0 ? <><span className="shrink-0">💎 Lance:</span><span className="truncate">{fmtCompacto(lanceNum)}</span><Pencil size={13} className="shrink-0" /></> : <><Plus size={15} />💎 Adicionar lance embutido</>}
               </button>
               {lanceMenu && (
-                <div className="absolute top-full mt-2 z-20 rounded-xl p-2 w-64" style={{ background: '#131418', border: '1px solid rgba(212,175,55,0.3)', boxShadow: '0 12px 32px rgba(0,0,0,0.5)' }}>
+                <div className="absolute top-full mt-2 z-20 rounded-xl p-2 w-64 max-w-[90vw]" style={{ background: '#131418', border: '1px solid rgba(212,175,55,0.3)', boxShadow: '0 12px 32px rgba(0,0,0,0.5)' }}>
                   <div className="grid grid-cols-4 gap-1.5 mb-2">
                     {(['10', '15', '20', '25'] as const).map(p => (
                       <button key={p} onClick={() => aplicarLance(p)} className="rounded-lg py-2 text-xs font-semibold" style={{ background: lanceModo === p ? 'rgba(212,175,55,0.22)' : 'rgba(255,255,255,0.04)', border: `1px solid ${lanceModo === p ? 'var(--accent)' : 'var(--border)'}`, color: lanceModo === p ? 'var(--accent)' : 'var(--text)' }}>{p}%</button>
                     ))}
                   </div>
-                  <button onClick={() => aplicarLance('livre')} className="w-full rounded-lg py-2 text-xs font-semibold mb-2" style={{ background: lanceModo === 'livre' ? 'rgba(212,175,55,0.22)' : 'rgba(255,255,255,0.04)', border: `1px solid ${lanceModo === 'livre' ? 'var(--accent)' : 'var(--border)'}`, color: lanceModo === 'livre' ? 'var(--accent)' : 'var(--text)' }}>Valor livre</button>
+                  <button onClick={() => setLanceModo('livre')} className="w-full rounded-lg py-2 text-xs font-semibold mb-2" style={{ background: lanceModo === 'livre' ? 'rgba(212,175,55,0.22)' : 'rgba(255,255,255,0.04)', border: `1px solid ${lanceModo === 'livre' ? 'var(--accent)' : 'var(--border)'}`, color: lanceModo === 'livre' ? 'var(--accent)' : 'var(--text)' }}>Valor livre</button>
                   {lanceModo === 'livre' && (
-                    <div className="flex items-center gap-1 rounded-lg px-2 py-1.5 mb-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)' }}>
-                      <span className="text-xs" style={{ color: 'var(--muted-color)' }}>R$</span>
-                      <input autoFocus value={s.lanceEmbutido} onChange={e => s.setLanceEmbutido(formatarMoeda(e.target.value))} placeholder="0" inputMode="numeric" className="flex-1 min-w-0 bg-transparent text-sm font-medium outline-none" style={{ color: 'var(--accent)' }} />
+                    <div className="flex items-center gap-1 rounded-lg px-2 py-1.5 mb-2 w-full" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)' }}>
+                      <span className="text-xs shrink-0" style={{ color: 'var(--muted-color)' }}>R$</span>
+                      <input autoFocus value={s.lanceEmbutido} onChange={e => s.setLanceEmbutido(formatarMoeda(e.target.value))} placeholder="0" inputMode="numeric" className="flex-1 min-w-0 w-full bg-transparent text-sm font-medium outline-none" style={{ color: 'var(--accent)' }} />
                     </div>
                   )}
-                  {lanceNum > 0 && <button onClick={removerLance} className="w-full rounded-lg py-1.5 text-[11px]" style={{ color: 'var(--muted-color)' }}>Remover lance</button>}
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setLanceMenu(false)} className="flex-1 rounded-lg py-2 text-xs font-semibold" style={{ background: 'linear-gradient(135deg, #d4af37, #b8941f)', color: '#0a0a0a' }}>Aplicar</button>
+                    {lanceNum > 0 && <button onClick={removerLance} className="flex-1 rounded-lg py-2 text-xs font-medium" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--muted-color)' }}>Remover lance</button>}
+                  </div>
                 </div>
               )}
             </div>
@@ -678,36 +821,42 @@ function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, o
             {lanceNum <= 0 ? (
               /* SEM lance: 2 cards grandes */
               <div className="grid gap-4 mt-8 sm:grid-cols-2 max-w-3xl mx-auto">
-                <div className="rounded-2xl px-6 py-9 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <div className="rounded-2xl px-6 py-9 text-center min-w-0 overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
                   <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--muted-color)' }}>Parcelas de</p>
-                  <p className="text-4xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(pdProposta)}</p>
+                  <p className="font-bold leading-tight" style={{ color: 'var(--text)', fontSize: fonteCard(fmtMoedaCard(pdProposta)) }}>{fmtMoedaCard(pdProposta)}</p>
                   <p className="text-sm mt-1" style={{ color: 'var(--muted-color)' }}>por mês</p>
                 </div>
-                <div className="rounded-2xl px-6 py-9 text-center" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.4)' }}>
+                <div className="rounded-2xl px-6 py-9 text-center min-w-0 overflow-hidden" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.4)' }}>
                   <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--accent)' }}>Entrada total</p>
-                  <p className="text-4xl font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(entradaProposta)}</p>
+                  <div className="flex items-center justify-center gap-2 min-w-0">
+                    <p className="font-bold leading-tight transition-opacity duration-300 truncate" style={{ color: 'var(--accent)', opacity: entradaVisivel ? 1 : 0.85, fontSize: fonteCard(entradaVisivel ? fmtMoedaCard(entradaProposta) : 'R$ ••••••') }}>{entradaVisivel ? fmtMoedaCard(entradaProposta) : 'R$ ••••••'}</p>
+                    <button onClick={() => setEntradaVisivel(v => !v)} aria-label={entradaVisivel ? 'Ocultar entrada' : 'Mostrar entrada'} className="shrink-0" style={{ color: 'var(--accent)' }}>{entradaVisivel ? <EyeOff size={20} /> : <Eye size={20} />}</button>
+                  </div>
                 </div>
               </div>
             ) : (
               /* COM lance embutido: 4 cards */
               <div className="grid gap-4 mt-8 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="rounded-2xl px-6 py-7 text-center" style={{ background: 'rgba(212,175,55,0.16)', border: '1px solid rgba(212,175,55,0.5)' }}>
+                <div className="rounded-2xl px-5 py-7 text-center min-w-0 overflow-hidden" style={{ background: 'rgba(212,175,55,0.16)', border: '1px solid rgba(212,175,55,0.5)' }}>
                   <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--accent)' }}>💰 Crédito líquido</p>
-                  <p className="text-4xl font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(creditoLiquido)}</p>
+                  <p className="font-bold leading-tight" style={{ color: 'var(--accent)', fontSize: fonteCard(fmtMoedaCard(creditoLiquido)) }}>{fmtMoedaCard(creditoLiquido)}</p>
                 </div>
-                <div className="rounded-2xl px-6 py-7 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(212,175,55,0.25)' }}>
+                <div className="rounded-2xl px-5 py-7 text-center min-w-0 overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(212,175,55,0.25)' }}>
                   <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--accent)' }}>💎 Lance embutido</p>
-                  <p className="text-2xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(lanceNum)}</p>
+                  <p className="font-bold leading-tight" style={{ color: 'var(--text)', fontSize: fonteCard(fmtMoedaCard(lanceNum), 24) }}>{fmtMoedaCard(lanceNum)}</p>
                   <p className="text-[11px] mt-1 text-pretty" style={{ color: 'var(--muted-color)' }}>sai do próprio crédito, sem desembolso</p>
                 </div>
-                <div className="rounded-2xl px-6 py-7 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <div className="rounded-2xl px-5 py-7 text-center min-w-0 overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
                   <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--muted-color)' }}>Parcelas de</p>
-                  <p className="text-2xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(pdProposta)}</p>
+                  <p className="font-bold leading-tight" style={{ color: 'var(--text)', fontSize: fonteCard(fmtMoedaCard(pdProposta), 24) }}>{fmtMoedaCard(pdProposta)}</p>
                   <p className="text-sm mt-1" style={{ color: 'var(--muted-color)' }}>por mês</p>
                 </div>
-                <div className="rounded-2xl px-6 py-7 text-center" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.4)' }}>
+                <div className="rounded-2xl px-5 py-7 text-center min-w-0 overflow-hidden" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.4)' }}>
                   <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--accent)' }}>Entrada total</p>
-                  <p className="text-2xl font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(entradaProposta)}</p>
+                  <div className="flex items-center justify-center gap-1.5 min-w-0">
+                    <p className="font-bold leading-tight transition-opacity duration-300" style={{ color: 'var(--accent)', opacity: entradaVisivel ? 1 : 0.85, fontSize: fonteCard(entradaVisivel ? fmtMoedaCard(entradaProposta) : 'R$ ••••••', 20) }}>{entradaVisivel ? fmtMoedaCard(entradaProposta) : 'R$ ••••••'}</p>
+                    <button onClick={() => setEntradaVisivel(v => !v)} aria-label={entradaVisivel ? 'Ocultar entrada' : 'Mostrar entrada'} className="shrink-0" style={{ color: 'var(--accent)' }}>{entradaVisivel ? <EyeOff size={16} /> : <Eye size={16} />}</button>
+                  </div>
                 </div>
               </div>
             )}
@@ -716,55 +865,14 @@ function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, o
             <p className="text-center text-base mt-8 text-pretty" style={{ color: 'var(--text)' }}>
               {lanceNum > 0
                 ? <>Com <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(lanceNum)}</span> de lance embutido, você conquista <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(faixa.credito)}</span> e recebe <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(creditoLiquido)}</span> líquidos</>
-                : <>Entrada total de <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(entradaProposta)}</span> e parcelas de <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(pdProposta)}</span> para conquistar <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(faixa.credito)}</span></>}
+                : entradaVisivel
+                  ? <>Entrada total de <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(entradaProposta)}</span> e parcelas de <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(pdProposta)}</span> para conquistar <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(faixa.credito)}</span></>
+                  : <>Parcelas de <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(pdProposta)}</span> para conquistar <span className="font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(faixa.credito)}</span></>}
             </p>
             <p className="text-center text-xs mt-2" style={{ color: 'var(--muted-color)' }}>Prazo de {prazoRestante} meses</p>
 
-            {/* 🏆 Grupo em destaque desta faixa */}
-            <div className="mt-8 mx-auto max-w-xl">
-              <button onClick={toggleDestaque} className="w-full flex items-center justify-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.3)', color: 'var(--accent)' }}>
-                <Trophy size={16} />Grupo em destaque desta faixa
-                <ChevronDown size={16} className="transition-transform" style={{ transform: expDestaque ? 'rotate(180deg)' : 'none' }} />
-              </button>
-              {expDestaque && (
-                <div className="mt-3 rounded-2xl p-5 text-left" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(212,175,55,0.25)' }}>
-                  {loadingDest ? (
-                    <div className="flex items-center justify-center py-4"><Loader2 size={18} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
-                  ) : !destaque?.encontrado ? (
-                    <p className="text-sm text-center" style={{ color: 'var(--muted-color)' }}>Nenhum grupo mapeado para esta faixa no momento.</p>
-                  ) : (
-                    <>
-                      <p className="text-lg font-bold" style={{ color: 'var(--accent)' }}>GRUPO {destaque.grupo} · {destaque.faixa_credito}</p>
-                      {destaque.ultima_assembleia ? (
-                        <>
-                          <p className="text-sm mt-2" style={{ color: 'var(--text)' }}>
-                            Última assembleia ({destaque.ultima_assembleia.label}): <span className="font-semibold">{destaque.ultima_assembleia.total_contemplados} contemplações</span>
-                          </p>
-                          <p className="text-sm mt-1" style={{ color: 'var(--muted-color)' }}>
-                            🎲 {destaque.ultima_assembleia.sorteio_qt} sorteio · 💎 {destaque.ultima_assembleia.lance_livre_qt} lance livre · {destaque.ultima_assembleia.lance_fixo_qt} lance fixo
-                          </p>
-                          {destaque.ultima_assembleia.lance_livre_menor_pct != null && (
-                            <p className="text-sm mt-1" style={{ color: 'var(--text)' }}>Menor lance livre contemplado: <span className="font-semibold" style={{ color: 'var(--accent)' }}>{destaque.ultima_assembleia.lance_livre_menor_pct}%</span></p>
-                          )}
-                        </>
-                      ) : (
-                        <p className="text-sm mt-2" style={{ color: 'var(--muted-color)' }}>Sem histórico de assembleia registrado para este grupo.</p>
-                      )}
-                      <p className="text-sm mt-1" style={{ color: 'var(--text)' }}>Próxima assembleia: <span className="font-semibold">{fmtData(destaque.proxima_assembleia)}</span></p>
-                      {destaque.tem_extrato && (
-                        <button onClick={abrirExtrato} disabled={extLoading} className="mt-3 flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-semibold" style={{ background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.4)', color: 'var(--accent)' }}>
-                          {extLoading ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}Ver extrato completo do grupo
-                        </button>
-                      )}
-                      <div className="flex items-start gap-2 rounded-lg p-3 mt-3" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
-                        <AlertTriangle size={14} style={{ color: '#f59e0b', marginTop: 1 }} />
-                        <p className="text-xs" style={{ color: '#f59e0b' }}>Grupo sujeito a disponibilidade — a adesão pode ocorrer em grupo similar da mesma faixa.</p>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
+            {/* 🏆 Grupo em destaque desta faixa (componente compartilhado) */}
+            <GrupoDestaque bem={planoAtual?.bem} credito={faixa.credito} variant="atendimento" />
           </div>
         )}
       </div>
@@ -774,11 +882,23 @@ function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, o
       {faixa && (
         <div className="fixed bottom-0 inset-x-0 z-10" style={{ background: 'linear-gradient(to top, #08090c 72%, rgba(8,9,12,0))' }}>
           <div className="mx-auto w-full max-w-5xl px-5 pt-6 pb-4 sm:px-8">
-            <div className="rounded-xl p-3 flex flex-col sm:flex-row sm:items-center gap-3" style={{ background: 'rgba(17,18,22,0.96)', border: '1px solid rgba(212,175,55,0.25)', boxShadow: '0 -4px 24px rgba(0,0,0,0.4)' }}>
-              {/* chips: como sai no PDF */}
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="rounded-full px-2.5 py-1 text-[10px] font-semibold" style={{ background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.4)', color: 'var(--accent)' }}>Parcela: {labelPorTipo(tipoParcela)}</span>
-                <span className="rounded-full px-2.5 py-1 text-[10px] font-semibold" style={{ background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.4)', color: '#60a5fa' }}>Entrada: {labelPorTipo(s.tipoAntecipacao)}</span>
+            <div className="rounded-xl p-3 flex flex-col lg:flex-row lg:items-center gap-3" style={{ background: 'rgba(17,18,22,0.96)', border: '1px solid rgba(212,175,55,0.25)', boxShadow: '0 -4px 24px rgba(0,0,0,0.4)' }}>
+              {/* chips: o que vai no PDF (pré-selecionado; o vendedor pode divergir) */}
+              <div className="flex flex-col gap-1.5 shrink-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] uppercase tracking-wide w-16 shrink-0" style={{ color: 'var(--muted-color)' }}>Parcela</span>
+                  {tiposParcela.map(t => {
+                    const on = tipoParcela === t.v
+                    return <button key={t.v} onClick={() => s.setTipoParcela(t.v)} className="rounded-full px-2.5 py-1 text-[10px] font-semibold" style={{ background: on ? 'rgba(212,175,55,0.2)' : 'rgba(255,255,255,0.04)', border: `1px solid ${on ? 'var(--accent)' : 'var(--border)'}`, color: on ? 'var(--accent)' : 'var(--muted-color)' }}>{labelChip(t.v)}</button>
+                  })}
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[10px] uppercase tracking-wide w-16 shrink-0" style={{ color: 'var(--muted-color)' }}>Entrada</span>
+                  {tiposParcela.map(t => {
+                    const on = s.tipoAntecipacao === t.v
+                    return <button key={t.v} onClick={() => s.setTipoAntecipacao(t.v)} className="rounded-full px-2.5 py-1 text-[10px] font-semibold" style={{ background: on ? 'rgba(59,130,246,0.2)' : 'rgba(255,255,255,0.04)', border: `1px solid ${on ? '#3b82f6' : 'var(--border)'}`, color: on ? '#60a5fa' : 'var(--muted-color)' }}>{labelChip(t.v)}</button>
+                  })}
+                </div>
               </div>
               <input value={s.nomeCliente} onChange={e => s.setNomeCliente(e.target.value)} placeholder="Nome do cliente" className="flex-1 min-w-0 rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
               <button onClick={() => gerarPropostaPDF(s, logoBase64, empresaNome)} className="rounded-lg px-4 py-2.5 text-sm font-semibold whitespace-nowrap flex items-center justify-center gap-2" style={{ background: 'linear-gradient(135deg, #d4af37, #b8941f)', border: '1px solid rgba(212,175,55,0.6)', color: '#0a0a0a', boxShadow: '0 8px 24px rgba(212,175,55,0.25)' }}>
