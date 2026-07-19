@@ -224,7 +224,7 @@ const avisoEmbracon = (
   </div>
 )
 
-// ═══════════════════════════════════��════���═══════════════════�����═
+// ═══════════════════════════════════���════���═══════════════════�����═
 // Gerador de proposta em PDF — compartilhado pelas duas abas.
 // Recebe a instância de simulação + logo/nome da empresa.
 // ══════════════════════════════════════════════════════════════
@@ -368,7 +368,7 @@ function gerarPropostaPDF(s: Sim, logoBase64: string | null, empresaNome: string
   }
 }
 
-// ══════════════════════════════════════════════════════════════
+// ════════════════════���═════════════════════════════════════════
 // 🏆 GRUPO EM DESTAQUE — componente compartilhado (Simulador + Atendimento)
 // Campeão = maior total_contemplados no último resultado disponível da faixa
 // ══════════════════════════════════════════════════════════════
@@ -1071,8 +1071,9 @@ export default function SimuladorPage() {
     fetch('/api/simulador/empresa').then(r => r.json()).then(d => {
       setEmpresaNome(d.empresa_nome || '')
       setEmpresaLogo(d.logo_url || null)
-      carregarLogo(d.logo_url || '/logo-lr.png')
-    }).catch(() => carregarLogo('/logo-lr.png'))
+    }).catch(() => {})
+    // o PDF usa sempre o logo branco (visível sobre o cabeçalho vermelho)
+    carregarLogo('/images/logo-lr-branco.png')
   }, [])
 
   const abas: { id: typeof modo; label: string; icon: typeof Calculator }[] = [
