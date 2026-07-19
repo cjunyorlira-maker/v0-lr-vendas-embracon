@@ -6,6 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import { Calculator, CreditCard, Loader2, AlertTriangle, FileText, MonitorPlay, Trophy, RotateCcw, ChevronDown, X, Pencil, Plus, Eye, EyeOff, Shield } from 'lucide-react'
 import { jsPDF } from 'jspdf'
+import PassarResultado from '@/components/PassarResultado'
 
 interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number; estorno_ate_pgto: number | null; categoria_comissao: string | null; seguro_pct?: number | null; tx_adm_topo?: number | null; cheia_incremento_pct?: number | null; prazo_meses?: number | null; reduzida_25_pct?: number | null; pl_demais_50_pct?: number | null; pl_demais_25_pct?: number | null; pl_demais_int_pct?: number | null; pl_p12_50_pct?: number | null; pl_p12_25_pct?: number | null; pl_p12_int_pct?: number | null }
 interface FaixaCredito { credito: number; primeira_parcela: number; demais_parcela: number; total_nao_estornar: number }
@@ -423,17 +424,20 @@ function GrupoDestaque({ bem, credito, variant, mostrarPercentuais = false }: { 
     } catch {}
     setExtLoading(false)
   }
-  const abrirResultado = async () => {
+  // a apresentação principal é sempre a arte do PassarResultado (modo travado)
+  const abrirResultado = () => {
     if (!destaque?.grupo) return
-    // sem arquivo oficial: monta o modal a partir dos dados do histórico
-    if (!destaque.tem_resultado) { setModalResultado(true); return }
+    setModalResultado(true)
+  }
+  // ação secundária dentro do modal: abre o PDF oficial quando existe arquivo_path
+  const abrirArquivoOficial = async () => {
+    if (!destaque?.grupo) return
     setResLoading(true)
     try {
       const r = await fetch(`/api/assembleias/resultado/download?grupo=${encodeURIComponent(destaque.grupo)}`)
       const d = await r.json()
       if (d.url) window.open(d.url, '_blank')
-      else setModalResultado(true) // arquivo indisponível: cai no modal
-    } catch { setModalResultado(true) }
+    } catch {}
     setResLoading(false)
   }
   const fmtData = (iso: string | null) => iso ? new Date(iso + 'T00:00:00').toLocaleDateString('pt-BR') : '—'
@@ -480,38 +484,27 @@ function GrupoDestaque({ bem, credito, variant, mostrarPercentuais = false }: { 
         <p className="text-xs" style={{ color: '#f59e0b' }}>Grupo sujeito a disponibilidade — a adesão pode ocorrer em grupo similar da mesma faixa.</p>
       </div>
 
-      {/* MODAL: resultado montado a partir do histórico (grupos sem PDF oficial) */}
+      {/* MODAL: MESMA arte do PassarResultado (Assembleias), em modo travado por aba */}
       {modalResultado && destaque.ultima_assembleia && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(4px)' }} onClick={() => setModalResultado(false)}>
-          <div className="relative w-full max-w-md rounded-2xl p-6 text-left" style={{ background: 'linear-gradient(180deg, #16130b 0%, #0d0d0d 100%)', border: '1px solid rgba(212,175,55,0.45)', boxShadow: '0 24px 64px rgba(0,0,0,0.6)' }} onClick={e => e.stopPropagation()}>
-            <button onClick={() => setModalResultado(false)} aria-label="Fechar" className="absolute top-4 right-4 rounded-full p-1.5" style={{ background: 'rgba(255,255,255,0.06)', color: 'var(--muted-color)' }}><X size={16} /></button>
-
-            <p className="text-xs font-semibold uppercase" style={{ letterSpacing: '2px', color: 'var(--accent)' }}>Resultado oficial</p>
-            <p className="text-lg font-bold mt-0.5" style={{ color: 'var(--text)' }}>GRUPO {destaque.grupo}</p>
-            <p className="text-sm mt-0.5" style={{ color: 'var(--muted-color)' }}>
-              Assembleia {destaque.ultima_assembleia.label}{destaque.ultima_assembleia.numero ? ` · nº ${destaque.ultima_assembleia.numero}` : ''}
-            </p>
-
-            <div className="mt-5 rounded-xl p-4 text-center" style={{ background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.3)' }}>
-              <p className="text-3xl font-bold" style={{ color: 'var(--accent)' }}>{destaque.ultima_assembleia.total_contemplados}</p>
-              <p className="text-xs uppercase tracking-wider mt-0.5" style={{ color: 'var(--accent)' }}>contemplações</p>
-            </div>
-
-            <ul className="mt-4 space-y-1.5">
-              {destaque.ultima_assembleia.sorteio_qt > 0 && <li className="text-sm flex items-center gap-2" style={{ color: 'var(--text)' }}><span>🎲</span> <span className="font-semibold">{destaque.ultima_assembleia.sorteio_qt}</span> por sorteio</li>}
-              {destaque.ultima_assembleia.lance_livre_qt > 0 && <li className="text-sm flex items-center gap-2" style={{ color: 'var(--text)' }}><span>💎</span> <span className="font-semibold">{destaque.ultima_assembleia.lance_livre_qt}</span> por lance livre</li>}
-              {destaque.ultima_assembleia.lance_fixo_50_qt > 0 && <li className="text-sm flex items-center gap-2" style={{ color: 'var(--text)' }}><span>💎</span> <span className="font-semibold">{destaque.ultima_assembleia.lance_fixo_50_qt}</span> por lance fixo{pct50}</li>}
-              {destaque.ultima_assembleia.lance_fixo_25_qt > 0 && <li className="text-sm flex items-center gap-2" style={{ color: 'var(--text)' }}><span>💎</span> <span className="font-semibold">{destaque.ultima_assembleia.lance_fixo_25_qt}</span> por lance fixo embutido{pct25}</li>}
-            </ul>
-
-            {destaque.ultima_assembleia.prazo_restante != null && (
-              <p className="text-sm mt-4 pt-4" style={{ color: 'var(--text)', borderTop: '1px solid var(--border)' }}>
-                Prazo restante do grupo: <span className="font-semibold">{destaque.ultima_assembleia.prazo_restante} meses</span>
-              </p>
-            )}
-            <p className="text-[11px] mt-3" style={{ color: 'var(--muted-color)' }}>fonte: resultado oficial Embracon</p>
-          </div>
-        </div>
+        <PassarResultado
+          grupo={String(destaque.grupo)}
+          bem={destaque.bem || bem || ''}
+          mes={{
+            mes_referencia: destaque.ultima_assembleia.mes_referencia || '',
+            mes_label: destaque.ultima_assembleia.label || '',
+            numero_assembleia: destaque.ultima_assembleia.numero ?? null,
+            sorteio_qt: destaque.ultima_assembleia.sorteio_qt ?? 0,
+            lance_livre_qt: destaque.ultima_assembleia.lance_livre_qt ?? 0,
+            lance_livre_maior: destaque.ultima_assembleia.lance_livre_maior ?? null,
+            lance_livre_menor: destaque.ultima_assembleia.lance_livre_menor ?? null,
+            lance_fixo_50_qt: destaque.ultima_assembleia.lance_fixo_50_qt ?? 0,
+            lance_fixo_25_qt: destaque.ultima_assembleia.lance_fixo_25_qt ?? 0,
+            total_contemplados: destaque.ultima_assembleia.total_contemplados ?? 0,
+          }}
+          modoFixo={variant}
+          onAbrirArquivoOficial={destaque.tem_resultado ? abrirArquivoOficial : undefined}
+          onClose={() => setModalResultado(false)}
+        />
       )}
     </>
   )

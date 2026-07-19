@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
     // 2) resultado de assembleia mais recente de cada candidato (por mes_referencia desc)
     const { data: hist } = await supabaseAdmin
       .from('assembleias_historico')
-      .select('grupo, mes_referencia, mes_label, numero_assembleia, sorteio_qt, lance_livre_qt, lance_fixo_50_qt, lance_fixo_25_qt, lance_livre_menor, total_contemplados, prazo_restante, arquivo_path')
+      .select('grupo, mes_referencia, mes_label, numero_assembleia, sorteio_qt, lance_livre_qt, lance_livre_maior, lance_fixo_50_qt, lance_fixo_25_qt, lance_livre_menor, total_contemplados, prazo_restante, arquivo_path')
       .in('grupo', gruposIds)
       .order('mes_referencia', { ascending: false })
 
@@ -95,11 +95,14 @@ export async function GET(req: NextRequest) {
       faixa_credito: escolhido.faixa_credito,
       qtd_grupos_faixa: candidatos.length,
       ultima_assembleia: ultima ? {
+        mes_referencia: ultima.mes_referencia,
         label: ultima.mes_label,
         numero: ultima.numero_assembleia,
         total_contemplados: ultima.total_contemplados ?? 0,
         sorteio_qt: ultima.sorteio_qt ?? 0,
         lance_livre_qt: ultima.lance_livre_qt ?? 0,
+        lance_livre_maior: ultima.lance_livre_maior ?? null,
+        lance_livre_menor: ultima.lance_livre_menor ?? null,
         lance_fixo_qt: lanceFixo,
         lance_fixo_50_qt: ultima.lance_fixo_50_qt ?? 0,
         lance_fixo_25_qt: ultima.lance_fixo_25_qt ?? 0,
