@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, useMemo, memo } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
 import { Trophy, Loader2, Users, Building2, User, Shield, Zap, CalendarRange, Tv, ChevronUp, ChevronDown, Minus, Globe, Flame, Crown, Swords } from 'lucide-react'
-import { dispararConfete } from '@/lib/confetti'
 
 interface RankItem { posicao: number; nome: string; foto?: string; valor: number; qtd: number; ticket_medio: number; maior_venda: number; equipe_nome?: string | null; empresa_nome?: string | null; empresa_id?: string | null; logo?: string | null; vendedor_id?: string | null; rei_semana?: boolean; streak_semanas?: number }
 
@@ -161,7 +160,6 @@ export default function RankingPage() {
   const [fixos, setFixos] = useState<Fixos | null>(null)
   const [foraDoRanking, setForaDoRanking] = useState<{ vendas: number; valor: number }>({ vendas: 0, valor: 0 })
   const [jaAnimou, setJaAnimou] = useState(false) // anima entrada só na 1ª carga
-  const liderAnterior = useRef<string | null>(null)
   const primeiraCarga = useRef(true)
   // guard anti-corrida: só a última requisição (modo/período mais recente) pode tocar a tela
   const reqSeq = useRef(0)
@@ -270,13 +268,6 @@ export default function RankingPage() {
       setRole(data.meu_role)
       if (data.producoes) setProducoes(data.producoes)
       if (data.producao_ativa && !producaoId && !periodo) setProducaoId(data.producao_ativa)
-
-      // confete quando o 1º lugar muda em relação à última visualização
-      const novoLider = data.ranking[0]?.nome || null
-      if (novoLider && liderAnterior.current && novoLider !== liderAnterior.current) {
-        dispararConfete()
-      }
-      liderAnterior.current = novoLider
 
       // variação vs produção anterior (só quando um período de produção está ativo)
       if (!periodo && data.producao_ativa) {
