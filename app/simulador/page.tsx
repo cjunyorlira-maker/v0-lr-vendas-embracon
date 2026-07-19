@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { Calculator, CreditCard, Loader2, AlertTriangle, FileText, MonitorPlay, Trophy } from 'lucide-react'
+import { Calculator, CreditCard, Loader2, AlertTriangle, FileText, MonitorPlay, Trophy, RotateCcw } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 
 interface Plano { id: string; sigla: string; nome_completo: string; bem: string; adesao_percent: number; estorno_ate_pgto: number | null; categoria_comissao: string | null; seguro_pct?: number | null; tx_adm_topo?: number | null; cheia_incremento_pct?: number | null; prazo_meses?: number | null; reduzida_25_pct?: number | null; pl_demais_50_pct?: number | null; pl_demais_25_pct?: number | null; pl_demais_int_pct?: number | null; pl_p12_50_pct?: number | null; pl_p12_25_pct?: number | null; pl_p12_int_pct?: number | null }
@@ -22,10 +22,19 @@ const CATEGORIAS: Record<string, { label: string; siglas: string[] }> = {
   pesados_2: { label: '🚛 Pesados Adesão 2%', siglas: ['SP'] },
 }
 
-export default function SimuladorPage() {
-  const [planos, setPlanos] = useState<Plano[]>([])
-  const [loading, setLoading] = useState(true)
-  const [modo, setModo] = useState<'simulador' | 'atendimento' | 'proposta'>('simulador')
+const inputStyle = { background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }
+
+const formatarMoeda = (valor: string) => {
+  const num = valor.replace(/\D/g, '')
+  if (!num) return ''
+  return parseInt(num).toLocaleString('pt-BR')
+}
+
+// ══════════════════════════════════════════════════════════════
+// Hook de simulação — cada instância é um estado INDEPENDENTE.
+// Chamado 1x por aba, então trocar de aba nunca mistura valores.
+// ══════════════════════════════════════════════════════════════
+function useSimulacao(planos: Plano[]) {
   const [categoria, setCategoria] = useState('')
   const [planoSigla, setPlanoSigla] = useState('')
   const [faixas, setFaixas] = useState<FaixaCredito[]>([])
@@ -37,39 +46,6 @@ export default function SimuladorPage() {
   const [qtdAntecipar, setQtdAntecipar] = useState('2')
   const [nomeCliente, setNomeCliente] = useState('')
   const [lanceEmbutido, setLanceEmbutido] = useState('')
-  const [empresaNome, setEmpresaNome] = useState('')
-  const [empresaLogo, setEmpresaLogo] = useState<string | null>(null)
-  const [logoBase64, setLogoBase64] = useState<string | null>(null)
-
-  useEffect(() => {
-    const supabase = createClient()
-    supabase.from('planos').select('id, sigla, nome_completo, bem, adesao_percent, estorno_ate_pgto, categoria_comissao, seguro_pct, tx_adm_topo, cheia_incremento_pct, prazo_meses, reduzida_25_pct, pl_demais_50_pct, pl_demais_25_pct, pl_demais_int_pct, pl_p12_50_pct, pl_p12_25_pct, pl_p12_int_pct').eq('ativo', true).order('bem').then(({ data }) => {
-      if (data) setPlanos(data as Plano[]); setLoading(false)
-    })
-  }, [])
-
-  useEffect(() => {
-    // carrega uma imagem (URL ou caminho público) e converte pra base64 pro PDF
-    const carregarLogo = (url: string) => {
-      fetch(url)
-        .then(res => res.blob())
-        .then(blob => {
-          const reader = new FileReader()
-          reader.onloadend = () => setLogoBase64(reader.result as string)
-          reader.readAsDataURL(blob)
-        })
-        .catch(() => setLogoBase64(null))
-    }
-    fetch('/api/simulador/empresa').then(r => r.json()).then(d => {
-      setEmpresaNome(d.empresa_nome || '')
-      setEmpresaLogo(d.logo_url || null)
-      // usa a logo própria da empresa; sem logo (ou LR Multimarcas) cai pra logo da LR do projeto
-      carregarLogo(d.logo_url || '/logo-lr.png')
-    }).catch(() => carregarLogo('/logo-lr.png'))
-  }, [])
-
-  // planos da categoria escolhida
-  const planosDaCategoria = categoria ? planos.filter(p => CATEGORIAS[categoria]?.siglas.includes(p.sigla)) : []
 
   useEffect(() => {
     if (!planoSigla) { setFaixas([]); return }
@@ -79,6 +55,14 @@ export default function SimuladorPage() {
     })
   }, [planoSigla])
 
+  const limpar = () => {
+    setCategoria(''); setPlanoSigla(''); setFaixas([]); setCreditoSel('')
+    setComSeguro(false); setVerCheia(false); setTipoParcela('red50'); setTipoAntecipacao('red50')
+    setQtdAntecipar('2'); setNomeCliente(''); setLanceEmbutido('')
+  }
+
+  // planos da categoria escolhida
+  const planosDaCategoria = categoria ? planos.filter(p => CATEGORIAS[categoria]?.siglas.includes(p.sigla)) : []
   const faixa = faixas.find(f => String(f.credito) === creditoSel)
   const qtd = parseInt(qtdAntecipar) || 0
   const planoAtual = planos.find(p => p.sigla === planoSigla)
@@ -99,14 +83,11 @@ export default function SimuladorPage() {
   let pdParc25 = demais25, p1Parc25 = primeira25, pdParcCheia = demaisCheia, p1ParcCheia = primeiraCheia
   if (ehParcelinha && faixa) {
     const C = faixa.credito
-    // demais (cada) por nível
     pdParc25    = Math.round(C * (planoAtual?.pl_demais_25_pct || 0) * 100) / 100 + seguroMensal
     pdParcCheia = Math.round(C * (planoAtual?.pl_demais_int_pct || 0) * 100) / 100 + seguroMensal
-    // 1ª-12ª por nível
     p1Parc25    = Math.round(C * (planoAtual?.pl_p12_25_pct || 0) * 100) / 100 + seguroMensal
     p1ParcCheia = Math.round(C * (planoAtual?.pl_p12_int_pct || 0) * 100) / 100 + seguroMensal
   }
-  // funções pra pegar a parcela conforme o tipo escolhido
   const pdPorTipo = (t: string) => {
     if (ehParcelinha) return t === 'cheia' ? pdParcCheia : t === 'red25' ? pdParc25 : pd
     return t === 'cheia' ? demaisCheia : t === 'red25' ? demais25 : pd
@@ -115,37 +96,125 @@ export default function SimuladorPage() {
     if (ehParcelinha) return t === 'cheia' ? p1ParcCheia : t === 'red25' ? p1Parc25 : p1
     return t === 'cheia' ? primeiraCheia : t === 'red25' ? primeira25 : p1
   }
-  const labelPorTipo = (t: string) => t === 'cheia' ? 'cheia' : t === 'red25' ? '25%' : '50%'
-  // parcela mostrada na proposta (escolha 1)
+  const labelPorTipo = (t: string) => t === 'cheia' ? 'Cheia' : t === 'red25' ? '25%' : '50%'
   const p1Proposta = p1PorTipo(tipoParcela)
   const pdProposta = pdPorTipo(tipoParcela)
-  // base da antecipação/entrada (escolha 2, independente)
   const pdAntecip = pdPorTipo(tipoAntecipacao)
   const p1Antecip = p1PorTipo(tipoAntecipacao)
-  // versões SEM seguro (o seguro é somado separadamente nas caixas do PDF)
   const p1PropostaSemSeg = p1Proposta - seguroMensal
   const pdPropostaSemSeg = pdProposta - seguroMensal
-  // valor da entrada = 1ª (base antecip) + (qtd) demais (base antecip); na Parcelinha são (1+qtd) parcelas iguais
   const entradaProposta = ehParcelinha ? p1Antecip * (1 + qtd) : p1Antecip + pdAntecip * qtd
   const nParcelasEntrada = 1 + qtd
   const entradaPropostaSemSeg = entradaProposta - seguroMensal * nParcelasEntrada
-  // antecipadas: na Parcelinha o cliente antecipa as parcelas 1-12 (valor p1); nos outros antecipa as demais (pd)
   const valorAntecipadas = ehParcelinha ? p1 * qtd : pd * qtd
   const totalCliente = ehParcelinha ? p1 * (1 + qtd) : p1 + pd * qtd
-  // não estornar (só planos com estorno; Parcelinha não tem)
   const limiteEstorno = planoAtual?.estorno_ate_pgto || 0
   const totalNaoEstornar = limiteEstorno > 0 ? p1 + pd * (limiteEstorno - 1) : (faixa?.total_nao_estornar || 0)
   const lanceNum = parseFloat((lanceEmbutido || '').replace(/\./g, '').replace(',', '.')) || 0
   const prazoRestante = Math.max(0, prazoPlano - (1 + qtd))
   const creditoLiquido = faixa ? faixa.credito - lanceNum : 0
+  const nomeAmigavel = planoAtual?.nome_completo || ''
 
-  const inputStyle = { background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }
-
-  const formatarMoeda = (valor: string) => {
-    const num = valor.replace(/\D/g, '')
-    if (!num) return ''
-    return parseInt(num).toLocaleString('pt-BR')
+  return {
+    categoria, setCategoria, planoSigla, setPlanoSigla, faixas, setFaixas, creditoSel, setCreditoSel,
+    comSeguro, setComSeguro, verCheia, setVerCheia, tipoParcela, setTipoParcela, tipoAntecipacao, setTipoAntecipacao,
+    qtdAntecipar, setQtdAntecipar, nomeCliente, setNomeCliente, lanceEmbutido, setLanceEmbutido, limpar,
+    planosDaCategoria, faixa, qtd, planoAtual, prazoPlano, seguroPct, seguroMensal, cheiaInc, demaisCheia, primeiraCheia,
+    red25Pct, demais25, primeira25, p1, pd, ehParcelinha, pdParc25, p1Parc25, pdParcCheia, p1ParcCheia,
+    pdPorTipo, p1PorTipo, labelPorTipo, p1Proposta, pdProposta, pdAntecip, p1Antecip, p1PropostaSemSeg, pdPropostaSemSeg,
+    entradaProposta, nParcelasEntrada, entradaPropostaSemSeg, valorAntecipadas, totalCliente, limiteEstorno, totalNaoEstornar,
+    lanceNum, prazoRestante, creditoLiquido, nomeAmigavel,
   }
+}
+
+type Sim = ReturnType<typeof useSimulacao>
+
+// Seletores de montagem (categoria / plano / crédito) reutilizados nas duas abas
+function GridMontagem({ s }: { s: Sim }) {
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      <div>
+        <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Tipo de tabela</label>
+        <select value={s.categoria} onChange={(e) => { s.setCategoria(e.target.value); s.setPlanoSigla(''); s.setFaixas([]) }} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle}>
+          <option value="" style={{ background: '#131313' }}>Selecione</option>
+          {Object.entries(CATEGORIAS).map(([k, v]) => <option key={k} value={k} style={{ background: '#131313' }}>{v.label}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Plano</label>
+        <select value={s.planoSigla} onChange={(e) => s.setPlanoSigla(e.target.value)} disabled={!s.planosDaCategoria.length} className="w-full rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" style={inputStyle}>
+          <option value="" style={{ background: '#131313' }}>Selecione</option>
+          {s.planosDaCategoria.map(p => <option key={p.id} value={p.sigla} style={{ background: '#131313' }}>{p.nome_completo} · {p.sigla}</option>)}
+        </select>
+        {s.planoAtual && <p className="text-[10px] mt-1" style={{ color: 'var(--muted-color)' }}>{s.nomeAmigavel} <span style={{ opacity: 0.6 }}>({s.planoAtual.sigla})</span></p>}
+      </div>
+      <div>
+        <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Valor do crédito</label>
+        <select value={s.creditoSel} onChange={(e) => s.setCreditoSel(e.target.value)} disabled={!s.faixas.length} className="w-full rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" style={inputStyle}>
+          <option value="" style={{ background: '#131313' }}>Selecione</option>
+          {s.faixas.map(f => <option key={f.credito} value={String(f.credito)} style={{ background: '#131313' }}>{fmtMoeda(f.credito)}</option>)}
+        </select>
+      </div>
+    </div>
+  )
+}
+
+// Botões de tipo de parcela / base de antecipação
+function SeletoresTipoParcela({ s }: { s: Sim }) {
+  if (!(s.red25Pct > 0 || s.cheiaInc > 0 || s.ehParcelinha)) return null
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div>
+        <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Parcela mostrada na proposta</label>
+        <div className="flex gap-2">
+          <button onClick={() => s.setTipoParcela('red50')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: s.tipoParcela === 'red50' ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${s.tipoParcela === 'red50' ? 'var(--accent)' : 'var(--border)'}`, color: s.tipoParcela === 'red50' ? 'var(--accent)' : 'var(--muted-color)' }}>50%</button>
+          {(s.red25Pct > 0 || s.ehParcelinha) && <button onClick={() => s.setTipoParcela('red25')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: s.tipoParcela === 'red25' ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${s.tipoParcela === 'red25' ? 'var(--accent)' : 'var(--border)'}`, color: s.tipoParcela === 'red25' ? 'var(--accent)' : 'var(--muted-color)' }}>25%</button>}
+          {(s.cheiaInc > 0 || s.ehParcelinha) && <button onClick={() => s.setTipoParcela('cheia')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: s.tipoParcela === 'cheia' ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${s.tipoParcela === 'cheia' ? 'var(--accent)' : 'var(--border)'}`, color: s.tipoParcela === 'cheia' ? 'var(--accent)' : 'var(--muted-color)' }}>Cheia</button>}
+        </div>
+      </div>
+      <div>
+        <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Base da antecipação (entrada)</label>
+        <div className="flex gap-2">
+          <button onClick={() => s.setTipoAntecipacao('red50')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: s.tipoAntecipacao === 'red50' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${s.tipoAntecipacao === 'red50' ? '#3b82f6' : 'var(--border)'}`, color: s.tipoAntecipacao === 'red50' ? '#3b82f6' : 'var(--muted-color)' }}>50%</button>
+          {(s.red25Pct > 0 || s.ehParcelinha) && <button onClick={() => s.setTipoAntecipacao('red25')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: s.tipoAntecipacao === 'red25' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${s.tipoAntecipacao === 'red25' ? '#3b82f6' : 'var(--border)'}`, color: s.tipoAntecipacao === 'red25' ? '#3b82f6' : 'var(--muted-color)' }}>25%</button>}
+          {(s.cheiaInc > 0 || s.ehParcelinha) && <button onClick={() => s.setTipoAntecipacao('cheia')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: s.tipoAntecipacao === 'cheia' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${s.tipoAntecipacao === 'cheia' ? '#3b82f6' : 'var(--border)'}`, color: s.tipoAntecipacao === 'cheia' ? '#3b82f6' : 'var(--muted-color)' }}>Cheia</button>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const SecaoTitulo = ({ n, children, extra }: { n: string; children: React.ReactNode; extra?: React.ReactNode }) => (
+  <div className="flex items-center justify-between mb-3">
+    <div className="flex items-center gap-2">
+      <span className="text-base">{n}</span>
+      <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--muted-color)' }}>{children}</h3>
+    </div>
+    {extra}
+  </div>
+)
+
+const cardStyle = { background: 'rgba(17,18,22,0.92)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', border: '1px solid var(--border)' } as const
+const avisoEmbracon = (
+  <div className="flex items-start gap-2 rounded-lg p-3" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
+    <AlertTriangle size={15} style={{ color: '#f59e0b', marginTop: 1 }} />
+    <p className="text-xs" style={{ color: '#f59e0b' }}>Se a venda for gerada em menos meses no sistema da Embracon, o valor das parcelas pode mudar. Confira a proposta final.</p>
+  </div>
+)
+
+// ══════════════════════════════════════════════════════════════
+// ABA SIMULADOR — 4 seções + barra de proposta sticky
+// ══════════════════════════════════════════════════════════════
+function SimuladorTab({ planos, empresaNome, logoBase64 }: { planos: Plano[]; empresaNome: string; logoBase64: string | null }) {
+  const s = useSimulacao(planos)
+  const {
+    faixa, qtd, planoAtual, prazoPlano, comSeguro, seguroPct, seguroMensal, verCheia, setVerCheia,
+    red25Pct, cheiaInc, demais25, primeira25, demaisCheia, primeiraCheia, p1, pd, ehParcelinha,
+    pdParc25, p1Parc25, pdParcCheia, p1ParcCheia, labelPorTipo, tipoParcela, tipoAntecipacao,
+    p1PropostaSemSeg, pdPropostaSemSeg, entradaProposta, entradaPropostaSemSeg, nParcelasEntrada,
+    valorAntecipadas, totalCliente, limiteEstorno, totalNaoEstornar, lanceNum, prazoRestante, creditoLiquido,
+    nomeAmigavel, nomeCliente, setNomeCliente, lanceEmbutido, setLanceEmbutido, pdProposta,
+  } = s
 
   const gerarPDF = () => {
     if (!faixa || !planoAtual) return
@@ -156,7 +225,6 @@ export default function SimuladorPage() {
     const fmt = (n: number) => 'R$ ' + n.toLocaleString('pt-BR', { minimumFractionDigits: 2 })
     const W = 210
 
-    // Badge pílula vermelha com texto branco (canto suave + sombra sutil)
     const badge = (x: number, yy: number, w: number, label: string) => {
       doc.setFillColor(220, 220, 220)
       doc.roundedRect(x + 0.4, yy + 0.5, w, 7, 4, 4, 'F')
@@ -175,7 +243,6 @@ export default function SimuladorPage() {
       doc.roundedRect(x, yy, w, h, 3, 3, 'FD')
     }
 
-    // Header com gradiente vermelho (escuro -> claro)
     for (let i = 0; i < 30; i++) {
       const t = i / 30
       const r = Math.round(160 + (210 - 160) * t)
@@ -188,7 +255,6 @@ export default function SimuladorPage() {
     doc.text('Oi, ' + (nomeCliente || 'Cliente'), 14, 13)
     doc.setFontSize(11)
     doc.text('Aqui está a sua simulação de crédito.', 14, 21)
-    // logo sobre faixa branca (pra logo preta aparecer legível no header vermelho)
     if (logoBase64) {
       try {
         const fmtImg = logoBase64.includes('image/png') ? 'PNG' : 'JPEG'
@@ -204,19 +270,15 @@ export default function SimuladorPage() {
       doc.text(empresaNome || 'LR MULTIMARCAS', W - 14, 16, { align: 'right' })
     }
 
-    // Bloco cliente (3 linhas com badge)
     let y = 40
     badge(14, y, 38, 'Cliente'); valor(56, y, nomeCliente || 'Simulação'); y += 10
     badge(14, y, 38, 'Criada em'); valor(56, y, new Date().toLocaleDateString('pt-BR') + ' ' + new Date().toLocaleTimeString('pt-BR', {hour:'2-digit',minute:'2-digit'})); y += 10
     badge(14, y, 38, 'Interesse'); valor(56, y, planoAtual.bem); y += 14
 
-    // Título central
     doc.setTextColor(...RED); doc.setFont('helvetica','bold'); doc.setFontSize(15)
     doc.text('Detalhes da proposta', W/2, y, { align: 'center' }); y += 10
 
     const colY = y
-    // ===== COLUNA ESQUERDA =====
-    // Caixa Resumo
     caixaSombra(14, colY, 88, 92)
     doc.setTextColor(...RED); doc.setFont('helvetica','bold'); doc.setFontSize(11)
     doc.text('Resumo', 14 + 44, colY + 8, { align: 'center' })
@@ -232,12 +294,9 @@ export default function SimuladorPage() {
     ]
     resumoItens.forEach(([k,v,bw]) => { badge(18, ry, bw, k); valor(18 + bw + 4, ry, v); ry += 10.5 })
 
-    // Investimento com seguro (fundo claro)
     const segMensal = Math.round(faixa.credito * (planoAtual.seguro_pct || 0) * 100) / 100
-    // valor de cada parcela 1ª-12ª (parcelinha) conforme o tipo escolhido na proposta
     const p12PropostaSemSeg = p1PropostaSemSeg
     const p12PropostaComSeg = p1PropostaSemSeg + segMensal
-    // Primeiro pagamento = 1ª parcela + parcelas antecipadas (qtd)
     const primeiroPagamentoSem = entradaPropostaSemSeg
     const primeiroPagamentoCom = entradaPropostaSemSeg + segMensal * nParcelasEntrada
     let y2 = colY + 100
@@ -250,7 +309,6 @@ export default function SimuladorPage() {
     badge(18, iy, 38, 'Demais parcelas'); valor(60, iy, fmt(pdPropostaSemSeg + segMensal)); iy += 10
     badge(18, iy, 36, 'Valor do seguro'); valor(58, iy, fmt(segMensal))
 
-    // Investimento sem seguro (fundo claro)
     let y3 = y2 + (ehParcelinha ? 62 : 52)
     caixaSombra(14, y3, 88, (ehParcelinha ? 44 : 34))
     doc.setTextColor(...RED); doc.setFont('helvetica','bold'); doc.setFontSize(10)
@@ -260,7 +318,6 @@ export default function SimuladorPage() {
     if (ehParcelinha) { badge(18, sy, 38, '1ª à 12ª'); valor(60, sy, fmt(p12PropostaSemSeg)); sy += 10 }
     badge(18, sy, 38, 'Demais parcelas'); valor(60, sy, fmt(pdPropostaSemSeg))
 
-    // ===== COLUNA DIREITA =====
     let ry2 = colY
     doc.setTextColor(...RED); doc.setFont('helvetica','bold'); doc.setFontSize(11)
     doc.text('Demonstrativo de taxa', 108 + 44, ry2 + 8, { align: 'center' })
@@ -274,7 +331,6 @@ export default function SimuladorPage() {
     const barAno = Math.min(barMes * 12, 44)
     badge(112, ry2, 22, 'Ano'); doc.setFillColor(235,200,205); doc.roundedRect(138, ry2+1, barAno, 5, 2.5, 2.5, 'F'); valor(138 + barAno + 4, ry2, fmtPct(taxaAno)); ry2 += 16
 
-    // Avisos
     doc.setTextColor(120,120,120); doc.setFont('helvetica','normal'); doc.setFontSize(7.5)
     const avisos = [
       '* Proposta sujeita a alterações, segundo critérios de disponibilidade de vagas no grupo de consórcio.',
@@ -290,81 +346,277 @@ export default function SimuladorPage() {
     doc.save('Proposta_' + (nomeCliente || 'cliente').replace(/\s+/g, '_') + '.pdf')
   }
 
-  const nomeAmigavel = planoAtual?.nome_completo || ''
+  return (
+    <div className="space-y-5 pb-40">
+      {/* 1️⃣ MONTAGEM */}
+      <div className="rounded-xl p-5" style={cardStyle}>
+        <SecaoTitulo n="1️⃣" extra={
+          <button onClick={s.limpar} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium transition-colors" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--muted-color)' }}>
+            <RotateCcw size={12} />Limpar
+          </button>
+        }>Montagem</SecaoTitulo>
+        <GridMontagem s={s} />
+      </div>
 
-  // Seletores compartilhados (plano, crédito, seguro, antecipação) — mesmo estado nas abas Simulador e Gerar Proposta
-  const gridSeletores = (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-      <div>
-        <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Tipo de tabela</label>
-        <select value={categoria} onChange={(e) => { setCategoria(e.target.value); setPlanoSigla(''); setFaixas([]) }} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle}>
-          <option value="" style={{ background: '#131313' }}>Selecione</option>
-          {Object.entries(CATEGORIAS).map(([k, v]) => <option key={k} value={k} style={{ background: '#131313' }}>{v.label}</option>)}
-        </select>
+      {/* 2️⃣ CONDIÇÕES */}
+      {faixa && (
+        <div className="rounded-xl p-5" style={cardStyle}>
+          <SecaoTitulo n="2️⃣">Condições</SecaoTitulo>
+          <div className="space-y-3">
+            <SeletoresTipoParcela s={s} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Parcelas a antecipar</label>
+                <input type="number" min="0" value={s.qtdAntecipar} onChange={(e) => s.setQtdAntecipar(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Lance embutido (opcional)</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--muted-color)' }}>R$</span>
+                  <input value={lanceEmbutido} onChange={e => setLanceEmbutido(formatarMoeda(e.target.value))} placeholder="0" inputMode="numeric" className="w-full rounded-lg pl-9 pr-3 py-2 text-sm outline-none" style={inputStyle} />
+                </div>
+              </div>
+            </div>
+            {seguroPct > 0 && (
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Seguro prestamista</label>
+                <div className="flex items-center gap-2">
+                  <button onClick={() => s.setComSeguro(false)} className="flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-colors" style={{ background: !comSeguro ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.05)', border: `1px solid ${!comSeguro ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.12)'}`, color: !comSeguro ? 'var(--accent)' : 'var(--muted-color)' }}>Sem seguro</button>
+                  <button onClick={() => s.setComSeguro(true)} className="flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-colors" style={{ background: comSeguro ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.05)', border: `1px solid ${comSeguro ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.12)'}`, color: comSeguro ? 'var(--accent)' : 'var(--muted-color)' }}>Com seguro</button>
+                </div>
+                {comSeguro && seguroMensal > 0 && <p className="text-[11px] mt-2" style={{ color: 'var(--muted-color)' }}>Seguro de R$ {seguroMensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês incluído em cada parcela.</p>}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 3️⃣ RESULTADO (visão interna) */}
+      {faixa && (
+        <div className="rounded-xl p-5" style={{ background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}>
+          <SecaoTitulo n="3️⃣">Resultado (visão interna)</SecaoTitulo>
+          <div className="flex items-center gap-3 mb-4"><CreditCard size={18} style={{ color: '#3b82f6' }} /><h3 className="text-sm font-semibold" style={{ color: '#3b82f6' }}>Quanto o cliente paga</h3></div>
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>{ehParcelinha ? 'Parcela (1ª a 12ª)' : '1ª parcela'}</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(p1)}</p></div>
+            <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Demais (cada)</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(pd)}</p></div>
+            <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>+ {qtd} antecipadas</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(valorAntecipadas)}</p></div>
+            {!ehParcelinha && <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Total p/ não estornar{limiteEstorno > 0 ? ` (1ª + ${limiteEstorno - 1})` : ''}</p><p className="text-lg font-semibold" style={{ color: '#f59e0b' }}>{fmtMoeda(totalNaoEstornar)}</p></div>}
+            <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Crédito líquido{lanceNum > 0 ? ' (após lance)' : ''}</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(creditoLiquido)}</p></div>
+            {seguroMensal > 0 && <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Seguro / mês</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(seguroMensal)}</p></div>}
+          </div>
+          <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
+            <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Total que o cliente desembolsa (1ª + {qtd})</p>
+            <p className="text-2xl font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(totalCliente)}</p>
+          </div>
+          <p className="text-xs mt-3" style={{ color: 'var(--muted-color)' }}>Prazo: {prazoPlano} meses {planoAtual?.tx_adm_topo ? `· Taxa adm. total: ${planoAtual.tx_adm_topo}%` : ''}</p>
+          {(red25Pct > 0 || cheiaInc > 0 || ehParcelinha) && (
+            <button onClick={() => setVerCheia(v => !v)} className={`mt-3 rounded-lg px-3 py-2 text-xs font-semibold transition-colors w-full ${verCheia ? '' : 'animate-pulse'}`} style={{
+              background: verCheia ? 'rgba(212,175,55,0.18)' : 'linear-gradient(135deg, rgba(200,32,46,0.85), rgba(160,20,34,0.85))',
+              border: `1px solid ${verCheia ? 'rgba(212,175,55,0.5)' : 'rgba(255,120,130,0.5)'}`,
+              color: verCheia ? 'var(--accent)' : '#fff',
+              boxShadow: verCheia ? 'none' : '0 4px 16px rgba(200,32,46,0.35)',
+            }}>
+              {verCheia ? 'Ocultar outras reduções' : '🔥 Ver 25% e parcela cheia'}
+            </button>
+          )}
+          {verCheia && (
+            <div className="mt-3 space-y-2">
+              {(red25Pct > 0 || ehParcelinha) && (
+                <div className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
+                  <p className="text-xs mb-2" style={{ color: 'var(--muted-color)' }}>Redução de 25%{comSeguro ? ' · com seguro' : ''}:</p>
+                  <div className="flex justify-between text-sm"><span style={{ color: 'var(--muted-color)' }}>{ehParcelinha ? '1ª a 12ª' : '1ª parcela'}</span><span style={{ color: 'var(--text)' }}>R$ {(ehParcelinha ? p1Parc25 : primeira25).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                  <div className="flex justify-between text-sm mt-1"><span style={{ color: 'var(--muted-color)' }}>Demais</span><span style={{ color: 'var(--text)' }}>R$ {(ehParcelinha ? pdParc25 : demais25).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                </div>
+              )}
+              {(cheiaInc > 0 || ehParcelinha) && (
+                <div className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
+                  <p className="text-xs mb-2" style={{ color: 'var(--muted-color)' }}>Parcela cheia (sem redução){comSeguro ? ' · com seguro' : ''}:</p>
+                  <div className="flex justify-between text-sm"><span style={{ color: 'var(--muted-color)' }}>{ehParcelinha ? '1ª a 12ª cheia' : '1ª parcela cheia'}</span><span style={{ color: 'var(--text)' }}>R$ {(ehParcelinha ? p1ParcCheia : primeiraCheia).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                  <div className="flex justify-between text-sm mt-1"><span style={{ color: 'var(--muted-color)' }}>Demais cheias</span><span style={{ color: 'var(--text)' }}>R$ {(ehParcelinha ? pdParcCheia : demaisCheia).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
+                  <p className="text-[10px] mt-2" style={{ color: 'var(--muted-color)' }}>Cobrada após a contemplação (devolução integral do crédito).</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {planoAtual?.bem === 'Imóvel' && faixa && (
+        <div className="rounded-xl p-4" style={{ background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.35)' }}>
+          <p className="text-sm font-medium text-center" style={{ color: 'var(--accent)' }}>
+            😮 Dica de venda: nos planos de imóvel, vendendo com 2% de adesão em vez de 1%, a taxa de administração total cai de 26% para 22%! Melhor pro cliente e mais comissão pra você.
+          </p>
+        </div>
+      )}
+
+      {faixa && avisoEmbracon}
+
+      {/* 4️⃣ BARRA DE PROPOSTA (sticky) */}
+      {faixa && (
+        <div className="sticky bottom-0 -mx-6 px-6 pt-3 pb-4 lg:-mx-8 lg:px-8" style={{ background: 'linear-gradient(to top, rgba(10,11,14,0.98) 70%, rgba(10,11,14,0))' }}>
+          {/* Resumo-frase */}
+          <p className="text-[11px] mb-2 text-pretty" style={{ color: 'var(--muted-color)' }}>
+            <span style={{ color: 'var(--text)' }}>{nomeAmigavel}</span> · {fmtMoeda(faixa.credito)} · parcela {labelPorTipo(tipoParcela)} · primeiro pagamento total de <span style={{ color: 'var(--accent)' }}>{fmtMoeda(entradaProposta)}</span> + {prazoRestante}× de {fmtMoeda(pdProposta)}
+          </p>
+          <div className="rounded-xl p-3 flex flex-col sm:flex-row sm:items-center gap-3" style={{ background: 'rgba(17,18,22,0.95)', border: '1px solid rgba(212,175,55,0.25)', boxShadow: '0 -4px 24px rgba(0,0,0,0.4)' }}>
+            {/* chips do que sai no PDF */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="rounded-full px-2.5 py-1 text-[10px] font-semibold" style={{ background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.4)', color: 'var(--accent)' }}>Parcela: {labelPorTipo(tipoParcela)}</span>
+              <span className="rounded-full px-2.5 py-1 text-[10px] font-semibold" style={{ background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.4)', color: '#60a5fa' }}>Entrada: {labelPorTipo(tipoAntecipacao)}</span>
+            </div>
+            <input value={nomeCliente} onChange={e => setNomeCliente(e.target.value)} placeholder="Nome do cliente" className="flex-1 min-w-0 rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
+            <button onClick={gerarPDF} className="rounded-lg px-4 py-2.5 text-sm font-semibold whitespace-nowrap flex items-center justify-center gap-2" style={{ background: 'linear-gradient(135deg, #d4af37, #b8941f)', border: '1px solid rgba(212,175,55,0.6)', color: '#0a0a0a', boxShadow: '0 8px 24px rgba(212,175,55,0.25)' }}>
+              <FileText size={15} />Gerar Proposta
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════
+// ABA ATENDIMENTO — estado próprio + apresentação pro cliente
+// ══════════════════════════════════════════════════════════════
+function AtendimentoTab({ planos, empresaNome, empresaLogo }: { planos: Plano[]; empresaNome: string; empresaLogo: string | null }) {
+  const s = useSimulacao(planos)
+  const { faixa, qtd, comSeguro, lanceNum, creditoLiquido, ehParcelinha, p1Proposta, pdProposta, entradaProposta, nParcelasEntrada, prazoRestante, nomeAmigavel } = s
+
+  return (
+    <div className="space-y-5">
+      {/* Painel de montagem compacto (estado independente desta aba) */}
+      <div className="rounded-xl p-5" style={cardStyle}>
+        <SecaoTitulo n="🎬" extra={
+          <button onClick={s.limpar} className="flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-[11px] font-medium" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--muted-color)' }}>
+            <RotateCcw size={12} />Limpar
+          </button>
+        }>Configurar apresentação</SecaoTitulo>
+        <div className="space-y-3">
+          <GridMontagem s={s} />
+          {faixa && (
+            <>
+              <SeletoresTipoParcela s={s} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Parcelas a antecipar</label>
+                  <input type="number" min="0" value={s.qtdAntecipar} onChange={(e) => s.setQtdAntecipar(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
+                </div>
+                <div>
+                  <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Lance embutido (opcional)</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--muted-color)' }}>R$</span>
+                    <input value={s.lanceEmbutido} onChange={e => s.setLanceEmbutido(formatarMoeda(e.target.value))} placeholder="0" inputMode="numeric" className="w-full rounded-lg pl-9 pr-3 py-2 text-sm outline-none" style={inputStyle} />
+                  </div>
+                </div>
+              </div>
+              {s.seguroPct > 0 && (
+                <div className="flex items-center gap-2">
+                  <button onClick={() => s.setComSeguro(false)} className="flex-1 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: !comSeguro ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.05)', border: `1px solid ${!comSeguro ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.12)'}`, color: !comSeguro ? 'var(--accent)' : 'var(--muted-color)' }}>Sem seguro</button>
+                  <button onClick={() => s.setComSeguro(true)} className="flex-1 rounded-lg px-3 py-2 text-xs font-medium" style={{ background: comSeguro ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.05)', border: `1px solid ${comSeguro ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.12)'}`, color: comSeguro ? 'var(--accent)' : 'var(--muted-color)' }}>Com seguro</button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
-      <div>
-        <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Plano</label>
-        <select value={planoSigla} onChange={(e) => setPlanoSigla(e.target.value)} disabled={!planosDaCategoria.length} className="w-full rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" style={inputStyle}>
-          <option value="" style={{ background: '#131313' }}>Selecione</option>
-          {planosDaCategoria.map(p => <option key={p.id} value={p.sigla} style={{ background: '#131313' }}>{p.nome_completo}</option>)}
-        </select>
-      </div>
-      <div>
-        <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Valor do crédito</label>
-        <select value={creditoSel} onChange={(e) => setCreditoSel(e.target.value)} disabled={!faixas.length} className="w-full rounded-lg px-3 py-2 text-sm outline-none disabled:opacity-50" style={inputStyle}>
-          <option value="" style={{ background: '#131313' }}>Selecione</option>
-          {faixas.map(f => <option key={f.credito} value={String(f.credito)} style={{ background: '#131313' }}>{fmtMoeda(f.credito)}</option>)}
-        </select>
-        {faixa && seguroPct > 0 && (
-          <div className="flex items-center gap-2 mt-3">
-            <button onClick={() => setComSeguro(false)} className="flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-colors" style={{ background: !comSeguro ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', border: `1px solid ${!comSeguro ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.12)'}`, color: !comSeguro ? 'var(--accent)' : 'var(--muted-color)' }}>Sem seguro</button>
-            <button onClick={() => setComSeguro(true)} className="flex-1 rounded-lg px-3 py-2 text-xs font-medium transition-colors" style={{ background: comSeguro ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.05)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', border: `1px solid ${comSeguro ? 'rgba(212,175,55,0.5)' : 'rgba(255,255,255,0.12)'}`, color: comSeguro ? 'var(--accent)' : 'var(--muted-color)' }}>Com seguro</button>
+
+      {/* Tela de apresentação (virada pro cliente) */}
+      <div className="rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(160deg, #0d0e12 0%, #14151b 100%)', border: '1px solid rgba(212,175,55,0.25)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}>
+        {!faixa ? (
+          <div className="flex flex-col items-center justify-center gap-3 py-20 px-6 text-center">
+            <MonitorPlay size={32} style={{ color: 'var(--accent)' }} />
+            <p className="text-sm" style={{ color: 'var(--muted-color)' }}>Escolha o plano e o crédito acima para apresentar ao cliente.</p>
+          </div>
+        ) : (
+          <div className="px-6 py-10 sm:px-10">
+            <div className="flex items-center justify-center mb-8">
+              {empresaLogo ? (
+                <img src={empresaLogo || "/placeholder.svg"} alt={empresaNome || 'Empresa'} className="h-16 w-auto object-contain" crossOrigin="anonymous" />
+              ) : (
+                <p className="text-lg font-bold tracking-wide" style={{ color: 'var(--accent)' }}>{empresaNome || 'LR MULTIMARCAS'}</p>
+              )}
+            </div>
+
+            <div className="text-center mb-2">
+              <p className="text-sm uppercase tracking-widest" style={{ color: 'var(--muted-color)' }}>Seu crédito</p>
+              <p className="font-bold leading-none mt-2" style={{ color: 'var(--accent)', fontSize: 'clamp(48px, 9vw, 84px)' }}>{fmtMoeda(faixa.credito)}</p>
+              <p className="text-base mt-3" style={{ color: 'var(--text)' }}>{nomeAmigavel}</p>
+            </div>
+
+            {lanceNum > 0 && (
+              <div className="mx-auto max-w-md mt-6 rounded-2xl px-6 py-4 text-center" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.4)' }}>
+                <p className="text-xs uppercase tracking-wider" style={{ color: 'var(--muted-color)' }}>Crédito líquido (após lance embutido)</p>
+                <p className="text-3xl font-bold mt-1" style={{ color: 'var(--accent)' }}>{fmtMoeda(creditoLiquido)}</p>
+              </div>
+            )}
+
+            <div className={`grid gap-4 mt-8 ${qtd > 0 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+              <div className="rounded-2xl px-6 py-7 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--muted-color)' }}>{ehParcelinha ? 'Parcela (1ª à 12ª)' : 'Primeira parcela'}</p>
+                <p className="text-3xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(p1Proposta)}</p>
+              </div>
+              <div className="rounded-2xl px-6 py-7 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--muted-color)' }}>Demais parcelas</p>
+                <p className="text-3xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(pdProposta)}</p>
+              </div>
+              {qtd > 0 && (
+                <div className="rounded-2xl px-6 py-7 text-center" style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.35)' }}>
+                  <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--muted-color)' }}>Entrada ({nParcelasEntrada} parcelas)</p>
+                  <p className="text-3xl font-bold" style={{ color: '#60a5fa' }}>{fmtMoeda(entradaProposta)}</p>
+                </div>
+              )}
+            </div>
+
+            <p className="text-center text-xs mt-8" style={{ color: 'var(--muted-color)' }}>Prazo de {prazoRestante} meses{comSeguro ? ' · seguro incluído' : ''}</p>
+
+            <div className="flex justify-center mt-6">
+              <button disabled title="Em breve" className="flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold opacity-40 cursor-not-allowed" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.3)', color: 'var(--accent)' }}>
+                <Trophy size={16} />Grupo em destaque desta faixa
+              </button>
+            </div>
           </div>
         )}
-        {comSeguro && seguroMensal > 0 && (
-          <p className="text-[11px] mt-2" style={{ color: 'var(--muted-color)' }}>Seguro de R$ {seguroMensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/mês incluído em cada parcela.</p>
-        )}
-      </div>
-      <div>
-        <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Parcelas a antecipar</label>
-        <input type="number" min="0" value={qtdAntecipar} onChange={(e) => setQtdAntecipar(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
       </div>
     </div>
   )
+}
 
-  // Botões de tipo de parcela / base de antecipação (compartilhados)
-  const seletoresTipoParcela = (red25Pct > 0 || cheiaInc > 0 || ehParcelinha) ? (
-    <>
-      <div>
-        <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Parcela mostrada na proposta</label>
-        <div className="flex gap-2">
-          <button onClick={() => setTipoParcela('red50')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoParcela === 'red50' ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoParcela === 'red50' ? 'var(--accent)' : 'var(--border)'}`, color: tipoParcela === 'red50' ? 'var(--accent)' : 'var(--muted-color)' }}>50%</button>
-          {(red25Pct > 0 || ehParcelinha) && <button onClick={() => setTipoParcela('red25')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoParcela === 'red25' ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoParcela === 'red25' ? 'var(--accent)' : 'var(--border)'}`, color: tipoParcela === 'red25' ? 'var(--accent)' : 'var(--muted-color)' }}>25%</button>}
-          {(cheiaInc > 0 || ehParcelinha) && <button onClick={() => setTipoParcela('cheia')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoParcela === 'cheia' ? 'rgba(212,175,55,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoParcela === 'cheia' ? 'var(--accent)' : 'var(--border)'}`, color: tipoParcela === 'cheia' ? 'var(--accent)' : 'var(--muted-color)' }}>Cheia</button>}
-        </div>
-      </div>
-      <div>
-        <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Base da antecipação (entrada)</label>
-        <div className="flex gap-2">
-          <button onClick={() => setTipoAntecipacao('red50')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoAntecipacao === 'red50' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoAntecipacao === 'red50' ? '#3b82f6' : 'var(--border)'}`, color: tipoAntecipacao === 'red50' ? '#3b82f6' : 'var(--muted-color)' }}>50%</button>
-          {(red25Pct > 0 || ehParcelinha) && <button onClick={() => setTipoAntecipacao('red25')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoAntecipacao === 'red25' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoAntecipacao === 'red25' ? '#3b82f6' : 'var(--border)'}`, color: tipoAntecipacao === 'red25' ? '#3b82f6' : 'var(--muted-color)' }}>25%</button>}
-          {(cheiaInc > 0 || ehParcelinha) && <button onClick={() => setTipoAntecipacao('cheia')} className="flex-1 rounded-lg px-2 py-1.5 text-[11px] font-medium" style={{ background: tipoAntecipacao === 'cheia' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.04)', border: `1px solid ${tipoAntecipacao === 'cheia' ? '#3b82f6' : 'var(--border)'}`, color: tipoAntecipacao === 'cheia' ? '#3b82f6' : 'var(--muted-color)' }}>Cheia</button>}
-        </div>
-      </div>
-    </>
-  ) : null
+export default function SimuladorPage() {
+  const [planos, setPlanos] = useState<Plano[]>([])
+  const [loading, setLoading] = useState(true)
+  const [modo, setModo] = useState<'simulador' | 'atendimento'>('simulador')
+  const [empresaNome, setEmpresaNome] = useState('')
+  const [empresaLogo, setEmpresaLogo] = useState<string | null>(null)
+  const [logoBase64, setLogoBase64] = useState<string | null>(null)
 
-  const avisoEmbracon = (
-    <div className="flex items-start gap-2 rounded-lg p-3" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
-      <AlertTriangle size={15} style={{ color: '#f59e0b', marginTop: 1 }} />
-      <p className="text-xs" style={{ color: '#f59e0b' }}>Se a venda for gerada em menos meses no sistema da Embracon, o valor das parcelas pode mudar. Confira a proposta final.</p>
-    </div>
-  )
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.from('planos').select('id, sigla, nome_completo, bem, adesao_percent, estorno_ate_pgto, categoria_comissao, seguro_pct, tx_adm_topo, cheia_incremento_pct, prazo_meses, reduzida_25_pct, pl_demais_50_pct, pl_demais_25_pct, pl_demais_int_pct, pl_p12_50_pct, pl_p12_25_pct, pl_p12_int_pct').eq('ativo', true).order('bem').then(({ data }) => {
+      if (data) setPlanos(data as Plano[]); setLoading(false)
+    })
+  }, [])
+
+  useEffect(() => {
+    const carregarLogo = (url: string) => {
+      fetch(url)
+        .then(res => res.blob())
+        .then(blob => {
+          const reader = new FileReader()
+          reader.onloadend = () => setLogoBase64(reader.result as string)
+          reader.readAsDataURL(blob)
+        })
+        .catch(() => setLogoBase64(null))
+    }
+    fetch('/api/simulador/empresa').then(r => r.json()).then(d => {
+      setEmpresaNome(d.empresa_nome || '')
+      setEmpresaLogo(d.logo_url || null)
+      carregarLogo(d.logo_url || '/logo-lr.png')
+    }).catch(() => carregarLogo('/logo-lr.png'))
+  }, [])
 
   const abas: { id: typeof modo; label: string; icon: typeof Calculator }[] = [
-    { id: 'simulador', label: 'Simulador', icon: Calculator },
-    { id: 'atendimento', label: 'Atendimento', icon: MonitorPlay },
-    { id: 'proposta', label: 'Gerar Proposta', icon: FileText },
+    { id: 'simulador', label: '🧮 Simulador', icon: Calculator },
+    { id: 'atendimento', label: '🎥 Atendimento', icon: MonitorPlay },
   ]
 
   return (
@@ -377,17 +629,17 @@ export default function SimuladorPage() {
             <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: 'rgba(212,175,55,0.15)', border: '1px solid rgba(212,175,55,0.25)' }}><Calculator size={18} style={{ color: 'var(--accent)' }} /></div>
             <div>
               <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Simulador de Venda</h2>
-              <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Simule, apresente ao cliente e emita a proposta</p>
+              <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Simule internamente ou apresente ao cliente</p>
             </div>
           </div>
 
-          {/* Abas dos 3 modos (estado único) */}
+          {/* Abas (estados independentes) */}
           <div className="flex gap-2 mb-6 p-1 rounded-xl" style={{ background: 'rgba(17,18,22,0.6)', border: '1px solid var(--border)' }}>
             {abas.map(a => {
-              const Icon = a.icon; const ativo = modo === a.id
+              const ativo = modo === a.id
               return (
                 <button key={a.id} onClick={() => setModo(a.id)} className="flex-1 flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold transition-colors" style={{ background: ativo ? 'rgba(212,175,55,0.18)' : 'transparent', border: `1px solid ${ativo ? 'rgba(212,175,55,0.5)' : 'transparent'}`, color: ativo ? 'var(--accent)' : 'var(--muted-color)' }}>
-                  <Icon size={15} />{a.label}
+                  {a.label}
                 </button>
               )
             })}
@@ -397,166 +649,13 @@ export default function SimuladorPage() {
             <div className="flex items-center justify-center py-12"><Loader2 size={20} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
           ) : (
             <>
-              {/* ═══════════ MODO SIMULADOR ═══════════ */}
-              {modo === 'simulador' && (
-                <div className="space-y-5">
-                  <div className="rounded-xl p-5" style={{ background: 'rgba(17,18,22,0.92)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', border: '1px solid var(--border)' }}>
-                    {gridSeletores}
-                  </div>
-
-                  {faixa && (
-                    <div className="rounded-xl p-5" style={{ background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(16px)', WebkitBackdropFilter: 'blur(16px)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}>
-                      <div className="flex items-center gap-3 mb-4"><CreditCard size={18} style={{ color: '#3b82f6' }} /><h3 className="text-sm font-semibold" style={{ color: '#3b82f6' }}>Quanto o cliente paga</h3></div>
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>{ehParcelinha ? 'Parcela (1ª a 12ª)' : '1ª parcela'}</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(p1)}</p></div>
-                        <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Demais (cada)</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(pd)}</p></div>
-                        <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>+ {qtd} antecipadas</p><p className="text-lg font-semibold" style={{ color: 'var(--text)' }}>{fmtMoeda(valorAntecipadas)}</p></div>
-                        {!ehParcelinha && <div><p className="text-xs" style={{ color: 'var(--muted-color)' }}>Total p/ não estornar{limiteEstorno > 0 ? ` (1ª + ${limiteEstorno - 1})` : ''}</p><p className="text-lg font-semibold" style={{ color: '#f59e0b' }}>{fmtMoeda(totalNaoEstornar)}</p></div>}
-                      </div>
-                      <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--border)' }}>
-                        <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Total que o cliente desembolsa (1ª + {qtd})</p>
-                        <p className="text-2xl font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(totalCliente)}</p>
-                      </div>
-
-                      <p className="text-xs mt-3" style={{ color: 'var(--muted-color)' }}>Prazo: {prazoPlano} meses {planoAtual?.tx_adm_topo ? `· Taxa adm. total: ${planoAtual.tx_adm_topo}%` : ''}</p>
-                      {(red25Pct > 0 || cheiaInc > 0 || ehParcelinha) && faixa && (
-                        <button onClick={() => setVerCheia(v => !v)} className={`mt-3 rounded-lg px-3 py-2 text-xs font-semibold transition-colors w-full ${verCheia ? '' : 'animate-pulse'}`} style={{
-                          background: verCheia ? 'rgba(212,175,55,0.18)' : 'linear-gradient(135deg, rgba(200,32,46,0.85), rgba(160,20,34,0.85))',
-                          border: `1px solid ${verCheia ? 'rgba(212,175,55,0.5)' : 'rgba(255,120,130,0.5)'}`,
-                          color: verCheia ? 'var(--accent)' : '#fff',
-                          boxShadow: verCheia ? 'none' : '0 4px 16px rgba(200,32,46,0.35)',
-                          backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)',
-                        }}>
-                          {verCheia ? 'Ocultar outras reduções' : '🔥 Ver 25% e parcela cheia'}
-                        </button>
-                      )}
-                      {verCheia && faixa && (
-                        <div className="mt-3 space-y-2">
-                          {(red25Pct > 0 || ehParcelinha) && (
-                            <div className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
-                              <p className="text-xs mb-2" style={{ color: 'var(--muted-color)' }}>Redução de 25%{comSeguro ? ' · com seguro' : ''}:</p>
-                              <div className="flex justify-between text-sm"><span style={{ color: 'var(--muted-color)' }}>{ehParcelinha ? '1ª a 12ª' : '1ª parcela'}</span><span style={{ color: 'var(--text)' }}>R$ {(ehParcelinha ? p1Parc25 : primeira25).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
-                              <div className="flex justify-between text-sm mt-1"><span style={{ color: 'var(--muted-color)' }}>Demais</span><span style={{ color: 'var(--text)' }}>R$ {(ehParcelinha ? pdParc25 : demais25).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
-                            </div>
-                          )}
-                          {(cheiaInc > 0 || ehParcelinha) && (
-                            <div className="rounded-lg p-3" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
-                              <p className="text-xs mb-2" style={{ color: 'var(--muted-color)' }}>Parcela cheia (sem redução){comSeguro ? ' · com seguro' : ''}:</p>
-                              <div className="flex justify-between text-sm"><span style={{ color: 'var(--muted-color)' }}>{ehParcelinha ? '1ª a 12ª cheia' : '1ª parcela cheia'}</span><span style={{ color: 'var(--text)' }}>R$ {(ehParcelinha ? p1ParcCheia : primeiraCheia).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
-                              <div className="flex justify-between text-sm mt-1"><span style={{ color: 'var(--muted-color)' }}>Demais cheias</span><span style={{ color: 'var(--text)' }}>R$ {(ehParcelinha ? pdParcCheia : demaisCheia).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></div>
-                              <p className="text-[10px] mt-2" style={{ color: 'var(--muted-color)' }}>Cobrada após a contemplação (devolução integral do crédito).</p>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {planoAtual?.bem === 'Imóvel' && faixa && (
-                    <div className="rounded-xl p-4 animate-pulse" style={{ background: 'rgba(212,175,55,0.1)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', border: '1px solid rgba(212,175,55,0.35)', boxShadow: '0 4px 16px rgba(212,175,55,0.15)' }}>
-                      <p className="text-sm font-medium text-center" style={{ color: 'var(--accent)' }}>
-                        😮 Dica de venda: nos planos de imóvel, vendendo com 2% de adesão em vez de 1%, a taxa de administração total cai de 26% para 22%! Melhor pro cliente e mais comissão pra você.
-                      </p>
-                    </div>
-                  )}
-
-                  {avisoEmbracon}
-                </div>
-              )}
-
-              {/* ═══════════ MODO ATENDIMENTO (virado pro cliente) ═══════════ */}
-              {modo === 'atendimento' && (
-                <div className="rounded-2xl overflow-hidden" style={{ background: 'linear-gradient(160deg, #0d0e12 0%, #14151b 100%)', border: '1px solid rgba(212,175,55,0.25)', boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }}>
-                  {!faixa ? (
-                    <div className="flex flex-col items-center justify-center gap-3 py-20 px-6 text-center">
-                      <MonitorPlay size={32} style={{ color: 'var(--accent)' }} />
-                      <p className="text-sm" style={{ color: 'var(--muted-color)' }}>Escolha o plano e o crédito na aba Simulador para apresentar ao cliente.</p>
-                      <button onClick={() => setModo('simulador')} className="mt-1 rounded-lg px-4 py-2 text-xs font-semibold" style={{ background: 'rgba(212,175,55,0.18)', border: '1px solid rgba(212,175,55,0.5)', color: 'var(--accent)' }}>Ir para o Simulador</button>
-                    </div>
-                  ) : (
-                    <div className="px-6 py-10 sm:px-10">
-                      {/* Logo da empresa */}
-                      <div className="flex items-center justify-center mb-8">
-                        {empresaLogo ? (
-                          <img src={empresaLogo || "/placeholder.svg"} alt={empresaNome || 'Empresa'} className="h-16 w-auto object-contain" crossOrigin="anonymous" />
-                        ) : (
-                          <p className="text-lg font-bold tracking-wide" style={{ color: 'var(--accent)' }}>{empresaNome || 'LR MULTIMARCAS'}</p>
-                        )}
-                      </div>
-
-                      {/* Crédito gigante */}
-                      <div className="text-center mb-2">
-                        <p className="text-sm uppercase tracking-widest" style={{ color: 'var(--muted-color)' }}>Seu crédito</p>
-                        <p className="font-bold leading-none mt-2" style={{ color: 'var(--accent)', fontSize: 'clamp(48px, 9vw, 84px)' }}>{fmtMoeda(faixa.credito)}</p>
-                        <p className="text-base mt-3" style={{ color: 'var(--text)' }}>{nomeAmigavel}</p>
-                      </div>
-
-                      {/* Crédito líquido (se houver lance embutido) */}
-                      {lanceNum > 0 && (
-                        <div className="mx-auto max-w-md mt-6 rounded-2xl px-6 py-4 text-center" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.4)' }}>
-                          <p className="text-xs uppercase tracking-wider" style={{ color: 'var(--muted-color)' }}>Crédito líquido (após lance embutido)</p>
-                          <p className="text-3xl font-bold mt-1" style={{ color: 'var(--accent)' }}>{fmtMoeda(creditoLiquido)}</p>
-                        </div>
-                      )}
-
-                      {/* Cards grandes de parcelas */}
-                      <div className={`grid gap-4 mt-8 ${qtd > 0 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
-                        <div className="rounded-2xl px-6 py-7 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                          <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--muted-color)' }}>{ehParcelinha ? 'Parcela (1ª à 12ª)' : 'Primeira parcela'}</p>
-                          <p className="text-3xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(p1Proposta)}</p>
-                        </div>
-                        <div className="rounded-2xl px-6 py-7 text-center" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}>
-                          <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--muted-color)' }}>Demais parcelas</p>
-                          <p className="text-3xl font-bold" style={{ color: 'var(--text)' }}>{fmtMoeda(pdProposta)}</p>
-                        </div>
-                        {qtd > 0 && (
-                          <div className="rounded-2xl px-6 py-7 text-center" style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.35)' }}>
-                            <p className="text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--muted-color)' }}>Entrada ({nParcelasEntrada} parcelas)</p>
-                            <p className="text-3xl font-bold" style={{ color: '#60a5fa' }}>{fmtMoeda(entradaProposta)}</p>
-                          </div>
-                        )}
-                      </div>
-
-                      <p className="text-center text-xs mt-8" style={{ color: 'var(--muted-color)' }}>Prazo de {prazoRestante} meses{comSeguro ? ' · seguro incluído' : ''}</p>
-
-                      {/* Reservado para a Fase 2 (desabilitado) */}
-                      <div className="flex justify-center mt-6">
-                        <button disabled title="Em breve" className="flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-semibold opacity-40 cursor-not-allowed" style={{ background: 'rgba(212,175,55,0.12)', border: '1px solid rgba(212,175,55,0.3)', color: 'var(--accent)' }}>
-                          <Trophy size={16} />Grupo em destaque desta faixa
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* ═══════════ MODO GERAR PROPOSTA ═══════════ */}
-              {modo === 'proposta' && (
-                <div className="space-y-5">
-                  <div className="rounded-xl p-5" style={{ background: 'rgba(17,18,22,0.92)', boxShadow: '0 8px 24px rgba(0,0,0,0.45)', backdropFilter: 'blur(4px)', border: '1px solid var(--border)' }}>
-                    <div className="flex items-center gap-3 mb-4"><FileText size={18} style={{ color: 'var(--accent)' }} /><h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Gerar proposta em PDF</h3></div>
-                    {gridSeletores}
-
-                    {faixa ? (
-                      <div className="mt-4 pt-4 space-y-2" style={{ borderTop: '1px solid var(--border)' }}>
-                        <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Dados do cliente</label>
-                        <input value={nomeCliente} onChange={e => setNomeCliente(e.target.value)} placeholder="Nome do cliente" className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} />
-                        <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm" style={{ color: 'var(--muted-color)' }}>R$</span>
-                          <input value={lanceEmbutido} onChange={e => setLanceEmbutido(formatarMoeda(e.target.value))} placeholder="Lance embutido (opcional)" inputMode="numeric" className="w-full rounded-lg pl-9 pr-3 py-2 text-sm outline-none" style={inputStyle} />
-                        </div>
-                        <p className="text-[11px]" style={{ color: 'var(--muted-color)' }}>Prazo da proposta: {prazoRestante} meses</p>
-                        {seletoresTipoParcela}
-                        <button onClick={gerarPDF} className="w-full rounded-lg px-4 py-2.5 text-sm font-semibold transition-colors" style={{ background: 'linear-gradient(135deg, rgba(200,32,46,0.85), rgba(160,20,34,0.85))', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.18)', color: '#fff', boxShadow: '0 8px 24px rgba(200,32,46,0.25)' }}>Gerar PDF da proposta</button>
-                      </div>
-                    ) : (
-                      <p className="mt-4 pt-4 text-xs" style={{ borderTop: '1px solid var(--border)', color: 'var(--muted-color)' }}>Selecione o plano e o valor do crédito acima para emitir a proposta.</p>
-                    )}
-                  </div>
-
-                  {avisoEmbracon}
-                </div>
-              )}
+              {/* Ambas montadas: alternar visibilidade preserva cada simulação independente */}
+              <div className={modo === 'simulador' ? '' : 'hidden'}>
+                <SimuladorTab planos={planos} empresaNome={empresaNome} logoBase64={logoBase64} />
+              </div>
+              <div className={modo === 'atendimento' ? '' : 'hidden'}>
+                <AtendimentoTab planos={planos} empresaNome={empresaNome} empresaLogo={empresaLogo} />
+              </div>
             </>
           )}
         </main>
