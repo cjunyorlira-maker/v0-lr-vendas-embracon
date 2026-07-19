@@ -236,8 +236,16 @@ function SidebarContent({ userNome, userEmail, userRole, empresaId, empresaNome,
     <div className="flex h-full flex-col" style={{ background: 'var(--surface)' }}>
       <div className="px-3 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
         <div className="flex flex-col items-center justify-center">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={logoSrc} alt={empresaNome || 'LR Multimarcas'} className="h-[50px] w-auto object-contain" />
+          {showLogoEmpresa ? (
+            /* chip claro para logos escuros de empresa (mesmo padrão do ranking) */
+            <div className="flex items-center justify-center rounded-xl bg-white/95 px-4 py-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={logoSrc || "/placeholder.svg"} alt={empresaNome || 'LR Multimarcas'} className="h-[46px] w-auto object-contain" />
+            </div>
+          ) : (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={logoSrc || "/placeholder.svg"} alt={empresaNome || 'LR Multimarcas'} className="h-[50px] w-auto object-contain" />
+          )}
           {userRole && userRole !== 'master' && empresaNome && (
             <span className="mt-2 text-[10px] font-semibold tracking-wider uppercase text-center" style={{ color: 'var(--accent)' }}>
               {empresaNome}
@@ -259,9 +267,9 @@ function SidebarContent({ userNome, userEmail, userRole, empresaId, empresaNome,
         <div className="my-4 px-3" style={{ borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
           {adminNav.filter((item) => {
             // Comissões: só master e representante
-            if (item.href === '/comissoes') return ['master', 'representante'].includes(userRole)
+            if (item.href === '/comissoes') return ['master', 'representante'].includes(userRole ?? '')
             // Planos: só master e representante
-            if (item.href === '/planos') return ['master', 'representante'].includes(userRole)
+            if (item.href === '/planos') return ['master', 'representante'].includes(userRole ?? '')
             return true
           }).map((item) => (<NavLink key={item.label} item={item} pathname={pathname} />))}
         </div>

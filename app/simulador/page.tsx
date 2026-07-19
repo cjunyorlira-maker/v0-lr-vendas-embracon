@@ -224,7 +224,7 @@ const avisoEmbracon = (
   </div>
 )
 
-// ════════════════════════════════════════���═══════════════════�����═
+// ═══════════════════════════════════���════���═══════════════════�����═
 // Gerador de proposta em PDF — compartilhado pelas duas abas.
 // Recebe a instância de simulação + logo/nome da empresa.
 // ══════════════════════════════════════════════════════════════
@@ -276,9 +276,12 @@ function gerarPropostaPDF(s: Sim, logoBase64: string | null, empresaNome: string
     if (logoBase64) {
       try {
         const fmtImg = logoBase64.includes('image/png') ? 'PNG' : 'JPEG'
-        doc.setFillColor(255, 255, 255)
-        doc.roundedRect(W - 60, 4, 50, 22, 2, 2, 'F')
-        doc.addImage(logoBase64, fmtImg, W - 58, 6, 46, 18, undefined, 'FAST')
+        // encaixa o PNG com a proporção real (sem fundo, sem esticar)
+        const props = doc.getImageProperties(logoBase64)
+        const maxW = 40, maxH = 24
+        const ratio = Math.min(maxW / props.width, maxH / props.height)
+        const lw = props.width * ratio, lh = props.height * ratio
+        doc.addImage(logoBase64, fmtImg, W - 14 - lw, 3 + (maxH - lh) / 2, lw, lh, undefined, 'FAST')
       } catch (e) {
         doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(255,255,255)
         doc.text(empresaNome || 'LR MULTIMARCAS', W - 14, 16, { align: 'right' })
@@ -365,7 +368,7 @@ function gerarPropostaPDF(s: Sim, logoBase64: string | null, empresaNome: string
   }
 }
 
-// ══════════════════════════════════════════════════════════════
+// ════════════════════���═════════════════════════════════════════
 // 🏆 GRUPO EM DESTAQUE — componente compartilhado (Simulador + Atendimento)
 // Campeão = maior total_contemplados no último resultado disponível da faixa
 // ══════════════════════════════════════════════════════════════
@@ -865,13 +868,9 @@ function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, o
           </div>
         ) : (
           <div>
-            {/* logo da empresa */}
+            {/* logo dourado claro, sem fundo — direto sobre o palco escuro */}
             <div className="flex items-center justify-center mb-8">
-              {empresaLogo ? (
-                <img src={empresaLogo || "/placeholder.svg"} alt={empresaNome || 'Empresa'} className="h-16 w-auto object-contain" crossOrigin="anonymous" />
-              ) : (
-                <p className="text-lg font-bold tracking-wide" style={{ color: 'var(--accent)' }}>{empresaNome || 'LR MULTIMARCAS'}</p>
-              )}
+              <img src="/images/logo-lr-gold.png" alt={empresaNome || 'LR Multimarcas'} className="h-24 w-auto object-contain" />
             </div>
 
             {/* saudação personalizada (só com nome) + crédito gigante + pill da categoria */}
@@ -1066,8 +1065,9 @@ export default function SimuladorPage() {
     fetch('/api/simulador/empresa').then(r => r.json()).then(d => {
       setEmpresaNome(d.empresa_nome || '')
       setEmpresaLogo(d.logo_url || null)
-      carregarLogo(d.logo_url || '/logo-lr.png')
-    }).catch(() => carregarLogo('/logo-lr.png'))
+    }).catch(() => {})
+    // o PDF usa sempre o logo branco (visível sobre o cabeçalho vermelho)
+    carregarLogo('/images/logo-lr-branco.png')
   }, [])
 
   const abas: { id: typeof modo; label: string; icon: typeof Calculator }[] = [
