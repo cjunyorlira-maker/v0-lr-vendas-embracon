@@ -868,15 +868,9 @@ function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, o
           </div>
         ) : (
           <div>
-            {/* logo da empresa — chip claro para visibilidade em fundo escuro */}
+            {/* logo dourado claro, sem fundo — direto sobre o palco escuro */}
             <div className="flex items-center justify-center mb-8">
-              {empresaLogo ? (
-                <div className="flex items-center justify-center rounded-2xl bg-white/95 px-5 py-3">
-                  <img src={empresaLogo || "/placeholder.svg"} alt={empresaNome || 'Empresa'} className="h-14 w-auto object-contain" crossOrigin="anonymous" />
-                </div>
-              ) : (
-                <p className="text-lg font-bold tracking-wide" style={{ color: 'var(--accent)' }}>{empresaNome || 'LR MULTIMARCAS'}</p>
-              )}
+              <img src="/images/logo-lr-gold.png" alt={empresaNome || 'LR Multimarcas'} className="h-24 w-auto object-contain" />
             </div>
 
             {/* saudação personalizada (só com nome) + crédito gigante + pill da categoria */}
