@@ -84,6 +84,8 @@ export async function GET(req: NextRequest) {
         sorteio_qt: ultima.sorteio_qt ?? 0,
         lance_livre_qt: ultima.lance_livre_qt ?? 0,
         lance_fixo_qt: lanceFixo,
+        lance_fixo_50_qt: ultima.lance_fixo_50_qt ?? 0,
+        lance_fixo_25_qt: ultima.lance_fixo_25_qt ?? 0,
         lance_livre_menor_pct: lanceLivreMenorPct,
       } : null,
       proxima_assembleia: escolhido.proxima_assembleia || null,
