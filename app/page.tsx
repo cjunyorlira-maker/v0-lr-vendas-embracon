@@ -181,7 +181,13 @@ export default function DashboardPage() {
                 </section>
               )}
 
-              {/* ═══ LINHA 2: SEUS LANCES · PRÓXIMOS VENCIMENTOS ═══ */}
+              {/* ═══ LINHA 2: TOP 3 DO MÊS (largura total, 3 colunas) ═══ */}
+              <CampeoesCard titulo="🏆 Top 3 do Mês" subtitulo="Produção corrente" campeoes={data.campeoes_mes} />
+
+              {/* ═══ LINHA 3: TOP 3 DA SEMANA (largura total, 3 colunas) ═══ */}
+              <CampeoesCard titulo="⚡ Top 3 da Semana" subtitulo="Domingo a sábado" badge="dom–sáb" campeoes={data.melhores_semana} vazioLabel="Nenhuma venda no período ainda" />
+
+              {/* ═══ LINHA 4: SEUS LANCES · PRÓXIMOS VENCIMENTOS ═══ */}
               <div className="grid gap-5 lg:grid-cols-2">
                 {/* Seus lances */}
                 <section className="card-dark flex flex-col p-5 anim-fade-up">
@@ -254,12 +260,6 @@ export default function DashboardPage() {
                   )}
                 </section>
               </div>
-
-              {/* ═══ LINHA 3: TOP 3 DO MÊS (largura total, 3 colunas) ═══ */}
-              <CampeoesCard titulo="🏆 Top 3 do Mês" subtitulo="Produção corrente" campeoes={data.campeoes_mes} />
-
-              {/* ═══ LINHA 4: TOP 3 DA SEMANA (largura total, 3 colunas) ═══ */}
-              <CampeoesCard titulo="⚡ Top 3 da Semana" subtitulo="Domingo a sábado" badge="dom–sáb" campeoes={data.melhores_semana} vazioLabel="Nenhuma venda no período ainda" />
 
               {/* ═══ LINHA 5: QUADRO DE AVISOS (largura total) ═══ */}
               {/* Quadro de avisos */}
