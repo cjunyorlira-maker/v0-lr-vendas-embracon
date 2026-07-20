@@ -14,13 +14,13 @@ import {
 
 interface Campeao { nome: string; foto?: string | null; equipe?: string | null; empresa?: string | null; logo?: string | null; valor: number }
 interface Campeoes { vendedores: Campeao[]; equipes: Campeao[]; representacoes: Campeao[] }
-interface CampeoesDuplo { geral: Campeoes; minha_empresa: Campeoes | null }
+interface CampeoesDuplo { geral: Campeoes | null; minha_empresa: Campeoes | null }
 interface Aviso { id: string; titulo: string; mensagem: string; tipo: string; fixado: boolean; criado_em: string }
 
 interface DashData {
   meu_role: string
   pode_publicar_avisos: boolean
-  meta: { valor: number; vendido_master: number; dias_restantes: number; ritmo_necessario: number; pct: number; producao_nome: string | null; cotas_master: number }
+  meta: { valor: number; vendido_master: number; dias_restantes: number; ritmo_necessario: number; pct: number; producao_nome: string | null; cotas_master: number } | null
   minha_operacao: { empresa_nome: string; vendido: number; cotas: number; ticket: number; pct_da_master: number } | null
   minha_fatia_master: { empresa_nome: string; vendido: number; cotas: number; pct_da_producao: number } | null
   campeoes_mes: CampeoesDuplo
@@ -93,6 +93,7 @@ export default function DashboardPage() {
             <div className="flex flex-col gap-5">
 
               {/* ═══ LINHA 1: TERMÔMETRO DA META ═══ */}
+              {data.meta && (
               <section
                 className="rounded-2xl p-6 anim-fade-up"
                 style={{ background: 'linear-gradient(135deg, rgba(212,175,55,0.10) 0%, rgba(212,175,55,0.03) 100%)', border: '1px solid rgba(212,175,55,0.22)' }}
@@ -163,6 +164,7 @@ export default function DashboardPage() {
                   )
                 })()}
               </section>
+              )}
 
               {/* ═══ CARD EXTRA: PRÓXIMA SEXTA (só master/representante) ═══ */}
               {data.proxima_sexta !== undefined && (

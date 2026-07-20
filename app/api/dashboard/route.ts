@@ -93,6 +93,14 @@ export async function GET() {
     const { escopoGlobal } = await getEscopo(me)
     const hoje = hojeISO()
 
+    // ── empresas com ranking bloqueado: dashboard degradado (sem dados globais) ──
+    let dashRestrito = false
+    if (me.role !== 'master' && me.empresa_id) {
+      const { data: minhaEmpFlag } = await supabaseAdmin
+        .from('empresas').select('ranking_bloqueado').eq('id', me.empresa_id).maybeSingle()
+      dashRestrito = minhaEmpFlag?.ranking_bloqueado === true
+    }
+
     // ── produção corrente (tabela producoes; a que contém hoje, senão a mais recente) ──
     const { data: producoesRaw } = await supabaseAdmin
       .from('producoes')
@@ -345,11 +353,15 @@ export async function GET() {
     const payload: any = {
       meu_role: me.role,
       pode_publicar_avisos: escopoGlobal, // master OU adm da matriz
-      meta,
+      meta: dashRestrito ? null : meta,
       minha_operacao,
       minha_fatia_master,
-      campeoes_mes,
-      melhores_semana,
+      campeoes_mes: dashRestrito
+        ? { geral: null, minha_empresa: campeoes_mes.minha_empresa }
+        : campeoes_mes,
+      melhores_semana: dashRestrito
+        ? { geral: null, minha_empresa: melhores_semana.minha_empresa }
+        : melhores_semana,
       minha_empresa_nome,
       lances_alerta,
       lances_minha_empresa,

@@ -23,7 +23,7 @@ interface Props {
   titulo: string
   subtitulo?: string
   badge?: string // ex.: "dom–sáb"
-  geral: Grupo
+  geral: Grupo | null
   minhaEmpresa?: Grupo | null
   empresaNome?: string | null // rótulo da pill "Minha representação"
   modo: Modo
@@ -117,16 +117,19 @@ function Pill({ ativo, onClick, children }: { ativo: boolean; onClick: () => voi
 }
 
 export default function CampeoesCard({ titulo, subtitulo, badge, geral, minhaEmpresa, empresaNome, modo, onModoChange, vazioLabel }: Props) {
-  // o toggle só existe se houver recorte da empresa do usuário
-  const temToggle = !!(minhaEmpresa && empresaNome)
-  const modoEfetivo: Modo = temToggle ? modo : 'geral'
-  const dados = modoEfetivo === 'minha_empresa' && minhaEmpresa ? minhaEmpresa : geral
+  // sem dados globais (empresa com ranking bloqueado): trava em "minha representação" e esconde o toggle
+  const temGeral = !!geral
+  // o toggle só existe se houver dados globais E recorte da empresa do usuário
+  const temToggle = !!(temGeral && minhaEmpresa && empresaNome)
+  const modoEfetivo: Modo = !temGeral ? 'minha_empresa' : (temToggle ? modo : 'geral')
+  const dados = (modoEfetivo === 'minha_empresa' ? minhaEmpresa : geral) || geral || minhaEmpresa || null
   const mostrarRepresentacoes = modoEfetivo === 'geral' // some no modo "minha representação"
 
   const vazio =
-    dados.vendedores.length === 0 &&
-    dados.equipes.length === 0 &&
-    (!mostrarRepresentacoes || dados.representacoes.length === 0)
+    !dados ||
+    (dados.vendedores.length === 0 &&
+      dados.equipes.length === 0 &&
+      (!mostrarRepresentacoes || dados.representacoes.length === 0))
 
   return (
     <div className="card-dark relative overflow-hidden p-5 h-full anim-fade-up">
@@ -160,10 +163,10 @@ export default function CampeoesCard({ titulo, subtitulo, badge, geral, minhaEmp
         <p className="relative text-sm py-6 text-center" style={{ color: 'var(--muted-color)' }}>{vazioLabel || 'Nenhuma venda no período ainda'}</p>
       ) : (
         <div className="relative flex flex-col gap-5 sm:flex-row sm:gap-4">
-          <Coluna titulo="Vendedores" emoji="🥇" itens={dados.vendedores} delayBase={0} />
-          <Coluna titulo="Equipes" emoji="🛡️" itens={dados.equipes} delayBase={120} />
+          <Coluna titulo="Vendedores" emoji="🥇" itens={dados!.vendedores} delayBase={0} />
+          <Coluna titulo="Equipes" emoji="🛡️" itens={dados!.equipes} delayBase={120} />
           {mostrarRepresentacoes && (
-            <Coluna titulo="Representações" emoji="🏢" itens={dados.representacoes} delayBase={240} />
+            <Coluna titulo="Representações" emoji="🏢" itens={dados!.representacoes} delayBase={240} />
           )}
         </div>
       )}
