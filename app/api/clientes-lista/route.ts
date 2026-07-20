@@ -25,7 +25,7 @@ export async function GET() {
 
     // busca vendas com escopo
     let q = supabaseAdmin.from('vendas')
-      .select('id, cliente_id, numero_proposta, numero_contrato, grupo, cota, valor_credito, adesao_percent, com_seguro, data_assembleia_entrada, data_venda, empresa_id, equipe_id, vendedor_id, checado, status_cliente, pdf_proposta_url, observacoes, planos(sigla, nome_completo, bem, adesao_percent), clientes(id, nome, cpf_cnpj, telefone), usuarios:vendedor_id(nome), equipes(nome), boletos(status, qtd_parcelas, data_proxima_cobranca)')
+      .select('id, cliente_id, numero_proposta, numero_contrato, grupo, cota, valor_credito, adesao_percent, com_seguro, data_assembleia_entrada, data_venda, empresa_id, equipe_id, vendedor_id, checado, status_cliente, cancelada, motivo_cancelamento, cancelado_em, cancelado_por, cancelamento_dentro_prazo, pdf_proposta_url, observacoes, planos(sigla, nome_completo, bem, adesao_percent), clientes(id, nome, cpf_cnpj, telefone), usuarios:vendedor_id(nome), equipes(nome), boletos(status, qtd_parcelas, data_proxima_cobranca)')
       .order('data_assembleia_entrada', { ascending: true })
 
     const { escopoGlobal } = await getEscopo(me)

@@ -185,6 +185,47 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true })
     }
 
+    // ── SÓ SORTEIO: tira o cliente da fila de lances (reversível) ──
+    if (acao === 'so_sorteio') {
+      const { config_id } = body
+      if (!config_id) return NextResponse.json({ error: "config_id obrigatório" }, { status: 400 })
+      if (!['master','representante','adm'].includes(me.role)) return NextResponse.json({ error: "Sem permissão" }, { status: 403 })
+      // marca a config como só sorteio (não gera mais lance mensal no ciclo)
+      await supabaseAdmin.from('lances_config').update({ tipo: 'so_sorteio', ativo: true, status_final: null, atualizado_em: new Date().toISOString() }).eq('id', config_id)
+      // apaga os lances mensais ATIVOS (não encerrados / não contemplados) — sai da fila (kanban, KPIs, régua)
+      await supabaseAdmin.from('lances_mensais').delete().eq('lance_config_id', config_id).neq('ciclo_encerrado', true).neq('contemplado', true)
+      return NextResponse.json({ success: true })
+    }
+
+    // ── VOLTAR A DAR LANCE: reverte o só sorteio e gera o lance do mês corrente ──
+    if (acao === 'voltar_lance') {
+      const { config_id, tipo, valor_percentual, observacao, recorrente } = body
+      if (!config_id) return NextResponse.json({ error: "config_id obrigatório" }, { status: 400 })
+      if (!['master','representante','adm'].includes(me.role)) return NextResponse.json({ error: "Sem permissão" }, { status: 403 })
+      const { data: cfg } = await supabaseAdmin.from('lances_config').select('*').eq('id', config_id).single()
+      if (!cfg) return NextResponse.json({ error: "Config não encontrada" }, { status: 404 })
+      // reativa a config com o lance escolhido
+      await supabaseAdmin.from('lances_config').update({
+        tipo: tipo || 'fixo25', valor_percentual: valor_percentual ?? null,
+        observacao: observacao ?? cfg.observacao, recorrente: !!recorrente,
+        ativo: true, status_final: null, atualizado_em: new Date().toISOString(),
+      }).eq('id', config_id)
+      // descobre a assembleia da venda
+      let dataAssembleia: string | null = null
+      if (cfg.venda_id) {
+        const { data: venda } = await supabaseAdmin.from('vendas').select('data_assembleia_entrada').eq('id', cfg.venda_id).single()
+        dataAssembleia = venda?.data_assembleia_entrada || null
+      }
+      // limpa qualquer lance não contemplado do mês corrente e gera o novo (pronto pra ofertar)
+      await supabaseAdmin.from('lances_mensais').delete().eq('lance_config_id', config_id).eq('mes_referencia', mesAtualRef()).neq('contemplado', true)
+      await supabaseAdmin.from('lances_mensais').insert({
+        lance_config_id: config_id, empresa_id: cfg.empresa_id, cliente_id: cfg.cliente_id,
+        vendedor_id: cfg.vendedor_id, equipe_id: cfg.equipe_id,
+        mes_referencia: mesAtualRef(), data_assembleia: dataAssembleia, status: 'solicitado',
+      })
+      return NextResponse.json({ success: true })
+    }
+
     // ── CANCELAR config ──
     if (acao === 'cancelar') {
       const { config_id } = body
