@@ -31,6 +31,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ grup
       .order('data_assembleia')
 
     let calendario: { mes: number; data_assembleia: string; data_vencimento: string }[] = []
+    let linhaCal: any = grupoData.linha_calendario
     if (calExato && calExato.length > 0) {
       calendario = calExato.map((c: any) => ({
         mes: new Date(c.data_assembleia + 'T00:00:00').getMonth() + 1,
@@ -44,7 +45,6 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ grup
     // que passem da data do PDF (calendário vai até jul/2027) ou grupos 
     // ainda não mapeados.
     if (calendario.length === 0) {
-      let linhaCal = grupoData.linha_calendario
       if (!linhaCal && grupoData.data_assembleia_manual) {
         const { data: match } = await supabaseAdmin
           .from('calendario_embracon')
