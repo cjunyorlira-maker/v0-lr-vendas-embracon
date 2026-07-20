@@ -50,6 +50,7 @@ export async function GET() {
     let q = supabaseAdmin
       .from('vendas')
       .select('id, valor_credito, numero_contrato, numero_proposta, empresa_id, equipe_id, vendedor_id, comissao_vendedor_percent, comissao_supervisor_percent, comissao_recebida_rs, comissao_recebida_percent, criado_em, data_venda, clientes(nome), usuarios:vendedor_id(nome, role), planos(sigla, comissao_total, comissao_parcelas, estorno_percent, estorno_ate_pgto, categoria_comissao, adesao_percent, bem), boletos(qtd_parcelas, status, data_efetivacao)')
+      .neq('cancelada', true) // vendas canceladas não geram comissão
       .order('criado_em', { ascending: false })
 
     const { escopoGlobal } = await getEscopo(me)
@@ -81,6 +82,7 @@ export async function GET() {
       while (true) {
         const { data: pg } = await supabaseAdmin.from('vendas')
           .select('id, numero_contrato, numero_proposta, empresa_id')
+          .neq('cancelada', true)
           .order('id', { ascending: true }).range(from, from + PAGE - 1)
         for (const v of (pg || []) as any[]) {
           const c1 = String(v.numero_contrato || '').trim(); if (c1) contratoEmpresa.set(c1, v.empresa_id)
