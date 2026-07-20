@@ -8,6 +8,7 @@ import {
   DollarSign, Settings, LogOut, Menu, X, Camera, Trash2,
   Calculator, BookOpen, CalendarCheck, PartyPopper,
 } from 'lucide-react'
+import AvisoFotoModal from '@/components/AvisoFotoModal'
 
 // Empresas participantes da Campanha Mac & Viagem (mesma lista da API)
 const EMPRESAS_CAMPANHA = [
@@ -310,6 +311,7 @@ function SidebarContent({ userNome, userEmail, userRole, empresaId, empresaNome,
 
 export default function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
   const [userNome, setUserNome] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [userRole, setUserRole] = useState<string | null>(null)
@@ -317,6 +319,8 @@ export default function Sidebar() {
   const [empresaNome, setEmpresaNome] = useState<string | null>(null)
   const [empresaLogo, setEmpresaLogo] = useState<string | null>(null)
   const [fotoUrl, setFotoUrl] = useState<string | null>(null)
+  // aviso "Adicione sua foto" — só decide DEPOIS do fetch resolver (nunca pisca p/ quem tem foto)
+  const [avisoFotoOpen, setAvisoFotoOpen] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -325,11 +329,12 @@ export default function Sidebar() {
       if (data.user) {
         const { data: usuario } = await supabase
           .from('usuarios')
-          .select(`nome, role, foto_url, empresa_id, empresas(nome, logo_url)`)
+          .select(`id, nome, role, foto_url, empresa_id, empresas(nome, logo_url)`)
           .eq('auth_user_id', data.user.id)
           .single()
 
         if (usuario) {
+          setUserId(usuario.id)
           setUserNome(usuario.nome)
           setUserEmail(data.user.email ?? null)
           setUserRole(usuario.role)
@@ -339,6 +344,13 @@ export default function Sidebar() {
           if (emp) {
             setEmpresaNome(emp.nome)
             setEmpresaLogo(emp.logo_url)
+          }
+          // cobrança gentil da foto: só vendedor/supervisor SEM foto, uma vez por sessão
+          const semFoto = !usuario.foto_url
+          const ehCobravel = usuario.role === 'vendedor' || usuario.role === 'supervisor'
+          const dispensadoNaSessao = typeof window !== 'undefined' && sessionStorage.getItem('fotoAvisoDispensado') === '1'
+          if (semFoto && ehCobravel && !dispensadoNaSessao) {
+            setAvisoFotoOpen(true)
           }
         }
       }
@@ -390,6 +402,17 @@ export default function Sidebar() {
           style={{ background: 'rgba(0, 0, 0, 0.5)' }}
         />
       )}
+
+      {/* Cobrança gentil: adicionar foto (vendedor/supervisor sem foto) */}
+      <AvisoFotoModal
+        open={avisoFotoOpen}
+        usuario={userId ? { id: userId, nome: userNome } : null}
+        onSalvou={(novaFotoUrl) => { setFotoUrl(novaFotoUrl); setAvisoFotoOpen(false) }}
+        onAgoraNao={() => {
+          if (typeof window !== 'undefined') sessionStorage.setItem('fotoAvisoDispensado', '1')
+          setAvisoFotoOpen(false)
+        }}
+      />
     </>
   )
 }
