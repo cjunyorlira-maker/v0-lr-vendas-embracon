@@ -221,7 +221,11 @@ export async function GET() {
       .not('data_proxima_cobranca', 'is', null)
       // a próxima cobrança pertence AOS efetivados (parcela seguinte à antecipação); só exclui cancelados
       .neq('status', 'cancelado')
-    if (!escopoGlobal && me.empresa_id) vq = vq.eq('empresa_id', me.empresa_id)
+    // escopo em cascata (mesmo espírito da tela de lances):
+    if (escopoGlobal) { /* master / adm matriz: vê tudo */ }
+    else if (['representante', 'adm'].includes(me.role)) vq = vq.eq('empresa_id', me.empresa_id) // da empresa
+    else if (me.role === 'supervisor') vq = vq.eq('equipe_id', me.equipe_id)                     // da equipe dele
+    else vq = vq.eq('vendedor_id', me.id)                                                        // só os dele
     const { data: boletos } = await vq
     const em15Str = emNdiasISO(15)
     const vencimentos = ((boletos || []) as any[])
