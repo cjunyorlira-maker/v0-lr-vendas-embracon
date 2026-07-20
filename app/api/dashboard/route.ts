@@ -225,53 +225,62 @@ export async function GET() {
     // 7. PRÓXIMA SEXTA (APENAS master e representante) — fila de mapas não pagos
     let proxima_sexta: { valor: number; data: string; fatia_empresa?: number; empresa_nome?: string } | undefined = undefined
     if (['master', 'representante'].includes(me.role)) {
-      let mq = supabaseAdmin.from('mapas_comissao').select('id, empresa_id, data_encerramento, total_comissao, pago').eq('pago', false)
-      // representante: só a empresa dele; master: global
-      if (me.role === 'representante' && me.empresa_id) mq = mq.eq('empresa_id', me.empresa_id)
-      const { data: mapas } = await mq
+      // Os mapas do borderô são GLOBAIS (empresa_id null). Buscamos todos os pago=false
+      // (null OU da própria empresa) — vale para master e representante.
+      const { data: mapas } = await supabaseAdmin
+        .from('mapas_comissao').select('id, empresa_id, data_encerramento, total_comissao, pago').eq('pago', false)
       const porData = new Map<string, number>()
       const mapaIdsPorData = new Map<string, string[]>() // data de pagamento -> ids dos mapas
       for (const mp of (mapas || []) as any[]) {
         if (!mp.data_encerramento) continue
+        if (me.role === 'representante' && mp.empresa_id && mp.empresa_id !== me.empresa_id) continue // futuro financeiro_proprio
         const dp = dataPagamentoMapa(mp.data_encerramento).toISOString()
         porData.set(dp, (porData.get(dp) || 0) + (mp.total_comissao || 0))
         mapaIdsPorData.set(dp, [...(mapaIdsPorData.get(dp) || []), mp.id])
       }
       const ordenado = Array.from(porData.entries()).sort((a, b) => a[0].localeCompare(b[0]))
-      if (ordenado.length > 0) proxima_sexta = { data: ordenado[0][0], valor: ordenado[0][1] }
-      else proxima_sexta = { data: '', valor: 0 }
+      const proxData = ordenado.length > 0 ? ordenado[0][0] : ''
+      const totalGlobalProx = ordenado.length > 0 ? ordenado[0][1] : 0
 
-      // master: fatia da PRÓPRIA empresa via cruzamento por CONTRATO (mapa_linhas não têm empresa_id)
-      if (me.role === 'master' && me.empresa_id) {
-        proxima_sexta.empresa_nome = minha_fatia_master?.empresa_nome || 'Minha empresa'
-        proxima_sexta.fatia_empresa = 0
-        if (proxima_sexta.data) {
-          // 1. contratos da empresa do master (TRIM de numero_contrato || numero_proposta)
-          const { data: vendasEmp } = await supabaseAdmin
-            .from('vendas').select('numero_contrato, numero_proposta').eq('empresa_id', me.empresa_id)
-          const contratosDaEmpresa = new Set<string>()
-          for (const v of (vendasEmp || []) as any[]) {
-            const c = String(v.numero_contrato || v.numero_proposta || '').trim()
-            if (c) contratosDaEmpresa.add(c)
-          }
-          // 2. mapas da PRÓXIMA data de pagamento (mesma do valor global)
-          const mapaIdsProx = new Set(mapaIdsPorData.get(proxima_sexta.data) || [])
-          // 3. soma valor_comissao das linhas desses mapas cujo contrato pertence à empresa (PAGINADO 1000)
-          let fatia = 0, from = 0
-          const PAGE = 1000
-          while (true) {
-            const { data: pg } = await supabaseAdmin
-              .from('mapa_linhas').select('mapa_id, contrato, valor_comissao')
-              .order('id', { ascending: true }).range(from, from + PAGE - 1)
-            for (const l of (pg || []) as any[]) {
-              if (!mapaIdsProx.has(l.mapa_id)) continue
-              if (contratosDaEmpresa.has(String(l.contrato).trim())) fatia += (l.valor_comissao || 0)
-            }
-            if (!pg || pg.length < PAGE) break
-            from += PAGE
-          }
-          proxima_sexta.fatia_empresa = fatia
+      // Fatia da empresa via cruzamento por CONTRATO (mapa_linhas não têm empresa_id):
+      // contratos da empresa × linhas dos mapas da próxima data de pagamento.
+      const fatiaDaEmpresa = async (empresaId: string): Promise<number> => {
+        if (!proxData) return 0
+        const { data: vendasEmp } = await supabaseAdmin
+          .from('vendas').select('numero_contrato, numero_proposta').eq('empresa_id', empresaId)
+        const contratosDaEmpresa = new Set<string>()
+        for (const v of (vendasEmp || []) as any[]) {
+          const c = String(v.numero_contrato || v.numero_proposta || '').trim()
+          if (c) contratosDaEmpresa.add(c)
         }
+        const mapaIdsProx = new Set(mapaIdsPorData.get(proxData) || [])
+        let fatia = 0, from = 0
+        const PAGE = 1000
+        while (true) {
+          const { data: pg } = await supabaseAdmin
+            .from('mapa_linhas').select('mapa_id, contrato, valor_comissao')
+            .order('id', { ascending: true }).range(from, from + PAGE - 1)
+          for (const l of (pg || []) as any[]) {
+            if (!mapaIdsProx.has(l.mapa_id)) continue
+            if (contratosDaEmpresa.has(String(l.contrato).trim())) fatia += (l.valor_comissao || 0)
+          }
+          if (!pg || pg.length < PAGE) break
+          from += PAGE
+        }
+        return fatia
+      }
+
+      if (me.role === 'master') {
+        // master: valor principal GLOBAL + linha da fatia da própria empresa (SJC)
+        proxima_sexta = { data: proxData, valor: totalGlobalProx }
+        if (me.empresa_id) {
+          proxima_sexta.empresa_nome = minha_fatia_master?.empresa_nome || 'Minha empresa'
+          proxima_sexta.fatia_empresa = await fatiaDaEmpresa(me.empresa_id)
+        }
+      } else {
+        // representante: valor principal = a FATIA da empresa dele (nunca o total global)
+        const fatia = me.empresa_id ? await fatiaDaEmpresa(me.empresa_id) : 0
+        proxima_sexta = { data: proxData, valor: fatia }
       }
     }
 
