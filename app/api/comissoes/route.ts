@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextRequest, NextResponse } from "next/server"
-import { getEscopo } from '@/lib/escopo'
+import { getEscopo, getEmpresasAutonomas } from '@/lib/escopo'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -65,7 +65,40 @@ export async function GET() {
       sexta.setHours(18, 0, 0, 0)
       return sexta
     }
-    const { data: mapasAll } = await supabaseAdmin.from('mapas_comissao').select('id, data_encerramento, pago')
+    const { data: mapasAll } = await supabaseAdmin.from('mapas_comissao').select('id, data_encerramento, pago, empresa_id')
+
+    // ── ISOLAMENTO FINANCEIRO (empresas com financeiro_proprio) ──
+    // Mapas globais ignoram contratos de empresas autônomas; mapas próprios (empresa_id
+    // preenchido) só valem para os contratos daquela empresa.
+    const autonomasSet = new Set(await getEmpresasAutonomas())
+    const mapaEmpresa = new Map<string, string | null>()
+    for (const mp of (mapasAll || []) as any[]) mapaEmpresa.set(mp.id, mp.empresa_id ?? null)
+    // contrato -> empresa de origem (TODAS as vendas, não só as do escopo do usuário)
+    const contratoEmpresa = new Map<string, string>()
+    {
+      let from = 0
+      const PAGE = 1000
+      while (true) {
+        const { data: pg } = await supabaseAdmin.from('vendas')
+          .select('id, numero_contrato, numero_proposta, empresa_id')
+          .order('id', { ascending: true }).range(from, from + PAGE - 1)
+        for (const v of (pg || []) as any[]) {
+          const c1 = String(v.numero_contrato || '').trim(); if (c1) contratoEmpresa.set(c1, v.empresa_id)
+          const c2 = String(v.numero_proposta || '').trim(); if (c2) contratoEmpresa.set(c2, v.empresa_id)
+        }
+        if (!pg || pg.length < PAGE) break
+        from += PAGE
+      }
+    }
+    // uma linha de mapa é válida para o cálculo conforme a origem do contrato:
+    const linhaValida = (mapaId: string, contrato: string): boolean => {
+      const mapaEmp = mapaEmpresa.get(mapaId) ?? null
+      const contratoEmp = contratoEmpresa.get(String(contrato).trim()) ?? null
+      const contratoAutonomo = contratoEmp ? autonomasSet.has(contratoEmp) : false
+      if (mapaEmp === null) return !contratoAutonomo // mapa global: ignora contratos de autônomas
+      return contratoEmp === mapaEmp                 // mapa próprio: só contratos daquela empresa
+    }
+
     let linhasAll: any[] = []
     {
       let from = 0
@@ -94,14 +127,23 @@ export async function GET() {
     const mapeadoTotalPorContrato = new Map<string, number>()
     const aReceberPorContrato = new Map<string, number>()
     for (const l of (linhasAll || []) as any[]) {
+      if (!linhaValida(l.mapa_id, l.contrato)) continue // isolamento financeiro
       const c = String(l.contrato).trim()
       const val = l.valor_comissao || 0
       mapeadoTotalPorContrato.set(c, (mapeadoTotalPorContrato.get(c) || 0) + val)
       if (mapaPago.get(l.mapa_id)) recebidoPagoPorContrato.set(c, (recebidoPagoPorContrato.get(c) || 0) + val)
       else aReceberPorContrato.set(c, (aReceberPorContrato.get(c) || 0) + val)
     }
+    // borderôs visíveis ao usuário: matriz vê os globais; empresa autônoma vê os próprios; rep normal vê globais
+    const mapaDoViewer = (mapId: string): boolean => {
+      const emp = mapaEmpresa.get(mapId) ?? null
+      if (escopoGlobal) return emp === null
+      if (me.empresa_id && autonomasSet.has(me.empresa_id)) return emp === me.empresa_id
+      return emp === null
+    }
     let proximaSextaPagamento: Date | null = null
     for (const [id, dp] of mapaDataPag) {
+      if (!mapaDoViewer(id)) continue
       if (!mapaPago.get(id) && (!proximaSextaPagamento || dp < proximaSextaPagamento)) proximaSextaPagamento = dp
     }
     // fila de pagamentos pendentes agrupada por data (para o card Próximo Pagamento)
@@ -109,9 +151,11 @@ export async function GET() {
     const mapaIdsPorData = new Map<string, string[]>() // 'ISO' -> ids dos mapas daquela sexta (para marcar pago)
     for (const mp of (mapasAll || []) as any[]) {
       if (mapaPago.get(mp.id)) continue
+      if (!mapaDoViewer(mp.id)) continue
       const dp = mapaDataPag.get(mp.id); if (!dp) continue
       const iso = dp.toISOString()
-      const totalMapa = (linhasAll || []).filter((l: any) => l.mapa_id === mp.id).reduce((s: number, l: any) => s + (l.valor_comissao || 0), 0)
+      // soma só as linhas válidas (isolamento financeiro por contrato)
+      const totalMapa = (linhasAll || []).filter((l: any) => l.mapa_id === mp.id && linhaValida(l.mapa_id, l.contrato)).reduce((s: number, l: any) => s + (l.valor_comissao || 0), 0)
       filaPorData.set(iso, (filaPorData.get(iso) || 0) + totalMapa)
       mapaIdsPorData.set(iso, [...(mapaIdsPorData.get(iso) || []), mp.id])
     }
@@ -124,6 +168,7 @@ export async function GET() {
     const aReceberPorContratoData = new Map<string, Record<string, number>>()
     for (const l of (linhasAll || []) as any[]) {
       if (mapaPago.get(l.mapa_id)) continue
+      if (!linhaValida(l.mapa_id, l.contrato)) continue // isolamento financeiro
       const dp = mapaDataPag.get(l.mapa_id); if (!dp) continue
       const c = String(l.contrato).trim()
       const obj = aReceberPorContratoData.get(c) || {}

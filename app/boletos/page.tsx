@@ -63,10 +63,14 @@ export default function BoletosPage() {
   const [extratoModal, setExtratoModal] = useState<{ boleto: Boleto } | null>(null)
   const [extratoPdf, setExtratoPdf] = useState<{ base64: string; nome: string } | null>(null)
   const extratoRef = useRef<HTMLInputElement>(null)
+  // isolamento financeiro: toggle "incluir operações autônomas" (só matriz)
+  const [incluirAutonomas, setIncluirAutonomas] = useState(false)
+  const [mostrarToggleAutonomas, setMostrarToggleAutonomas] = useState(false)
+  const [ocultosAutonomas, setOcultosAutonomas] = useState(0)
 
   useEffect(() => { loadData() }, [])
 
-  async function loadData() {
+  async function loadData(incluir = false) {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
@@ -82,9 +86,11 @@ export default function BoletosPage() {
     // carrega config de produção
     try { const rp = await fetch('/api/config-producao'); const dp = await rp.json(); if (dp.data_inicio) setProdInicio(dp.data_inicio); if (dp.data_fim) setProdFim(dp.data_fim) } catch {}
     try {
-      const resB = await fetch('/api/boletos/listar')
+      const resB = await fetch(`/api/boletos/listar${incluir ? '?incluir_autonomas=1' : ''}`)
       const dB = await resB.json()
       if (dB.boletos) setBoletos(dB.boletos as any)
+      setMostrarToggleAutonomas(!!dB.escopo_global && !!dB.tem_autonomas)
+      setOcultosAutonomas(dB.ocultos_autonomas || 0)
     } catch {}
     setLoading(false)
   }
@@ -360,6 +366,25 @@ O boleto está em anexo.`
             </div>
             {(fEmpresa || fEquipe || fVendedor || dataDe || dataAte) && <button onClick={() => { setFEmpresa(''); setFEquipe(''); setFVendedor(''); setDataDe(''); setDataAte('') }} className="rounded-lg px-3 py-1.5 text-xs self-end" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>Limpar</button>}
           </div>
+
+          {mostrarToggleAutonomas && (
+            <div className="flex items-center gap-2 mb-4 text-xs">
+              <button
+                onClick={() => { const novo = !incluirAutonomas; setIncluirAutonomas(novo); loadData(novo) }}
+                className="rounded-lg px-3 py-1.5"
+                style={incluirAutonomas
+                  ? { background: 'rgba(212,175,55,0.14)', color: 'var(--accent)', border: '1px solid rgba(212,175,55,0.35)' }
+                  : { background: 'rgba(255,255,255,0.05)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}
+              >
+                {incluirAutonomas ? 'Ocultar operações autônomas' : 'Incluir operações autônomas'}
+              </button>
+              {!incluirAutonomas && ocultosAutonomas > 0 && (
+                <span style={{ color: 'var(--muted-color)' }}>
+                  {ocultosAutonomas} boleto(s) de operações autônomas ocultos
+                </span>
+              )}
+            </div>
+          )}
 
           <div className="flex gap-2 mb-6 flex-wrap">
             {STATUS.map(s => {

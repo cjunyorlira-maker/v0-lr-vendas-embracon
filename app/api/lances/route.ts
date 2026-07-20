@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextRequest, NextResponse } from "next/server"
-import { getEscopo } from '@/lib/escopo'
+import { getEscopo, getEmpresasAutonomas } from '@/lib/escopo'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -16,8 +16,9 @@ function mesAtualRef(): string {
 }
 
 // GET: lista lances do mês atual + gera os recorrentes que faltam
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const incluirAutonomas = new URL(req.url).searchParams.get('incluir_autonomas') === '1'
     const cookieStore = await cookies()
     const supabaseUser = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
