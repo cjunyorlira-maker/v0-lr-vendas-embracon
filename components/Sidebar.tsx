@@ -18,6 +18,12 @@ const EMPRESAS_CAMPANHA = [
   '384c3561-5ce4-4cd6-bb4e-a6899fe08a61', // CEM Negócios (autônoma)
 ]
 
+// empresas com o Ranking bloqueado (espelho de empresas.ranking_bloqueado no banco)
+const EMPRESAS_RANKING_BLOQUEADO = [
+  'c08f519f-9e52-41ce-9f7e-9655102de17b', // Ravi Representações
+  '83f7f141-a6e8-4a96-8657-c5da7b994493', // Grupo Ribeiro Consultoria
+]
+
 interface NavItem {
   icon: React.ReactNode
   label: string
@@ -263,6 +269,7 @@ function SidebarContent({ userNome, userEmail, userRole, empresaId, empresaNome,
             if (item.href === '/equipe') return userRole !== 'vendedor'
             // Campanha: só master e usuários das empresas participantes
             if (item.href === '/campanha') return userRole === 'master' || (!!empresaId && EMPRESAS_CAMPANHA.includes(empresaId))
+            if (item.href === '/ranking') return userRole === 'master' || !empresaId || !EMPRESAS_RANKING_BLOQUEADO.includes(empresaId)
             return true
           }).map((item) => (<NavLink key={item.label} item={item} pathname={pathname} />))}
         </div>
