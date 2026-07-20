@@ -10,13 +10,21 @@ const supabaseAdmin = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
 
-const hojeISO = () => new Date().toISOString().slice(0, 10)
+// ── datas SEMPRE em horário de Brasília (BRT, UTC-3), comparadas como string YYYY-MM-DD ──
+// (evita bug: à noite o toISOString() em UTC "pula" para o dia seguinte e some com vencimentos)
+const nowBRT = () => new Date(Date.now() - 3 * 3600 * 1000)
+const hojeISO = () => nowBRT().toISOString().slice(0, 10)
+const emNdiasISO = (n: number) => {
+  const d = nowBRT()
+  d.setUTCDate(d.getUTCDate() + n)
+  return d.toISOString().slice(0, 10)
+}
 
-// primeiro dia (DOMINGO) da semana corrente — getDay(): domingo=0
+// primeiro dia (DOMINGO) da semana corrente em BRT — getUTCDay() sobre a data já deslocada
 const inicioSemanaDomingoISO = () => {
-  const d = new Date()
-  const dia = d.getDay() // 0=domingo .. 6=sábado
-  d.setDate(d.getDate() - dia)
+  const d = nowBRT()
+  const dia = d.getUTCDay() // 0=domingo .. 6=sábado
+  d.setUTCDate(d.getUTCDate() - dia)
   return d.toISOString().slice(0, 10)
 }
 
@@ -105,7 +113,8 @@ export async function GET() {
     // 1. META (MASTER LR — global)
     const metaValor = producao?.meta_valor || 0
     const vendidoMaster = listaProd.reduce((s, v) => s + (v.valor_credito || 0), 0)
-    const diasRestantes = Math.max(0, Math.ceil((new Date(pFim + 'T23:59:59').getTime() - Date.now()) / 86400000))
+    // fim da produção às 23:59:59 BRT (offset -03:00 explícito, independe do TZ do servidor)
+    const diasRestantes = Math.max(0, Math.ceil((Date.parse(pFim + 'T23:59:59-03:00') - Date.now()) / 86400000))
     const ritmoNecessario = Math.max(0, (metaValor - vendidoMaster)) / Math.max(1, diasRestantes)
     const meta = {
       valor: metaValor,
@@ -130,6 +139,21 @@ export async function GET() {
         cotas,
         ticket: cotas > 0 ? vendido / cotas : 0,
         pct_da_master: vendidoMaster > 0 ? (vendido / vendidoMaster) * 100 : 0,
+      }
+    }
+
+    // 2b. FATIA DA PRÓPRIA EMPRESA DO MASTER (além do consolidado global)
+    let minha_fatia_master: any = null
+    if (me.role === 'master' && me.empresa_id) {
+      const daEmpresa = listaProd.filter((v) => v.empresa_id === me.empresa_id)
+      const vendido = daEmpresa.reduce((s, v) => s + (v.valor_credito || 0), 0)
+      const cotas = daEmpresa.length
+      const { data: emp } = await supabaseAdmin.from('empresas').select('nome').eq('id', me.empresa_id).single()
+      minha_fatia_master = {
+        empresa_nome: emp?.nome || 'Minha empresa',
+        vendido,
+        cotas,
+        pct_da_producao: vendidoMaster > 0 ? (vendido / vendidoMaster) * 100 : 0,
       }
     }
 
@@ -159,8 +183,7 @@ export async function GET() {
     const lancesAtivos = (lancesRaw || []) as any[]
     const pendentesArr = lancesAtivos.filter((l) => ['pendente', 'solicitado'].includes(l.status))
     const ofertadosAguardando = lancesAtivos.filter((l) => l.status === 'ofertado').length
-    const em7 = new Date(); em7.setDate(em7.getDate() + 7)
-    const em7Str = em7.toISOString().slice(0, 10)
+    const em7Str = emNdiasISO(7)
     const datasFuturas = pendentesArr
       .map((l) => l.data_assembleia)
       .filter((d): d is string => !!d && d >= hoje)
@@ -182,14 +205,17 @@ export async function GET() {
       .neq('status', 'efetivado')
     if (!escopoGlobal && me.empresa_id) vq = vq.eq('empresa_id', me.empresa_id)
     const { data: boletos } = await vq
-    const em15 = new Date(); em15.setDate(em15.getDate() + 15)
-    const em15Str = em15.toISOString().slice(0, 10)
+    const em15Str = emNdiasISO(15)
     const vencimentos = ((boletos || []) as any[])
-      .filter((b) => b.data_proxima_cobranca >= hoje && b.data_proxima_cobranca <= em15Str)
-      .sort((a, b) => a.data_proxima_cobranca.localeCompare(b.data_proxima_cobranca))
+      // compara só a parte YYYY-MM-DD (datas do banco podem vir com hora); tudo em BRT
+      .filter((b) => {
+        const d = String(b.data_proxima_cobranca).slice(0, 10)
+        return d >= hoje && d <= em15Str
+      })
+      .sort((a, b) => String(a.data_proxima_cobranca).slice(0, 10).localeCompare(String(b.data_proxima_cobranca).slice(0, 10)))
       .slice(0, 6)
       .map((b) => ({
-        data: b.data_proxima_cobranca,
+        data: String(b.data_proxima_cobranca).slice(0, 10),
         cliente: primeiro<any>(b.clientes)?.nome || '—',
         grupo: primeiro<any>(b.vendas)?.grupo || '',
         cota: primeiro<any>(b.vendas)?.cota || '',
@@ -197,21 +223,30 @@ export async function GET() {
       }))
 
     // 7. PRÓXIMA SEXTA (APENAS master e representante) — fila de mapas não pagos
-    let proxima_sexta: { valor: number; data: string } | undefined = undefined
+    let proxima_sexta: { valor: number; data: string; fatia_empresa?: number; empresa_nome?: string } | undefined = undefined
     if (['master', 'representante'].includes(me.role)) {
       let mq = supabaseAdmin.from('mapas_comissao').select('id, empresa_id, data_encerramento, total_comissao, pago').eq('pago', false)
       // representante: só a empresa dele; master: global
       if (me.role === 'representante' && me.empresa_id) mq = mq.eq('empresa_id', me.empresa_id)
       const { data: mapas } = await mq
       const porData = new Map<string, number>()
+      const porDataEmpresa = new Map<string, number>() // fatia da empresa do master, por data de pagamento
       for (const mp of (mapas || []) as any[]) {
         if (!mp.data_encerramento) continue
         const dp = dataPagamentoMapa(mp.data_encerramento).toISOString()
         porData.set(dp, (porData.get(dp) || 0) + (mp.total_comissao || 0))
+        if (me.role === 'master' && me.empresa_id && mp.empresa_id === me.empresa_id) {
+          porDataEmpresa.set(dp, (porDataEmpresa.get(dp) || 0) + (mp.total_comissao || 0))
+        }
       }
       const ordenado = Array.from(porData.entries()).sort((a, b) => a[0].localeCompare(b[0]))
       if (ordenado.length > 0) proxima_sexta = { data: ordenado[0][0], valor: ordenado[0][1] }
       else proxima_sexta = { data: '', valor: 0 }
+      // master: fatia da própria operação no mesmo dia de pagamento
+      if (me.role === 'master' && minha_fatia_master) {
+        proxima_sexta.fatia_empresa = proxima_sexta.data ? (porDataEmpresa.get(proxima_sexta.data) || 0) : 0
+        proxima_sexta.empresa_nome = minha_fatia_master.empresa_nome
+      }
     }
 
     // 8. AVISOS (ativos, fixados primeiro, depois criado_em desc, máx 8)
@@ -228,6 +263,7 @@ export async function GET() {
       pode_publicar_avisos: escopoGlobal, // master OU adm da matriz
       meta,
       minha_operacao,
+      minha_fatia_master,
       campeoes_mes,
       melhores_semana,
       lances_alerta,

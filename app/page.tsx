@@ -21,11 +21,12 @@ interface DashData {
   pode_publicar_avisos: boolean
   meta: { valor: number; vendido_master: number; dias_restantes: number; ritmo_necessario: number; pct: number; producao_nome: string | null; cotas_master: number }
   minha_operacao: { empresa_nome: string; vendido: number; cotas: number; ticket: number; pct_da_master: number } | null
+  minha_fatia_master: { empresa_nome: string; vendido: number; cotas: number; pct_da_producao: number } | null
   campeoes_mes: Campeoes
   melhores_semana: Campeoes
   lances_alerta: { pendentes: number; pendentes_proxima_assembleia: number; data_assembleia_proxima: string | null; ofertados_aguardando: number }
   vencimentos: { data: string; cliente: string; grupo: string; cota: string; valor: number }[]
-  proxima_sexta?: { valor: number; data: string }
+  proxima_sexta?: { valor: number; data: string; fatia_empresa?: number; empresa_nome?: string }
   avisos: Aviso[]
 }
 
@@ -146,9 +147,16 @@ export default function DashboardPage() {
                       </p>
                     </div>
                   </div>
-                  <p className="font-mono text-2xl font-bold" style={{ color: '#22c55e' }}>
-                    <AnimatedNumber value={data.proxima_sexta.valor} format={fmtMoedaFull} />
-                  </p>
+                  <div className="text-right">
+                    <p className="font-mono text-2xl font-bold" style={{ color: '#22c55e' }}>
+                      <AnimatedNumber value={data.proxima_sexta.valor} format={fmtMoedaFull} />
+                    </p>
+                    {data.proxima_sexta.fatia_empresa !== undefined && (
+                      <p className="mt-0.5 text-xs" style={{ color: 'var(--muted-color)' }}>
+                        sua operação ({data.proxima_sexta.empresa_nome}): <span className="font-mono font-semibold" style={{ color: '#22c55e' }}>{fmtMoeda(data.proxima_sexta.fatia_empresa)}</span>
+                      </p>
+                    )}
+                  </div>
                 </section>
               )}
 
@@ -179,6 +187,20 @@ export default function DashboardPage() {
                         </div>
                         <p className="mt-1 font-mono text-lg font-bold" style={{ color: 'var(--accent)' }}>{data.meta.pct.toFixed(1)}%</p>
                       </div>
+                      {/* fatia da própria empresa do master */}
+                      {data.minha_fatia_master && (
+                        <div className="col-span-2 flex flex-wrap items-center justify-between gap-2 rounded-xl p-3.5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="shrink-0 leading-none" style={{ fontSize: 18 }} role="img" aria-label="Representação">🏢</span>
+                            <span className="truncate text-sm font-semibold" style={{ color: 'var(--text)' }}>{data.minha_fatia_master.empresa_nome}</span>
+                          </div>
+                          <p className="text-xs" style={{ color: 'var(--muted-color)' }}>
+                            <span className="font-mono font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(data.minha_fatia_master.vendido)}</span>
+                            {' · '}{data.minha_fatia_master.cotas} cotas
+                            {' · '}<span className="font-semibold" style={{ color: 'var(--accent)' }}>{data.minha_fatia_master.pct_da_producao.toFixed(1)}%</span> da produção
+                          </p>
+                        </div>
+                      )}
                     </div>
                   ) : data.minha_operacao ? (
                     <>
@@ -212,7 +234,7 @@ export default function DashboardPage() {
 
               {/* ═══ LINHA 3: MELHORES DA SEMANA · SEUS LANCES ═══ */}
               <div className="grid gap-5 lg:grid-cols-2">
-                <CampeoesCard titulo="Melhores da semana" subtitulo="Domingo a sábado" campeoes={data.melhores_semana} />
+                <CampeoesCard titulo="Melhores da semana" subtitulo="Domingo a sábado" badge="dom–sáb" campeoes={data.melhores_semana} />
 
                 {/* Seus lances */}
                 <section className="card-dark flex flex-col p-5 anim-fade-up">

@@ -287,6 +287,29 @@
 }
 .pulse-vermelho { animation: pulseVermelho 1.2s ease-in-out infinite; }
 
+/* ── Campeões: luz dourada atravessando o card a cada ~6s (mesmo efeito do botão Nova Venda, mais lento) ── */
+@keyframes shimmerCross {
+  0%   { transform: translateX(-120%) skewX(-12deg); }
+  18%  { transform: translateX(220%) skewX(-12deg); }
+  100% { transform: translateX(220%) skewX(-12deg); }
+}
+.shimmer-cross {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 45%;
+  background: linear-gradient(90deg, transparent 0%, rgba(212,175,55,0.14) 45%, rgba(255,235,170,0.22) 50%, rgba(212,175,55,0.14) 55%, transparent 100%);
+  pointer-events: none;
+  animation: shimmerCross 6s ease-in-out infinite;
+}
+
+/* anel dourado + glow sutil na foto/escudo dos campeões */
+.anel-dourado {
+  border: 2px solid rgba(212,175,55,0.75) !important;
+  box-shadow: 0 0 14px rgba(212,175,55,0.35);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .globo-gira, .borda-viva, .borda-viva::before, .glow-pulse, .raio-pisca,
   .card-borda-viva, .card-borda-viva::before,
