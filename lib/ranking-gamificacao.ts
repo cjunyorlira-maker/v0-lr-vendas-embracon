@@ -23,7 +23,7 @@ async function fetchAll(admin: SupabaseClient, build: (q: any) => any) {
   let from = 0
   const size = 1000
   for (;;) {
-    const { data, error } = await build(admin.from('vendas')).range(from, from + size - 1)
+    const { data, error } = await build(admin.from('vendas')).neq('cancelada', true).range(from, from + size - 1)
     if (error || !data || data.length === 0) break
     out.push(...data)
     if (data.length < size) break

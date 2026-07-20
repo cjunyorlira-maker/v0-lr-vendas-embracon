@@ -146,12 +146,22 @@ export async function POST(req: Request) {
       for (const vd of (vendasCota || []) as any[]) {
         // marca o lance do mês desta assembleia (se existir) e encerra a config
         const { data: cfgs } = await supabaseAdmin.from('lances_config')
-          .select('id').eq('venda_id', vd.id).eq('ativo', true)
+          .select('id, tipo, empresa_id, cliente_id, vendedor_id, equipe_id').eq('venda_id', vd.id).eq('ativo', true)
         for (const cfg of (cfgs || []) as any[]) {
-          await supabaseAdmin.from('lances_mensais')
-            .update({ contemplado: true })
-            .eq('lance_config_id', cfg.id)
-            .eq('mes_referencia', mesRef)
+          // pega o lance ativo desta config (independe do mês); se não houver (ex.: só sorteio), cria um contemplado
+          const { data: lmExist } = await supabaseAdmin.from('lances_mensais')
+            .select('id').eq('lance_config_id', cfg.id).neq('contemplado', true)
+            .order('mes_referencia', { ascending: false }).limit(1).maybeSingle()
+          if (lmExist) {
+            await supabaseAdmin.from('lances_mensais').update({ contemplado: true, ciclo_encerrado: true }).eq('id', lmExist.id)
+          } else {
+            await supabaseAdmin.from('lances_mensais').insert({
+              lance_config_id: cfg.id, empresa_id: cfg.empresa_id, cliente_id: cfg.cliente_id,
+              vendedor_id: cfg.vendedor_id, equipe_id: cfg.equipe_id,
+              mes_referencia: mesRef || new Date().toISOString().slice(0, 7),
+              data_assembleia: null, status: 'solicitado', contemplado: true, ciclo_encerrado: true,
+            })
+          }
           await supabaseAdmin.from('lances_config')
             .update({ ativo: false, status_final: 'contemplado', atualizado_em: new Date().toISOString() })
             .eq('id', cfg.id)

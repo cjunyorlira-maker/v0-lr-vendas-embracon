@@ -41,7 +41,8 @@ export async function GET() {
     // 1. Vendas do sistema (para cruzar contrato → cliente/empresa/crédito). Contratos SEM venda ficam de fora.
     const { data: vendasRaw } = await supabaseAdmin
       .from('vendas')
-      .select('id, valor_credito, numero_contrato, numero_proposta, empresa_id, clientes(nome), empresas(nome)')
+      .select('id, valor_credito, numero_contrato, numero_proposta, empresa_id, cancelada, clientes(nome), empresas(nome)')
+      .neq('cancelada', true) // vendas canceladas não geram os 0,25% do master
     const vendas = (vendasRaw || []).filter((v: any) => !(v.empresa_id && autonomasSet.has(v.empresa_id)))
     const contratoToVenda = new Map<string, any>()
     for (const v of (vendas || []) as any[]) {

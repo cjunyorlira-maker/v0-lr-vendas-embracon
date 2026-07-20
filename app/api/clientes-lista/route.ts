@@ -25,7 +25,7 @@ export async function GET() {
 
     // busca vendas com escopo
     let q = supabaseAdmin.from('vendas')
-      .select('id, cliente_id, numero_proposta, numero_contrato, grupo, cota, valor_credito, adesao_percent, com_seguro, data_assembleia_entrada, data_venda, empresa_id, equipe_id, vendedor_id, checado, status_cliente, pdf_proposta_url, observacoes, planos(sigla, nome_completo, bem, adesao_percent), clientes(id, nome, cpf_cnpj, telefone), usuarios:vendedor_id(nome), equipes(nome), boletos(status, qtd_parcelas, data_proxima_cobranca)')
+      .select('id, cliente_id, numero_proposta, numero_contrato, grupo, cota, valor_credito, adesao_percent, com_seguro, data_assembleia_entrada, data_venda, empresa_id, equipe_id, vendedor_id, checado, status_cliente, cancelada, motivo_cancelamento, cancelado_em, cancelado_por, cancelamento_dentro_prazo, pdf_proposta_url, observacoes, planos(sigla, nome_completo, bem, adesao_percent), clientes(id, nome, cpf_cnpj, telefone), usuarios:vendedor_id(nome), equipes(nome), boletos(status, qtd_parcelas, data_proxima_cobranca)')
       .order('data_assembleia_entrada', { ascending: true })
 
     const { escopoGlobal } = await getEscopo(me)
@@ -63,12 +63,14 @@ export async function GET() {
         plano: plano?.sigla || '-',
         data_assembleia: v.data_assembleia_entrada, data_venda: v.data_venda,
         vendedor: vendedor?.nome || null, equipe_nome: (Array.isArray(v.equipes) ? v.equipes[0]?.nome : v.equipes?.nome) || null, vendedor_id: v.vendedor_id, equipe_id: v.equipe_id, empresa_id: v.empresa_id,
-        status_cliente: v.status_cliente || 'em_dia',
+        status_cliente: v.cancelada ? 'cancelado' : (v.status_cliente || 'em_dia'),
         status_boleto: boleto?.status || 'pendente', qtd_parcelas: boleto?.qtd_parcelas || 0,
         proxima_cobranca: boleto?.data_proxima_cobranca || null,
         status_lance: statusLance, checado: v.checado || false,
         pdf_proposta_url: v.pdf_proposta_url,
         observacoes: v.observacoes || null,
+        cancelada: v.cancelada || false, motivo_cancelamento: v.motivo_cancelamento || null,
+        cancelado_em: v.cancelado_em || null, cancelamento_dentro_prazo: v.cancelamento_dentro_prazo ?? null,
       }
     })
 

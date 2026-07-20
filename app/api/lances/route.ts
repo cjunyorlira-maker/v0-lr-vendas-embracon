@@ -57,6 +57,8 @@ export async function GET(req: NextRequest) {
     }
 
     for (const cfg of (configsAtivas || [])) {
+      // "só sorteio": não gera lance mensal (o cliente concorre apenas por sorteio)
+      if (cfg.tipo === 'so_sorteio') continue
       // pega o lance ATIVO atual desta config (não encerrado)
       const { data: lanceAtivo } = await supabaseAdmin
         .from('lances_mensais')
@@ -111,6 +113,12 @@ export async function GET(req: NextRequest) {
       .neq('ciclo_encerrado', true)
 
     const { escopoGlobal } = await getEscopo(me)
+    // ISOLAMENTO: kanban e régua de comprovantes da MATRIZ excluem operações autônomas por padrão.
+    // (Contemplados/vitrine seguem com todos — a autônoma conta na vitrine.)
+    const autonomasSet = new Set(await getEmpresasAutonomas())
+    const filtrarAutonomas = escopoGlobal && !incluirAutonomas && autonomasSet.size > 0
+    const semAutonomas = <T extends { empresa_id?: string | null }>(arr: T[]) =>
+      filtrarAutonomas ? arr.filter((x) => !(x.empresa_id && autonomasSet.has(x.empresa_id))) : arr
     if (escopoGlobal) { /* master ou adm matriz: vê tudo */ }
     else if (['representante', 'adm'].includes(me.role)) q = q.eq('empresa_id', me.empresa_id)
     else if (me.role === 'supervisor') q = q.eq('equipe_id', me.equipe_id)
@@ -196,6 +204,34 @@ export async function GET(req: NextRequest) {
       }
     })
 
+    // ── SÓ SORTEIO (clientes fora da fila de lances, concorrendo por sorteio) ──
+    let qss = supabaseAdmin
+      .from('lances_config')
+      .select('id, tipo, cliente_id, venda_id, empresa_id, equipe_id, vendedor_id, criado_em, atualizado_em, clientes(nome), usuarios:vendedor_id(nome), equipes(nome)')
+      .eq('tipo', 'so_sorteio')
+      .eq('ativo', true)
+      .is('status_final', null)
+    if (escopoGlobal) { /* vê tudo */ }
+    else if (['representante', 'adm'].includes(me.role)) qss = qss.eq('empresa_id', me.empresa_id)
+    else if (me.role === 'supervisor') qss = qss.eq('equipe_id', me.equipe_id)
+    else qss = qss.eq('vendedor_id', me.id)
+    const { data: soSorteioRaw } = await qss.order('atualizado_em', { ascending: false })
+    const vendaIdsSS = (soSorteioRaw || []).map((c: any) => c.venda_id).filter(Boolean)
+    let vendasMapSS: Record<string, any> = {}
+    if (vendaIdsSS.length > 0) {
+      const { data: vendasSS } = await supabaseAdmin.from('vendas').select('id, grupo, cota, numero_proposta, numero_contrato').in('id', vendaIdsSS)
+      for (const v of (vendasSS || [])) vendasMapSS[v.id] = v
+    }
+    const soSorteio = (soSorteioRaw || []).map((c: any) => {
+      const venda = c.venda_id ? vendasMapSS[c.venda_id] : null
+      return {
+        ...c,
+        grupo: venda?.grupo || null, cota: venda?.cota || null,
+        numero_proposta: venda?.numero_proposta || venda?.numero_contrato || null,
+        desde: c.atualizado_em || c.criado_em || null,
+      }
+    })
+
     // opções de filtro conforme o role
     let empresasOpc: any[] = [], equipesOpc: any[] = [], vendedoresOpc: any[] = []
     if (escopoGlobal) {
@@ -209,9 +245,21 @@ export async function GET(req: NextRequest) {
       const { data: vd } = await supabaseAdmin.from('usuarios').select('id, nome, empresa_id, equipe_id').in('role', ['vendedor', 'supervisor']).eq('equipe_id', me.equipe_id).order('nome'); vendedoresOpc = vd || []
     }
 
+    const lancesVisiveis = semAutonomas(lancesEnriq)
+    const comprovantesVisiveis = semAutonomas(comprovantes_nao_baixados)
+    const ocultosAutonomas = filtrarAutonomas
+      ? (lancesEnriq.length - lancesVisiveis.length) + (comprovantes_nao_baixados.length - comprovantesVisiveis.length)
+      : 0
+
+    const soSorteioVisiveis = semAutonomas(soSorteio)
+
     return NextResponse.json({
-      mes_referencia: mesRef, lances: lancesEnriq, contemplados, comprovantes_nao_baixados, meu_role: me.role,
+      mes_referencia: mesRef, lances: lancesVisiveis, contemplados, comprovantes_nao_baixados: comprovantesVisiveis, so_sorteio: soSorteioVisiveis, meu_role: me.role,
       filtros: { empresas: empresasOpc, equipes: equipesOpc, vendedores: vendedoresOpc },
+      escopo_global: escopoGlobal,
+      tem_autonomas: autonomasSet.size > 0,
+      incluindo_autonomas: incluirAutonomas,
+      ocultos_autonomas: ocultosAutonomas,
     })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })

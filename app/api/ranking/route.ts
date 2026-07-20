@@ -75,6 +75,7 @@ export async function GET(req: NextRequest) {
       .select('valor_credito, vendedor_id, equipe_id, empresa_id, data_venda, usuarios:vendedor_id(nome, foto_url, placeholder), equipes(nome), empresas(nome, logo_url)')
       .gte('data_venda', inicio)
       .lte('data_venda', fim)
+      .neq('cancelada', true) // vendas canceladas não contam na produção
 
     // escopo reutilizável (ranking do período + melhor da semana corrente compartilham as mesmas regras)
     const esc = await getEscopo(me)
@@ -200,6 +201,7 @@ export async function GET(req: NextRequest) {
         .from('vendas')
         .select('valor_credito, vendedor_id, equipe_id, empresa_id, usuarios:vendedor_id(nome, foto_url, placeholder), equipes(nome), empresas(nome, logo_url)')
         .gte('data_venda', inicio).lte('data_venda', fim)
+        .neq('cancelada', true) // exclui canceladas
       const eqMap = new Map<string, { nome: string; empresa?: string; valor: number }>()
       const empMap = new Map<string, { nome: string; logo?: string; valor: number }>()
       const vendMap = new Map<string, { nome: string; foto?: string; equipe?: string; empresa?: string; valor: number }>()

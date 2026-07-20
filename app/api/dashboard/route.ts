@@ -108,6 +108,7 @@ export async function GET() {
       .from('vendas')
       .select('valor_credito, vendedor_id, equipe_id, empresa_id, data_venda, usuarios:vendedor_id(nome, foto_url, placeholder), equipes(nome), empresas(nome, logo_url)')
       .gte('data_venda', pInicio).lte('data_venda', pFim)
+      .neq('cancelada', true) // vendas canceladas não contam na produção
     const listaProd = (vendasProd || []) as any[]
 
     // 1. META (MASTER LR — global)
@@ -169,6 +170,7 @@ export async function GET() {
       .from('vendas')
       .select('valor_credito, vendedor_id, equipe_id, empresa_id, usuarios:vendedor_id(nome, foto_url, placeholder), equipes(nome), empresas(nome, logo_url)')
       .gte('data_venda', inicioSemana).lte('data_venda', hoje)
+      .neq('cancelada', true) // exclui canceladas
     const listaSemana = (vendasSemana || []) as any[]
     const melhores_semana = {
       geral: calcularCampeoes(listaSemana),
@@ -189,7 +191,10 @@ export async function GET() {
     else if (me.role === 'supervisor') lq = lq.eq('equipe_id', me.equipe_id)
     else lq = lq.eq('vendedor_id', me.id)
     const { data: lancesRaw } = await lq
-    const lancesAtivos = (lancesRaw || []) as any[]
+    // ISOLAMENTO: na visão da matriz (global), os cards operacionais excluem operações autônomas.
+    const autonomasSetDash = new Set(await getEmpresasAutonomas())
+    const lancesAtivos = ((lancesRaw || []) as any[])
+      .filter((l) => !(escopoGlobal && l.empresa_id && autonomasSetDash.has(l.empresa_id)))
     const em7Str = emNdiasISO(7)
     // resume um conjunto de lances nos mesmos indicadores do card
     const resumirLances = (arr: any[]) => {
@@ -217,7 +222,7 @@ export async function GET() {
     // 6. VENCIMENTOS (escopo por empresa) — próximos 15 dias, não efetivados, máx 6
     let vq = supabaseAdmin
       .from('boletos')
-      .select('data_proxima_cobranca, valor_boleto, status, clientes(nome), vendas(grupo, cota)')
+      .select('data_proxima_cobranca, valor_boleto, status, empresa_id, clientes(nome), vendas(grupo, cota)')
       .not('data_proxima_cobranca', 'is', null)
       // a próxima cobrança pertence AOS efetivados (parcela seguinte à antecipação); só exclui cancelados
       .neq('status', 'cancelado')
@@ -226,7 +231,10 @@ export async function GET() {
     else if (['representante', 'adm'].includes(me.role)) vq = vq.eq('empresa_id', me.empresa_id) // da empresa
     else if (me.role === 'supervisor') vq = vq.eq('equipe_id', me.equipe_id)                     // da equipe dele
     else vq = vq.eq('vendedor_id', me.id)                                                        // só os dele
-    const { data: boletos } = await vq
+    const { data: boletosRaw } = await vq
+    // ISOLAMENTO: matriz (global) não vê vencimentos de operações autônomas
+    const boletos = ((boletosRaw || []) as any[])
+      .filter((b) => !(escopoGlobal && b.empresa_id && autonomasSetDash.has(b.empresa_id)))
     const em15Str = emNdiasISO(15)
     const vencimentos = ((boletos || []) as any[])
       // compara só a parte YYYY-MM-DD (datas do banco podem vir com hora); tudo em BRT
@@ -249,7 +257,7 @@ export async function GET() {
     if (['master', 'representante'].includes(me.role)) {
       // ISOLAMENTO: matriz vê borderôs globais (empresa_id null) EXCLUINDO contratos de
       // empresas autônomas; empresa autônoma vê só o próprio borderô.
-      const autonomasSet = new Set(await getEmpresasAutonomas())
+      const autonomasSet = autonomasSetDash
       const souAutonoma = !!(me.empresa_id && autonomasSet.has(me.empresa_id))
       const { data: mapas } = await supabaseAdmin
         .from('mapas_comissao').select('id, empresa_id, data_encerramento, pago').eq('pago', false)

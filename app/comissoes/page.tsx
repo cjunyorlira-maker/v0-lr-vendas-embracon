@@ -132,6 +132,7 @@ export default function ComissoesPage() {
   const [catConfig, setCatConfig] = useState<Record<string, { vend: string; sup: string; supProprio: string }>>({})
   const [importando, setImportando] = useState(false)
   const [resultImport, setResultImport] = useState<string | null>(null)
+  const [canceladosImport, setCanceladosImport] = useState<{ contrato: string; cliente: string | null; valor: number }[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
 
   const abasValidas = ['vendas', 'config', 'mapa', 'calculo', 'ranking', 'seguro', 'master']
@@ -320,13 +321,14 @@ export default function ComissoesPage() {
   }
 
   async function importarMapa(file: File) {
-    setImportando(true); setResultImport(null)
+    setImportando(true); setResultImport(null); setCanceladosImport([])
     try {
       const fd = new FormData(); fd.append('file', file)
       const res = await fetch('/api/comissoes/importar-mapa', { method: 'POST', body: fd })
       const data = await res.json()
       if (!res.ok) { setResultImport('Erro: ' + (data.error || 'falhou')); setImportando(false); return }
       const naoEnc = data.contratos_nao_encontrados?.length || 0
+      setCanceladosImport(data.contratos_cancelados || [])
       setResultImport(`Mapa importado! ${data.total_contratos} contratos, ${fmtMoeda(data.total_comissao)} em comissão.${naoEnc > 0 ? ` ${naoEnc} contrato(s) não encontrado(s) nas vendas.` : ''}`)
       await loadData(true)
       if (aba === 'mapa') await carregarMapas()
@@ -554,6 +556,28 @@ export default function ComissoesPage() {
             </button>
             {resultImport && <span className="text-xs" style={{ color: resultImport.startsWith('Erro') ? '#ef4444' : '#22c55e' }}>{resultImport}</span>}
           </div>
+          )}
+
+          {/* Vigia de borderô: contratos deste mapa que batem em vendas canceladas */}
+          {canceladosImport.length > 0 && (
+            <div className="rounded-xl p-4 mb-5" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)' }}>
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle size={16} style={{ color: '#ef4444' }} />
+                <span className="text-sm font-semibold" style={{ color: '#f87171' }}>Atenção: {canceladosImport.length} contrato(s) cancelado(s) ainda no borderô</span>
+              </div>
+              <p className="text-xs mb-3" style={{ color: 'var(--muted-color)' }}>Estas cotas foram canceladas no sistema mas a Embracon ainda enviou comissão no mapa. Verifique se haverá estorno.</p>
+              <div className="flex flex-col gap-1.5">
+                {canceladosImport.map((c) => (
+                  <div key={c.contrato} className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-xs" style={{ background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(239,68,68,0.2)' }}>
+                    <span className="flex items-center gap-2 min-w-0">
+                      <span className="font-mono px-1.5 py-0.5 rounded" style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171' }}>{c.contrato}</span>
+                      {c.cliente && <span className="truncate" style={{ color: 'var(--text2)' }}>{c.cliente}</span>}
+                    </span>
+                    <span className="font-mono shrink-0" style={{ color: '#f87171' }}>{fmtMoeda(c.valor)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
 
           {/* Filtro por data */}

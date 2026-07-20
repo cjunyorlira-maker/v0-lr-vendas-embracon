@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { Target, Loader2, Upload, Download, Check, Paperclip, Trophy, X, Clock, Search } from 'lucide-react'
+import { Target, Loader2, Upload, Download, Check, Paperclip, Trophy, X, Clock, Search, Dices, Undo2 } from 'lucide-react'
 
 interface Lance {
   id: string
@@ -34,6 +34,7 @@ function descTipo(c?: { tipo: string; valor_percentual: number }): string {
   if (c.tipo === 'fixo50') return 'Fixo 50%'
   if (c.tipo === 'valor') return `R$ ${(c.valor_percentual || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
   if (c.tipo === 'livre') return `Livre ${c.valor_percentual || 0}%`
+  if (c.tipo === 'so_sorteio') return 'Só sorteio'
   return ''
 }
 const fmtData = (d: string | null) => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '-'
@@ -72,7 +73,10 @@ function agruparPorAssembleia(lista: Lance[]) {
 export default function LancesPage() {
   const [lances, setLances] = useState<Lance[]>([])
   const [contemplados, setContemplados] = useState<any[]>([])
-  const [visao, setVisao] = useState<'andamento' | 'contemplados'>('andamento')
+  const [soSorteio, setSoSorteio] = useState<any[]>([])
+  const [visao, setVisao] = useState<'andamento' | 'so_sorteio' | 'contemplados'>('andamento')
+  const [confirmarSoSorteio, setConfirmarSoSorteio] = useState<Lance | null>(null)
+  const [voltarItem, setVoltarItem] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [role, setRole] = useState('')
   const [mesRef, setMesRef] = useState('')
@@ -100,6 +104,10 @@ export default function LancesPage() {
   const [fEmpresa, setFEmpresa] = useState('')
   const [fEquipe, setFEquipe] = useState('')
   const [fVendedor, setFVendedor] = useState('')
+  // isolamento financeiro: toggle "incluir operações autônomas" (só matriz)
+  const [incluirAutonomas, setIncluirAutonomas] = useState(false)
+  const [mostrarToggleAutonomas, setMostrarToggleAutonomas] = useState(false)
+  const [ocultosAutonomas, setOcultosAutonomas] = useState(0)
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { loadData() }, [])
@@ -116,16 +124,19 @@ export default function LancesPage() {
     setCarregandoHist(false)
   }
 
-  async function loadData() {
+  async function loadData(incluir = false) {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    const res = await fetch('/api/lances')
+    const res = await fetch(`/api/lances${incluir ? '?incluir_autonomas=1' : ''}`)
     const data = await res.json()
     if (data.lances) { setLances(data.lances); setMesRef(data.mes_referencia); setRole(data.meu_role) }
     if (data.contemplados) setContemplados(data.contemplados)
+    if (data.so_sorteio) setSoSorteio(data.so_sorteio)
     if (data.comprovantes_nao_baixados) setNaoBaixados(data.comprovantes_nao_baixados)
     if (data.filtros) setFiltrosOpc(data.filtros)
+    setMostrarToggleAutonomas(!!data.escopo_global && !!data.tem_autonomas)
+    setOcultosAutonomas(data.ocultos_autonomas || 0)
     setLoading(false)
   }
 
@@ -290,6 +301,28 @@ export default function LancesPage() {
     setProcessando(null)
   }
 
+  async function marcarSoSorteio(lance: Lance) {
+    setProcessando(lance.id)
+    await fetch('/api/lances/acao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'so_sorteio', config_id: lance.lance_config_id }) })
+    setConfirmarSoSorteio(null)
+    await loadData(incluirAutonomas)
+    setProcessando(null)
+  }
+
+  async function confirmarVoltar() {
+    if (!voltarItem) return
+    setProcessando(voltarItem.id)
+    const payload: any = { acao: 'voltar_lance', config_id: voltarItem.id, tipo: defTipo, observacao: defObs, recorrente: defRecorrente }
+    if (defTipo !== 'fixo25') {
+      const limpo = defTipo === 'valor' ? defValor.replace(/\./g, '').replace(',', '.') : defValor.replace(',', '.')
+      payload.valor_percentual = parseFloat(limpo) || 0
+    }
+    await fetch('/api/lances/acao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+    setVoltarItem(null)
+    await loadData(incluirAutonomas)
+    setProcessando(null)
+  }
+
   function CardLance({ lance }: { lance: Lance }) {
     const hojeStr = new Date().toISOString().slice(0, 10)
     const em7diasStr = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
@@ -330,6 +363,11 @@ export default function LancesPage() {
         {lance.status === 'pendente' && (
           <button onClick={() => { setDefinirModal(lance); setDefTipo((lance.lances_config?.tipo as 'fixo25' | 'valor' | 'livre') || 'fixo25'); setDefValor(lance.lances_config?.valor_percentual ? (lance.lances_config?.tipo === 'valor' ? Number(lance.lances_config.valor_percentual).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : String(lance.lances_config.valor_percentual)) : ''); setDefObs(lance.lances_config?.observacao || ''); setDefRecorrente(lance.lances_config?.recorrente || false) }} disabled={processando === lance.id} className="w-full flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-semibold transition-transform hover:scale-105 active:scale-95" style={{ background: 'rgba(234,179,8,0.15)', color: '#eab308', border: '1px solid #eab308' }}>
             <Target size={13} />Definir lance pra ofertar
+          </button>
+        )}
+        {lance.status === 'pendente' && podeOfertar && (
+          <button onClick={() => setConfirmarSoSorteio(lance)} disabled={processando === lance.id} className="w-full flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-[11px] mt-1.5" style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>
+            <Dices size={12} />Só sorteio
           </button>
         )}
         {lance.status === 'solicitado' && podeOfertar && (
@@ -470,12 +508,36 @@ export default function LancesPage() {
               <button onClick={() => setVisao('andamento')} className="rounded-full px-4 py-2 text-xs font-semibold transition-colors" style={{ background: visao === 'andamento' ? 'var(--accent)' : 'rgba(255,255,255,0.04)', color: visao === 'andamento' ? '#0a0a0a' : 'var(--muted-color)', border: `1px solid ${visao === 'andamento' ? 'var(--accent)' : 'var(--border)'}` }}>
                 Em andamento
               </button>
+              <button onClick={() => setVisao('so_sorteio')} className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition-colors" style={{ background: visao === 'so_sorteio' ? 'rgba(59,130,246,0.18)' : 'rgba(255,255,255,0.04)', color: visao === 'so_sorteio' ? '#3b82f6' : 'var(--muted-color)', border: `1px solid ${visao === 'so_sorteio' ? 'rgba(59,130,246,0.5)' : 'var(--border)'}` }}>
+                <Dices size={13} /> Só Sorteio ({soSorteio.length})
+              </button>
               <button onClick={() => setVisao('contemplados')} className="flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-semibold transition-colors" style={{ background: visao === 'contemplados' ? 'rgba(34,197,94,0.18)' : 'rgba(255,255,255,0.04)', color: visao === 'contemplados' ? '#22c55e' : 'var(--muted-color)', border: `1px solid ${visao === 'contemplados' ? 'rgba(34,197,94,0.5)' : 'var(--border)'}` }}>
                 <Trophy size={13} /> Contemplados ({contemplados.length})
               </button>
             </div>
 
-            {visao === 'contemplados' ? (
+            {visao === 'so_sorteio' ? (
+              soSorteio.length === 0 ? (
+                <p className="text-sm text-center py-16" style={{ color: 'var(--muted-color)' }}>Nenhum cliente concorrendo apenas por sorteio.</p>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {soSorteio.map((s: any) => (
+                    <div key={s.id} className="flex items-center justify-between gap-3 rounded-xl px-4 py-3 flex-wrap" style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.25)' }}>
+                      <div className="flex items-center gap-2 text-xs flex-wrap min-w-0">
+                        <Dices size={14} style={{ color: '#3b82f6' }} />
+                        <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{s.clientes?.nome || 'Cliente'}</span>
+                        {s.grupo && <span style={{ color: 'var(--muted-color)' }}>{'\u00b7'} Grupo {s.grupo}/{s.cota}</span>}
+                        {s.usuarios?.nome && <span style={{ color: 'var(--muted-color)' }}>{'\u00b7'} {s.usuarios.nome}</span>}
+                        {s.desde && <span style={{ color: 'var(--muted-color)' }}>{'\u00b7'} desde {fmtData(String(s.desde).slice(0, 10))}</span>}
+                      </div>
+                      <button onClick={() => { setVoltarItem(s); setDefTipo('fixo25'); setDefValor(''); setDefObs(''); setDefRecorrente(false) }} className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium shrink-0" style={{ background: 'rgba(212,175,55,0.14)', color: 'var(--accent)', border: '1px solid rgba(212,175,55,0.35)' }}>
+                        <Undo2 size={12} />Voltar a dar lance
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )
+            ) : visao === 'contemplados' ? (
               contemplados.length === 0 ? (
                 <p className="text-sm text-center py-16" style={{ color: 'var(--muted-color)' }}>Nenhum contemplado ainda.</p>
               ) : (
@@ -484,7 +546,10 @@ export default function LancesPage() {
                     <div key={c.id} className="rounded-xl p-4" style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.4)' }}>
                       <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{c.clientes?.nome || 'Cliente'}</span>
-                        <span className="flex items-center gap-1 text-xs font-bold" style={{ color: '#22c55e' }}><Trophy size={12} />Contemplado</span>
+                        <div className="flex items-center gap-1.5">
+                          {c.lances_config?.tipo === 'so_sorteio' && <span className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full" style={{ background: 'rgba(59,130,246,0.15)', color: '#3b82f6' }}><Dices size={11} />por sorteio</span>}
+                          <span className="flex items-center gap-1 text-xs font-bold" style={{ color: '#22c55e' }}><Trophy size={12} />Contemplado</span>
+                        </div>
                       </div>
                       <div className="flex flex-wrap gap-2 text-xs" style={{ color: 'var(--muted-color)' }}>
                         <span className="px-2 py-0.5 rounded" style={{ background: 'rgba(212,175,55,0.12)', color: 'var(--accent)' }}>{descTipo(c.lances_config)}</span>
@@ -531,6 +596,25 @@ export default function LancesPage() {
               </select>
               {(fGrupo || busca || fEmpresa || fEquipe || fVendedor) && <button onClick={() => { setFGrupo(''); setBusca(''); setFEmpresa(''); setFEquipe(''); setFVendedor('') }} className="rounded-lg px-3 py-1.5 text-xs" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>Limpar</button>}
             </div>
+
+            {mostrarToggleAutonomas && (
+              <div className="flex items-center gap-2 mb-4 text-xs">
+                <button
+                  onClick={() => { const novo = !incluirAutonomas; setIncluirAutonomas(novo); loadData(novo) }}
+                  className="rounded-lg px-3 py-1.5"
+                  style={incluirAutonomas
+                    ? { background: 'rgba(212,175,55,0.14)', color: 'var(--accent)', border: '1px solid rgba(212,175,55,0.35)' }
+                    : { background: 'rgba(255,255,255,0.05)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}
+                >
+                  {incluirAutonomas ? 'Ocultar operações autônomas' : 'Incluir operações autônomas'}
+                </button>
+                {!incluirAutonomas && ocultosAutonomas > 0 && (
+                  <span style={{ color: 'var(--muted-color)' }}>
+                    {ocultosAutonomas} lance(s) de operações autônomas ocultos
+                  </span>
+                )}
+              </div>
+            )}
 
             {/* Switcher de colunas (mobile) */}
             <div className="flex md:hidden gap-2 mb-4">
@@ -622,6 +706,64 @@ export default function LancesPage() {
               <button onClick={() => marcarContemplado(confirmarContemplado)} disabled={processando === confirmarContemplado.id} className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold" style={{ background: '#22c55e', color: '#0a0a0a' }}>
                 {processando === confirmarContemplado.id ? <Loader2 size={13} className="animate-spin" /> : <Trophy size={13} />} Confirmar contemplação
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal confirmar só sorteio */}
+      {confirmarSoSorteio && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }} onClick={() => setConfirmarSoSorteio(null)} />
+          <div className="relative w-full max-w-md rounded-xl p-6" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+            <h3 className="text-base font-semibold mb-2 flex items-center gap-2" style={{ color: 'var(--text)' }}><Dices size={16} style={{ color: '#3b82f6' }} />Concorrer só por sorteio</h3>
+            <p className="text-sm mb-5" style={{ color: 'var(--muted-color)' }}>
+              Confirma que <span style={{ color: 'var(--text)', fontWeight: 600 }}>{confirmarSoSorteio.clientes?.nome}</span> vai concorrer apenas por sorteio? Ele sai da fila de lances (reversível a qualquer momento).
+            </p>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setConfirmarSoSorteio(null)} className="rounded-lg px-4 py-2 text-xs font-medium" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>Cancelar</button>
+              <button onClick={() => marcarSoSorteio(confirmarSoSorteio)} disabled={processando === confirmarSoSorteio.id} className="flex items-center gap-1.5 rounded-lg px-4 py-2 text-xs font-semibold" style={{ background: '#3b82f6', color: '#0a0a0a' }}>
+                {processando === confirmarSoSorteio.id ? <Loader2 size={13} className="animate-spin" /> : <Dices size={13} />} Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal voltar a dar lance (a partir do só sorteio) */}
+      {voltarItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }} onClick={() => setVoltarItem(null)} />
+          <div className="relative w-full max-w-md rounded-xl p-6" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+            <h3 className="text-base font-semibold mb-1" style={{ color: 'var(--text)' }}>Voltar a dar lance</h3>
+            <p className="text-xs mb-4" style={{ color: 'var(--muted-color)' }}>{voltarItem.clientes?.nome} · define o lance e volta para a fila deste mês.</p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Tipo de lance</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {([['fixo25','Fixo 25%'],['fixo50','Fixo 50%'],['valor','Valor R$'],['livre','Livre %']] as const).map(([k, lbl]) => (
+                    <button key={k} onClick={() => setDefTipo(k)} className="rounded-lg py-2 text-xs font-medium" style={{ background: defTipo === k ? 'rgba(212,175,55,0.15)' : 'rgba(255,255,255,0.03)', border: `1px solid ${defTipo === k ? 'var(--accent)' : 'var(--border)'}`, color: defTipo === k ? 'var(--accent)' : 'var(--muted-color)' }}>{lbl}</button>
+                  ))}
+                </div>
+              </div>
+              {defTipo !== 'fixo25' && (
+                <div>
+                  <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>{defTipo === 'valor' ? 'Valor (R$)' : 'Percentual (%)'}</label>
+                  <input value={defValor} onChange={(e) => setDefValor(defTipo === 'valor' ? formatarMoedaInput(e.target.value) : e.target.value)} placeholder={defTipo === 'valor' ? '50.000,00' : '30'} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+                </div>
+              )}
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Observação (opcional)</label>
+                <input value={defObs} onChange={(e) => setDefObs(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+              </div>
+              <label className="flex items-center gap-2 text-xs cursor-pointer" style={{ color: 'var(--text2)' }}>
+                <input type="checkbox" checked={defRecorrente} onChange={(e) => setDefRecorrente(e.target.checked)} className="accent-yellow-500" />
+                Repetir lance todo mês (recorrente)
+              </label>
+              <div className="flex gap-2">
+                <button onClick={() => setVoltarItem(null)} className="flex-1 rounded-lg py-2.5 text-sm" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text2)' }}>Cancelar</button>
+                <button onClick={() => confirmarVoltar()} disabled={processando === voltarItem.id} className="flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #d4af37 0%, #c9a227 50%, #b8941f 100%)', color: '#0a0a0a' }}>{processando === voltarItem.id ? <Loader2 size={14} className="animate-spin" /> : 'Voltar para a fila'}</button>
+              </div>
             </div>
           </div>
         </div>

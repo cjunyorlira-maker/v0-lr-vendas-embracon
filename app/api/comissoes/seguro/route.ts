@@ -50,6 +50,7 @@ export async function GET() {
       .from('vendas')
       .select('id, valor_credito, grupo, cota, empresa_id, equipe_id, vendedor_id, com_seguro, comissao_seguro_recebida, clientes(nome), empresas(nome)')
       .eq('com_seguro', true)
+      .neq('cancelada', true) // vendas canceladas não contam na comissão de seguro
       .order('criado_em', { ascending: false })
 
     q = await aplicarEscopo(q, me)

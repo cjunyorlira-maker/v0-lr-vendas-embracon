@@ -68,6 +68,7 @@ export async function GET(req: NextRequest) {
       .in('empresa_id', EMPRESAS_CAMPANHA)
       .gte('data_venda', CAMPANHA_INICIO)
       .lte('data_venda', CAMPANHA_FIM)
+      .neq('cancelada', true) // vendas canceladas não contam na campanha
     const vendas = (vendasRaw || []) as any[]
 
     // ── 1) MACBOOK: ranking de vendedores por empresa (exclui representações) ──
