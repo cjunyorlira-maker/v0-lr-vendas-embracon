@@ -168,6 +168,27 @@ export async function POST(req: Request) {
       }
     }
 
+    // ── QUADRO DE AVISOS: publica automaticamente o resultado (sem citar pessoas/ADM) ──
+    try {
+      const labelMes = mesLabel || 'esta assembleia'
+      await supabaseAdmin.from('avisos').insert({
+        titulo: `🏆 Saiu o resultado do Grupo ${grupo}`,
+        mensagem: `${totalContemplados} contemplações na assembleia de ${labelMes}`,
+        tipo: 'assembleia', fixado: false, ativo: true, criado_por: null,
+      })
+      // se houver contemplados NOSSOS, um segundo aviso comemorativo (sem nomes)
+      if (contempladosMarcados.length > 0) {
+        const qtd = contempladosMarcados.length
+        await supabaseAdmin.from('avisos').insert({
+          titulo: `🎉 Temos ${qtd} cliente${qtd > 1 ? 's' : ''} contemplado${qtd > 1 ? 's' : ''} no Grupo ${grupo}!`,
+          mensagem: `Confira os detalhes na tela de Lances.`,
+          tipo: 'assembleia', fixado: true, ativo: true, criado_por: null,
+        })
+      }
+    } catch (e) {
+      console.error('Erro ao publicar aviso automático da assembleia:', e)
+    }
+
     return NextResponse.json({
       success: true, grupo, mes_label: mesLabel, numero_assembleia: numeroAssembleia,
       resumo: { sorteio: sorteioQt, fixo50: fixo50Qt, fixo25: fixo25Qt, livre: livreQt, total: totalContemplados },

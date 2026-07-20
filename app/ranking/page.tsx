@@ -161,6 +161,7 @@ export default function RankingPage() {
   const [fixos, setFixos] = useState<Fixos | null>(null)
   const [foraDoRanking, setForaDoRanking] = useState<{ vendas: number; valor: number }>({ vendas: 0, valor: 0 })
   const [jaAnimou, setJaAnimou] = useState(false) // anima entrada só na 1ª carga
+  const [respModo, setRespModo] = useState('') // DEBUG (remover depois): modo que a última resposta declarou
   const primeiraCarga = useRef(true)
   // guard anti-corrida: só a última requisição (modo/período mais recente) pode tocar a tela
   const reqSeq = useRef(0)
@@ -259,10 +260,15 @@ export default function RankingPage() {
     if (periodo) url += `&periodo=${periodo}`
     else if (producaoId) url += `&producao_id=${producaoId}`
 
-    const res = await fetch(url)
+    const res = await fetch(url, { cache: 'no-store' })
     const data = await res.json()
     if (meuReq !== reqSeq.current) return // resposta velha: descarta antes de qualquer setState
+    // ── guard SEMÂNTICO: a resposta precisa corresponder ao que está selecionado AGORA ──
+    if (data.modo && data.modo !== modo) return                 // resposta de OUTRO modo: descarta
+    if (data.escopo && data.escopo !== escopo) return            // resposta de OUTRO escopo: descarta
+    if ((periodo || null) !== (data.periodo_tipo || null)) return // resposta de OUTRO período: descarta
     if (data.ranking) {
+      setRespModo(data.modo || '') // DEBUG (remover depois)
       setRanking(data.ranking)
       setDestaques(data.destaques || null)
       setReiSemana(data.rei_semana || null)
@@ -472,6 +478,18 @@ export default function RankingPage() {
         <div className="flex flex-col items-center justify-center py-12 gap-2"><Trophy size={32} style={{ color: 'var(--muted-color)' }} /><p className="text-sm" style={{ color: 'var(--muted-color)' }}>Nenhuma venda no período</p></div>
       ) : (
         <div style={{ transition: 'opacity 150ms ease', opacity: trocando ? 0.35 : 1, pointerEvents: trocando ? 'none' : 'auto' }}>
+          {/* DEBUG TEMPORÁRIO (remover depois): prova visual de resposta trocada — só master */}
+          {role === 'master' && (
+            <div className="flex justify-end mb-1">
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded" style={{
+                color: respModo && respModo !== modo ? '#ef4444' : 'var(--muted-color)',
+                border: `1px solid ${respModo && respModo !== modo ? '#ef4444' : 'var(--border)'}`,
+                background: respModo && respModo !== modo ? 'rgba(239,68,68,0.1)' : 'transparent',
+              }}>
+                modo: {modo} · resp: {respModo || '—'}
+              </span>
+            </div>
+          )}
           <Ticker frases={frasesTicker} />
           {escopo === 'geral' && ranking.length >= 2 && (
             <div className={`rounded-xl px-4 py-2.5 mb-5 flex items-center gap-2 ${animCls}`} style={{ background: 'linear-gradient(90deg, rgba(212,175,55,0.12), rgba(0,0,0,0.12))', border: '1px solid rgba(212,175,55,0.25)' }}>
