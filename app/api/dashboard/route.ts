@@ -181,20 +181,28 @@ export async function GET() {
     else lq = lq.eq('vendedor_id', me.id)
     const { data: lancesRaw } = await lq
     const lancesAtivos = (lancesRaw || []) as any[]
-    const pendentesArr = lancesAtivos.filter((l) => ['pendente', 'solicitado'].includes(l.status))
-    const ofertadosAguardando = lancesAtivos.filter((l) => l.status === 'ofertado').length
     const em7Str = emNdiasISO(7)
-    const datasFuturas = pendentesArr
-      .map((l) => l.data_assembleia)
-      .filter((d): d is string => !!d && d >= hoje)
-      .sort()
-    const dataAssembleiaProxima = datasFuturas[0] || null
-    const pendentesProxima = pendentesArr.filter((l) => l.data_assembleia && l.data_assembleia >= hoje && l.data_assembleia <= em7Str).length
-    const lances_alerta = {
-      pendentes: pendentesArr.length,
-      pendentes_proxima_assembleia: pendentesProxima,
-      data_assembleia_proxima: dataAssembleiaProxima,
-      ofertados_aguardando: ofertadosAguardando,
+    // resume um conjunto de lances nos mesmos indicadores do card
+    const resumirLances = (arr: any[]) => {
+      const pendentesArr = arr.filter((l) => ['pendente', 'solicitado'].includes(l.status))
+      const ofertadosAguardando = arr.filter((l) => l.status === 'ofertado').length
+      const datasFuturas = pendentesArr
+        .map((l) => l.data_assembleia)
+        .filter((d): d is string => !!d && d >= hoje)
+        .sort()
+      const pendentesProxima = pendentesArr.filter((l) => l.data_assembleia && l.data_assembleia >= hoje && l.data_assembleia <= em7Str).length
+      return {
+        pendentes: pendentesArr.length,
+        pendentes_proxima_assembleia: pendentesProxima,
+        data_assembleia_proxima: datasFuturas[0] || null,
+        ofertados_aguardando: ofertadosAguardando,
+      }
+    }
+    const lances_alerta = resumirLances(lancesAtivos)
+    // master: mesmos indicadores, mas filtrados pela PRÓPRIA empresa (fatia "a minha parte")
+    let lances_minha_empresa: ReturnType<typeof resumirLances> | null = null
+    if (me.role === 'master' && me.empresa_id) {
+      lances_minha_empresa = resumirLances(lancesAtivos.filter((l) => l.empresa_id === me.empresa_id))
     }
 
     // 6. VENCIMENTOS (escopo por empresa) — próximos 15 dias, não efetivados, máx 6
@@ -302,6 +310,7 @@ export async function GET() {
       campeoes_mes,
       melhores_semana,
       lances_alerta,
+      lances_minha_empresa,
       vencimentos,
       avisos: avisosRaw || [],
     }
