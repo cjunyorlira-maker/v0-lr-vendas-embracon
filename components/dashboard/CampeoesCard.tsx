@@ -11,15 +11,23 @@ interface Campeao {
   valor: number
 }
 
+interface Grupo {
+  vendedores: Campeao[]
+  equipes: Campeao[]
+  representacoes: Campeao[]
+}
+
+type Modo = 'geral' | 'minha_empresa'
+
 interface Props {
   titulo: string
   subtitulo?: string
   badge?: string // ex.: "dom–sáb"
-  campeoes: {
-    vendedores: Campeao[]
-    equipes: Campeao[]
-    representacoes: Campeao[]
-  }
+  geral: Grupo
+  minhaEmpresa?: Grupo | null
+  empresaNome?: string | null // rótulo da pill "Minha representação"
+  modo: Modo
+  onModoChange: (m: Modo) => void
   vazioLabel?: string
 }
 
@@ -91,20 +99,43 @@ function Coluna({ titulo, emoji, itens, delayBase }: { titulo: string; emoji: st
   )
 }
 
-export default function CampeoesCard({ titulo, subtitulo, badge, campeoes, vazioLabel }: Props) {
+function Pill({ ativo, onClick, children }: { ativo: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-full px-2.5 py-1 text-[11px] font-semibold transition-colors"
+      style={{
+        background: ativo ? 'rgba(212,175,55,0.16)' : 'transparent',
+        border: `1px solid ${ativo ? 'rgba(212,175,55,0.4)' : 'var(--border)'}`,
+        color: ativo ? 'var(--accent)' : 'var(--muted-color)',
+      }}
+    >
+      {children}
+    </button>
+  )
+}
+
+export default function CampeoesCard({ titulo, subtitulo, badge, geral, minhaEmpresa, empresaNome, modo, onModoChange, vazioLabel }: Props) {
+  // o toggle só existe se houver recorte da empresa do usuário
+  const temToggle = !!(minhaEmpresa && empresaNome)
+  const modoEfetivo: Modo = temToggle ? modo : 'geral'
+  const dados = modoEfetivo === 'minha_empresa' && minhaEmpresa ? minhaEmpresa : geral
+  const mostrarRepresentacoes = modoEfetivo === 'geral' // some no modo "minha representação"
+
   const vazio =
-    campeoes.vendedores.length === 0 &&
-    campeoes.equipes.length === 0 &&
-    campeoes.representacoes.length === 0
+    dados.vendedores.length === 0 &&
+    dados.equipes.length === 0 &&
+    (!mostrarRepresentacoes || dados.representacoes.length === 0)
 
   return (
     <div className="card-dark relative overflow-hidden p-5 h-full anim-fade-up">
       {/* luz dourada atravessando o card a cada ~6s */}
       <span className="shimmer-cross" aria-hidden="true" />
 
-      <div className="relative flex items-center gap-2 mb-4">
+      <div className="relative mb-4 flex flex-wrap items-center gap-x-2 gap-y-2">
         <Medal size={16} style={{ color: 'var(--accent)' }} />
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{titulo}</h3>
             {badge && (
@@ -115,15 +146,25 @@ export default function CampeoesCard({ titulo, subtitulo, badge, campeoes, vazio
           </div>
           {subtitulo && <p className="text-[11px]" style={{ color: 'var(--muted-color)' }}>{subtitulo}</p>}
         </div>
+
+        {/* toggle Master / Minha representação */}
+        {temToggle && (
+          <div className="flex items-center gap-1.5">
+            <Pill ativo={modoEfetivo === 'geral'} onClick={() => onModoChange('geral')}>🌎 Master</Pill>
+            <Pill ativo={modoEfetivo === 'minha_empresa'} onClick={() => onModoChange('minha_empresa')}>🏢 {empresaNome}</Pill>
+          </div>
+        )}
       </div>
 
       {vazio ? (
         <p className="relative text-sm py-6 text-center" style={{ color: 'var(--muted-color)' }}>{vazioLabel || 'Nenhuma venda no período ainda'}</p>
       ) : (
         <div className="relative flex flex-col gap-5 sm:flex-row sm:gap-4">
-          <Coluna titulo="Vendedores" emoji="🥇" itens={campeoes.vendedores} delayBase={0} />
-          <Coluna titulo="Equipes" emoji="🛡️" itens={campeoes.equipes} delayBase={120} />
-          <Coluna titulo="Representações" emoji="🏢" itens={campeoes.representacoes} delayBase={240} />
+          <Coluna titulo="Vendedores" emoji="🥇" itens={dados.vendedores} delayBase={0} />
+          <Coluna titulo="Equipes" emoji="🛡️" itens={dados.equipes} delayBase={120} />
+          {mostrarRepresentacoes && (
+            <Coluna titulo="Representações" emoji="🏢" itens={dados.representacoes} delayBase={240} />
+          )}
         </div>
       )}
     </div>

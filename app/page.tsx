@@ -14,6 +14,7 @@ import {
 
 interface Campeao { nome: string; foto?: string | null; equipe?: string | null; empresa?: string | null; logo?: string | null; valor: number }
 interface Campeoes { vendedores: Campeao[]; equipes: Campeao[]; representacoes: Campeao[] }
+interface CampeoesDuplo { geral: Campeoes; minha_empresa: Campeoes | null }
 interface Aviso { id: string; titulo: string; mensagem: string; tipo: string; fixado: boolean; criado_em: string }
 
 interface DashData {
@@ -22,8 +23,9 @@ interface DashData {
   meta: { valor: number; vendido_master: number; dias_restantes: number; ritmo_necessario: number; pct: number; producao_nome: string | null; cotas_master: number }
   minha_operacao: { empresa_nome: string; vendido: number; cotas: number; ticket: number; pct_da_master: number } | null
   minha_fatia_master: { empresa_nome: string; vendido: number; cotas: number; pct_da_producao: number } | null
-  campeoes_mes: Campeoes
-  melhores_semana: Campeoes
+  campeoes_mes: CampeoesDuplo
+  melhores_semana: CampeoesDuplo
+  minha_empresa_nome: string | null
   lances_alerta: { pendentes: number; pendentes_proxima_assembleia: number; data_assembleia_proxima: string | null; ofertados_aguardando: number }
   lances_minha_empresa: { pendentes: number; pendentes_proxima_assembleia: number; data_assembleia_proxima: string | null; ofertados_aguardando: number } | null
   vencimentos: { data: string; cliente: string; grupo: string; cota: string; valor: number }[]
@@ -48,6 +50,16 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashData | null>(null)
   const [loading, setLoading] = useState(true)
   const [modalAviso, setModalAviso] = useState(false)
+  // toggle Master / Minha representação — compartilhado pelos dois cards Top 3, persiste na sessão
+  const [modoCampeoes, setModoCampeoes] = useState<'geral' | 'minha_empresa'>('geral')
+  useEffect(() => {
+    const salvo = sessionStorage.getItem('dash_modo_campeoes')
+    if (salvo === 'geral' || salvo === 'minha_empresa') setModoCampeoes(salvo)
+  }, [])
+  const trocarModoCampeoes = (m: 'geral' | 'minha_empresa') => {
+    setModoCampeoes(m)
+    sessionStorage.setItem('dash_modo_campeoes', m)
+  }
 
   const carregar = () => {
     fetch('/api/dashboard').then((r) => r.json()).then((d) => { if (!d.error) setData(d); setLoading(false) }).catch(() => setLoading(false))
@@ -183,10 +195,10 @@ export default function DashboardPage() {
               )}
 
               {/* ═══ LINHA 2: TOP 3 DO MÊS (largura total, 3 colunas) ═══ */}
-              <CampeoesCard titulo="🏆 Top 3 do Mês" subtitulo="Produção corrente" campeoes={data.campeoes_mes} />
+              <CampeoesCard titulo="🏆 Top 3 do Mês" subtitulo="Produção corrente" geral={data.campeoes_mes.geral} minhaEmpresa={data.campeoes_mes.minha_empresa} empresaNome={data.minha_empresa_nome} modo={modoCampeoes} onModoChange={trocarModoCampeoes} />
 
               {/* ═══ LINHA 3: TOP 3 DA SEMANA (largura total, 3 colunas) ═══ */}
-              <CampeoesCard titulo="⚡ Top 3 da Semana" subtitulo="Domingo a sábado" badge="dom–sáb" campeoes={data.melhores_semana} vazioLabel="Nenhuma venda no período ainda" />
+              <CampeoesCard titulo="⚡ Top 3 da Semana" subtitulo="Domingo a sábado" badge="dom–sáb" geral={data.melhores_semana.geral} minhaEmpresa={data.melhores_semana.minha_empresa} empresaNome={data.minha_empresa_nome} modo={modoCampeoes} onModoChange={trocarModoCampeoes} vazioLabel="Nenhuma venda no período ainda" />
 
               {/* ═══ LINHA 4: SEUS LANCES · PRÓXIMOS VENCIMENTOS ═══ */}
               <div className="grid gap-5 lg:grid-cols-2">

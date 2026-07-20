@@ -157,16 +157,25 @@ export async function GET() {
       }
     }
 
-    // 3. CAMPEÕES DO MÊS (produção corrente, geral)
-    const campeoes_mes = calcularCampeoes(listaProd)
+    // 3. CAMPEÕES DO MÊS — geral + recorte da própria empresa (para o toggle no card)
+    const campeoes_mes = {
+      geral: calcularCampeoes(listaProd),
+      minha_empresa: me.empresa_id ? calcularCampeoes(listaProd.filter((v) => v.empresa_id === me.empresa_id)) : null,
+    }
 
-    // 4. MELHORES DA SEMANA (domingo → hoje, geral)
+    // 4. MELHORES DA SEMANA (domingo → hoje) — geral + recorte da própria empresa
     const inicioSemana = inicioSemanaDomingoISO()
     const { data: vendasSemana } = await supabaseAdmin
       .from('vendas')
       .select('valor_credito, vendedor_id, equipe_id, empresa_id, usuarios:vendedor_id(nome, foto_url, placeholder), equipes(nome), empresas(nome, logo_url)')
       .gte('data_venda', inicioSemana).lte('data_venda', hoje)
-    const melhores_semana = calcularCampeoes((vendasSemana || []) as any[])
+    const listaSemana = (vendasSemana || []) as any[]
+    const melhores_semana = {
+      geral: calcularCampeoes(listaSemana),
+      minha_empresa: me.empresa_id ? calcularCampeoes(listaSemana.filter((v) => v.empresa_id === me.empresa_id)) : null,
+    }
+    // nome da empresa do usuário (rótulo do toggle "Minha representação")
+    const minha_empresa_nome = minha_fatia_master?.empresa_nome || minha_operacao?.empresa_nome || null
 
     // 5. LANCES (alerta) — escopo por role, igual à tela de lances
     let lq = supabaseAdmin
@@ -210,7 +219,8 @@ export async function GET() {
       .from('boletos')
       .select('data_proxima_cobranca, valor_boleto, status, clientes(nome), vendas(grupo, cota)')
       .not('data_proxima_cobranca', 'is', null)
-      .neq('status', 'efetivado')
+      // a próxima cobrança pertence AOS efetivados (parcela seguinte à antecipação); só exclui cancelados
+      .neq('status', 'cancelado')
     if (!escopoGlobal && me.empresa_id) vq = vq.eq('empresa_id', me.empresa_id)
     const { data: boletos } = await vq
     const em15Str = emNdiasISO(15)
@@ -309,6 +319,7 @@ export async function GET() {
       minha_fatia_master,
       campeoes_mes,
       melhores_semana,
+      minha_empresa_nome,
       lances_alerta,
       lances_minha_empresa,
       vencimentos,
