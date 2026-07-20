@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextRequest, NextResponse } from "next/server"
+import { getEmpresasAutonomas } from '@/lib/escopo'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -33,10 +34,15 @@ export async function GET() {
     // trava de segurança: 404 (não revela que a rota existe) para qualquer role != master
     if (!me || me.role !== 'master') return NextResponse.json({ error: 'Não encontrado' }, { status: 404 })
 
+    // ISOLAMENTO: a comissão de 0,25% da matriz NÃO incide sobre empresas autônomas
+    // (financeiro_proprio). Excluímos as vendas dessas empresas do devido / a receber / a vencer.
+    const autonomasSet = new Set(await getEmpresasAutonomas())
+
     // 1. Vendas do sistema (para cruzar contrato → cliente/empresa/crédito). Contratos SEM venda ficam de fora.
-    const { data: vendas } = await supabaseAdmin
+    const { data: vendasRaw } = await supabaseAdmin
       .from('vendas')
       .select('id, valor_credito, numero_contrato, numero_proposta, empresa_id, clientes(nome), empresas(nome)')
+    const vendas = (vendasRaw || []).filter((v: any) => !(v.empresa_id && autonomasSet.has(v.empresa_id)))
     const contratoToVenda = new Map<string, any>()
     for (const v of (vendas || []) as any[]) {
       const cliente = Array.isArray(v.clientes) ? v.clientes[0] : v.clientes

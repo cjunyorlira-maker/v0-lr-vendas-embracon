@@ -15,6 +15,7 @@ const EMPRESAS_CAMPANHA = [
   '4b4088bb-ab79-4a8f-8517-6b1fdc6b0fd1', // LR Multimarcas
   '1be64a2b-2e15-416f-9eb9-8b0175d1c89f', // Grupo Marques
   'f131525b-ce2b-4eb4-a282-8e5f4cc224f2', // G.L.R Ribeirão
+  '384c3561-5ce4-4cd6-bb4e-a6899fe08a61', // CEM Negócios (autônoma)
 ]
 
 interface NavItem {

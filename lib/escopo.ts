@@ -22,3 +22,13 @@ export async function getEscopo(me: { id: string; role: string; empresa_id: stri
 
   return { escopoGlobal, empresaMatrizId }
 }
+
+// IDs das empresas com operação financeira própria (financeiro_proprio = true).
+// Elas CONTAM em produção/vitrine, mas ficam FORA do operacional/financeiro da matriz.
+export async function getEmpresasAutonomas(): Promise<string[]> {
+  const { data } = await supabaseAdmin
+    .from('empresas')
+    .select('id')
+    .eq('financeiro_proprio', true)
+  return (data || []).map((e: any) => e.id)
+}

@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
-import { getEscopo } from '@/lib/escopo'
+import { getEscopo, getEmpresasAutonomas } from '@/lib/escopo'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -247,25 +247,58 @@ export async function GET() {
     // 7. PRÓXIMA SEXTA (APENAS master e representante) — fila de mapas não pagos
     let proxima_sexta: { valor: number; data: string; fatia_empresa?: number; empresa_nome?: string } | undefined = undefined
     if (['master', 'representante'].includes(me.role)) {
-      // Os mapas do borderô são GLOBAIS (empresa_id null). Buscamos todos os pago=false
-      // (null OU da própria empresa) — vale para master e representante.
+      // ISOLAMENTO: matriz vê borderôs globais (empresa_id null) EXCLUINDO contratos de
+      // empresas autônomas; empresa autônoma vê só o próprio borderô.
+      const autonomasSet = new Set(await getEmpresasAutonomas())
+      const souAutonoma = !!(me.empresa_id && autonomasSet.has(me.empresa_id))
       const { data: mapas } = await supabaseAdmin
-        .from('mapas_comissao').select('id, empresa_id, data_encerramento, total_comissao, pago').eq('pago', false)
-      const porData = new Map<string, number>()
-      const mapaIdsPorData = new Map<string, string[]>() // data de pagamento -> ids dos mapas
+        .from('mapas_comissao').select('id, empresa_id, data_encerramento, pago').eq('pago', false)
+      // contratos de empresas autônomas (para excluir do borderô global da matriz)
+      const contratosAutonomos = new Set<string>()
+      if (autonomasSet.size > 0) {
+        const { data: vAut } = await supabaseAdmin
+          .from('vendas').select('numero_contrato, numero_proposta').in('empresa_id', Array.from(autonomasSet))
+        for (const v of (vAut || []) as any[]) {
+          const c = String(v.numero_contrato || v.numero_proposta || '').trim()
+          if (c) contratosAutonomos.add(c)
+        }
+      }
+      // mapas visíveis por data de pagamento (escopo do viewer)
+      const mapaIdsPorData = new Map<string, string[]>()
       for (const mp of (mapas || []) as any[]) {
         if (!mp.data_encerramento) continue
-        if (me.role === 'representante' && mp.empresa_id && mp.empresa_id !== me.empresa_id) continue // futuro financeiro_proprio
+        const emp = mp.empresa_id ?? null
+        const visivel = souAutonoma ? emp === me.empresa_id : emp === null // autônoma: próprios; demais: globais
+        if (!visivel) continue
         const dp = dataPagamentoMapa(mp.data_encerramento).toISOString()
-        porData.set(dp, (porData.get(dp) || 0) + (mp.total_comissao || 0))
         mapaIdsPorData.set(dp, [...(mapaIdsPorData.get(dp) || []), mp.id])
       }
-      const ordenado = Array.from(porData.entries()).sort((a, b) => a[0].localeCompare(b[0]))
-      const proxData = ordenado.length > 0 ? ordenado[0][0] : ''
-      const totalGlobalProx = ordenado.length > 0 ? ordenado[0][1] : 0
+      const datasOrdenadas = Array.from(mapaIdsPorData.keys()).sort()
+      const proxData = datasOrdenadas[0] || ''
 
-      // Fatia da empresa via cruzamento por CONTRATO (mapa_linhas não têm empresa_id):
-      // contratos da empresa × linhas dos mapas da próxima data de pagamento.
+      // linhas dos mapas da próxima data (uma leitura), com isolamento por contrato
+      const mapaIdsProx = new Set(proxData ? mapaIdsPorData.get(proxData) || [] : [])
+      let totalGlobalProx = 0
+      const porContrato: { contrato: string; valor: number }[] = []
+      if (proxData) {
+        let from = 0
+        const PAGE = 1000
+        while (true) {
+          const { data: pg } = await supabaseAdmin
+            .from('mapa_linhas').select('mapa_id, contrato, valor_comissao')
+            .order('id', { ascending: true }).range(from, from + PAGE - 1)
+          for (const l of (pg || []) as any[]) {
+            if (!mapaIdsProx.has(l.mapa_id)) continue
+            const c = String(l.contrato).trim()
+            // matriz (global): ignora contratos de autônomas
+            if (!souAutonoma && contratosAutonomos.has(c)) continue
+            totalGlobalProx += (l.valor_comissao || 0)
+            porContrato.push({ contrato: c, valor: l.valor_comissao || 0 })
+          }
+          if (!pg || pg.length < PAGE) break
+          from += PAGE
+        }
+      }
       const fatiaDaEmpresa = async (empresaId: string): Promise<number> => {
         if (!proxData) return 0
         const { data: vendasEmp } = await supabaseAdmin
@@ -275,32 +308,18 @@ export async function GET() {
           const c = String(v.numero_contrato || v.numero_proposta || '').trim()
           if (c) contratosDaEmpresa.add(c)
         }
-        const mapaIdsProx = new Set(mapaIdsPorData.get(proxData) || [])
-        let fatia = 0, from = 0
-        const PAGE = 1000
-        while (true) {
-          const { data: pg } = await supabaseAdmin
-            .from('mapa_linhas').select('mapa_id, contrato, valor_comissao')
-            .order('id', { ascending: true }).range(from, from + PAGE - 1)
-          for (const l of (pg || []) as any[]) {
-            if (!mapaIdsProx.has(l.mapa_id)) continue
-            if (contratosDaEmpresa.has(String(l.contrato).trim())) fatia += (l.valor_comissao || 0)
-          }
-          if (!pg || pg.length < PAGE) break
-          from += PAGE
-        }
-        return fatia
+        return porContrato.filter((l) => contratosDaEmpresa.has(l.contrato)).reduce((s, l) => s + l.valor, 0)
       }
 
       if (me.role === 'master') {
-        // master: valor principal GLOBAL + linha da fatia da própria empresa (SJC)
+        // master: valor principal GLOBAL (sem autônomas) + linha da fatia da própria empresa (SJC)
         proxima_sexta = { data: proxData, valor: totalGlobalProx }
         if (me.empresa_id) {
           proxima_sexta.empresa_nome = minha_fatia_master?.empresa_nome || 'Minha empresa'
           proxima_sexta.fatia_empresa = await fatiaDaEmpresa(me.empresa_id)
         }
       } else {
-        // representante: valor principal = a FATIA da empresa dele (nunca o total global)
+        // representante (inclui autônomo): valor principal = a FATIA da empresa dele
         const fatia = me.empresa_id ? await fatiaDaEmpresa(me.empresa_id) : 0
         proxima_sexta = { data: proxData, valor: fatia }
       }

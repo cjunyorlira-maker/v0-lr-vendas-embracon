@@ -16,8 +16,9 @@ const CAMPANHA_FIM = '2026-07-31'
 const LR = '4b4088bb-ab79-4a8f-8517-6b1fdc6b0fd1'      // LR Multimarcas — viagem: top 3 + supervisor
 const MARQUES = '1be64a2b-2e15-416f-9eb9-8b0175d1c89f' // Grupo Marques — viagem: top 2 + supervisor
 const GLR = 'f131525b-ce2b-4eb4-a282-8e5f4cc224f2'     // G.L.R Ribeirão — viagem: top 3 + supervisor
-const EMPRESAS_CAMPANHA = [LR, MARQUES, GLR]
-const TOP_VIAGEM: Record<string, number> = { [LR]: 3, [MARQUES]: 2, [GLR]: 3 }
+const CEM = '384c3561-5ce4-4cd6-bb4e-a6899fe08a61'     // CEM Negócios (autônoma) — viagem: top 3 + supervisor
+const EMPRESAS_CAMPANHA = [LR, MARQUES, GLR, CEM]
+const TOP_VIAGEM: Record<string, number> = { [LR]: 3, [MARQUES]: 2, [GLR]: 3, [CEM]: 3 }
 
 const first = <T,>(x: T | T[] | null | undefined): T | undefined => (Array.isArray(x) ? x[0] : x || undefined)
 const fmt = (v: number) => (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })

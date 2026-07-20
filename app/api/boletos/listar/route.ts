@@ -2,7 +2,7 @@ import { createClient } from "@supabase/supabase-js"
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
-import { getEscopo } from '@/lib/escopo'
+import { getEscopo, getEmpresasAutonomas } from '@/lib/escopo'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -10,8 +10,9 @@ const supabaseAdmin = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 )
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const incluirAutonomas = new URL(req.url).searchParams.get('incluir_autonomas') === '1'
     const cookieStore = await cookies()
     const supabaseUser = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -38,7 +39,28 @@ export async function GET() {
     }
 
     const { data } = await q
-    return NextResponse.json({ boletos: data || [], meu_role: me.role })
+
+    // ISOLAMENTO: para a MATRIZ (master/adm matriz), os boletos de empresas autônomas
+    // saem das listas/contadores/SLA por padrão. Toggle "incluir operações autônomas" para consulta.
+    // O time da própria empresa autônoma continua vendo os seus (já restrito pelo escopo acima).
+    const autonomasIds = await getEmpresasAutonomas()
+    const autonomasSet = new Set(autonomasIds)
+    let boletos = data || []
+    let ocultos_autonomas = 0
+    if (escopoGlobal && !incluirAutonomas && autonomasSet.size > 0) {
+      const antes = boletos.length
+      boletos = boletos.filter((b: any) => !(b.empresa_id && autonomasSet.has(b.empresa_id)))
+      ocultos_autonomas = antes - boletos.length
+    }
+
+    return NextResponse.json({
+      boletos,
+      meu_role: me.role,
+      escopo_global: escopoGlobal,
+      tem_autonomas: autonomasSet.size > 0,
+      incluindo_autonomas: incluirAutonomas,
+      ocultos_autonomas,
+    })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
