@@ -14,6 +14,7 @@ import {
 
 interface Campeao { nome: string; foto?: string | null; equipe?: string | null; empresa?: string | null; logo?: string | null; valor: number }
 interface Campeoes { vendedores: Campeao[]; equipes: Campeao[]; representacoes: Campeao[] }
+interface CampeoesDuplo { geral: Campeoes; minha_empresa: Campeoes | null }
 interface Aviso { id: string; titulo: string; mensagem: string; tipo: string; fixado: boolean; criado_em: string }
 
 interface DashData {
@@ -22,9 +23,11 @@ interface DashData {
   meta: { valor: number; vendido_master: number; dias_restantes: number; ritmo_necessario: number; pct: number; producao_nome: string | null; cotas_master: number }
   minha_operacao: { empresa_nome: string; vendido: number; cotas: number; ticket: number; pct_da_master: number } | null
   minha_fatia_master: { empresa_nome: string; vendido: number; cotas: number; pct_da_producao: number } | null
-  campeoes_mes: Campeoes
-  melhores_semana: Campeoes
+  campeoes_mes: CampeoesDuplo
+  melhores_semana: CampeoesDuplo
+  minha_empresa_nome: string | null
   lances_alerta: { pendentes: number; pendentes_proxima_assembleia: number; data_assembleia_proxima: string | null; ofertados_aguardando: number }
+  lances_minha_empresa: { pendentes: number; pendentes_proxima_assembleia: number; data_assembleia_proxima: string | null; ofertados_aguardando: number } | null
   vencimentos: { data: string; cliente: string; grupo: string; cota: string; valor: number }[]
   proxima_sexta?: { valor: number; data: string; fatia_empresa?: number; empresa_nome?: string }
   avisos: Aviso[]
@@ -47,6 +50,16 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashData | null>(null)
   const [loading, setLoading] = useState(true)
   const [modalAviso, setModalAviso] = useState(false)
+  // toggle Master / Minha representação — compartilhado pelos dois cards Top 3, persiste na sessão
+  const [modoCampeoes, setModoCampeoes] = useState<'geral' | 'minha_empresa'>('geral')
+  useEffect(() => {
+    const salvo = sessionStorage.getItem('dash_modo_campeoes')
+    if (salvo === 'geral' || salvo === 'minha_empresa') setModoCampeoes(salvo)
+  }, [])
+  const trocarModoCampeoes = (m: 'geral' | 'minha_empresa') => {
+    setModoCampeoes(m)
+    sessionStorage.setItem('dash_modo_campeoes', m)
+  }
 
   const carregar = () => {
     fetch('/api/dashboard').then((r) => r.json()).then((d) => { if (!d.error) setData(d); setLoading(false) }).catch(() => setLoading(false))
@@ -182,21 +195,24 @@ export default function DashboardPage() {
               )}
 
               {/* ═══ LINHA 2: TOP 3 DO MÊS (largura total, 3 colunas) ═══ */}
-              <CampeoesCard titulo="🏆 Top 3 do Mês" subtitulo="Produção corrente" campeoes={data.campeoes_mes} />
+              <CampeoesCard titulo="🏆 Top 3 do Mês" subtitulo="Produção corrente" geral={data.campeoes_mes.geral} minhaEmpresa={data.campeoes_mes.minha_empresa} empresaNome={data.minha_empresa_nome} modo={modoCampeoes} onModoChange={trocarModoCampeoes} />
 
               {/* ═══ LINHA 3: TOP 3 DA SEMANA (largura total, 3 colunas) ═══ */}
-              <CampeoesCard titulo="⚡ Top 3 da Semana" subtitulo="Domingo a sábado" badge="dom–sáb" campeoes={data.melhores_semana} vazioLabel="Nenhuma venda no período ainda" />
+              <CampeoesCard titulo="⚡ Top 3 da Semana" subtitulo="Domingo a sábado" badge="dom–sáb" geral={data.melhores_semana.geral} minhaEmpresa={data.melhores_semana.minha_empresa} empresaNome={data.minha_empresa_nome} modo={modoCampeoes} onModoChange={trocarModoCampeoes} vazioLabel="Nenhuma venda no período ainda" />
 
               {/* ═══ LINHA 4: SEUS LANCES · PRÓXIMOS VENCIMENTOS ═══ */}
               <div className="grid gap-5 lg:grid-cols-2">
-                {/* Seus lances */}
+                {/* Seus lances / 💎 Lances (master) */}
                 <section className="card-dark flex flex-col p-5 anim-fade-up">
                   <div className="mb-4 flex items-center gap-2">
                     <Gem size={16} style={{ color: 'var(--accent)' }} />
-                    <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Seus lances</h3>
+                    <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{isMaster ? 'Lances' : 'Seus lances'}</h3>
                   </div>
 
                   <div className="flex flex-1 flex-col gap-3">
+                    {isMaster && (
+                      <p className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--muted-color)' }}>Operação (todas)</p>
+                    )}
                     <div
                       className={`rounded-xl p-4 ${lancesUrgente ? 'pulse-vermelho' : ''}`}
                       style={{
@@ -224,6 +240,39 @@ export default function DashboardPage() {
                       <p className="font-mono text-2xl font-bold" style={{ color: 'var(--text)' }}><AnimatedNumber value={data.lances_alerta.ofertados_aguardando} /></p>
                       <p className="text-sm" style={{ color: 'var(--muted-color)' }}>ofertado{data.lances_alerta.ofertados_aguardando !== 1 ? 's' : ''} aguardando</p>
                     </div>
+
+                    {/* Master: fatia da própria empresa (mesmo dourado sutil da faixa "Sua Operação") */}
+                    {isMaster && data.lances_minha_empresa && (() => {
+                      const me = data.lances_minha_empresa!
+                      const meUrgente = !!(me.data_assembleia_proxima && me.pendentes_proxima_assembleia > 0)
+                      return (
+                        <div
+                          className={`rounded-xl p-4 ${meUrgente ? 'pulse-vermelho' : ''}`}
+                          style={{
+                            background: 'rgba(212,175,55,0.07)',
+                            border: `1px solid ${meUrgente ? 'rgba(239,68,68,0.35)' : 'rgba(212,175,55,0.18)'}`,
+                          }}
+                        >
+                          <div className="mb-2 flex items-center gap-2">
+                            <span className="shrink-0 leading-none" style={{ fontSize: 14 }} role="img" aria-label="Empresa">🏢</span>
+                            <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--accent)' }}>
+                              {data.minha_fatia_master?.empresa_nome || 'Sua empresa'}
+                            </span>
+                          </div>
+                          <p className="text-sm" style={{ color: 'var(--muted-color)' }}>
+                            <span className="font-mono text-lg font-bold" style={{ color: meUrgente ? '#ef4444' : 'var(--text)' }}>{me.pendentes}</span> pendente{me.pendentes !== 1 ? 's' : ''}
+                            {' · '}
+                            <span className="font-mono text-lg font-bold" style={{ color: 'var(--text)' }}>{me.ofertados_aguardando}</span> ofertado{me.ofertados_aguardando !== 1 ? 's' : ''}
+                          </p>
+                          {me.pendentes_proxima_assembleia > 0 && (
+                            <p className="mt-1 text-xs font-semibold" style={{ color: '#ef4444' }}>
+                              {me.pendentes_proxima_assembleia} com assembleia nos próximos 7 dias
+                              {me.data_assembleia_proxima && <> · próx. {fmtData(me.data_assembleia_proxima)}</>}
+                            </p>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </div>
 
                   <Link href="/lances" className="mt-4 flex items-center justify-center gap-1.5 rounded-lg py-2.5 text-sm font-semibold transition-colors" style={{ background: 'rgba(212,175,55,0.1)', border: '1px solid rgba(212,175,55,0.3)', color: 'var(--accent)' }}>
