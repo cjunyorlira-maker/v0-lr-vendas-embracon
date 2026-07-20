@@ -16,38 +16,86 @@ interface Props {
   subtitulo?: string
   badge?: string // ex.: "dom–sáb"
   campeoes: {
-    vendedor: Campeao | null
-    equipe: (Campeao & { empresa?: string | null }) | null
-    representacao: (Campeao & { logo?: string | null }) | null
+    vendedores: Campeao[]
+    equipes: Campeao[]
+    representacoes: Campeao[]
   }
-  destaque?: boolean
+  vazioLabel?: string
 }
 
 const fmtMoeda = (v: number) =>
   (v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })
 
-function Iniciais({ nome }: { nome: string }) {
+const MEDALHAS = ['🥇', '🥈', '🥉']
+
+function Iniciais({ nome, size }: { nome: string; size: number }) {
   const ini = nome.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase()
-  return <span className="text-sm font-bold" style={{ color: 'var(--accent)' }}>{ini || '?'}</span>
+  return <span className="font-bold" style={{ color: 'var(--accent)', fontSize: size }}>{ini || '?'}</span>
 }
 
-export default function CampeoesCard({ titulo, subtitulo, badge, campeoes, destaque }: Props) {
-  const linhas: {
-    label: string; emoji: string; nome: string; foto?: string | null;
-    logo?: string | null; sub?: string | null; valor: number;
-  }[] = [
-    campeoes.vendedor && {
-      label: 'Vendedor', emoji: '🥇', nome: campeoes.vendedor.nome, foto: campeoes.vendedor.foto,
-      sub: [campeoes.vendedor.equipe, campeoes.vendedor.empresa].filter(Boolean).join(' · ') || null,
-      valor: campeoes.vendedor.valor,
-    },
-    campeoes.equipe && {
-      label: 'Equipe', emoji: '🛡️', nome: campeoes.equipe.nome, sub: campeoes.equipe.empresa || null, valor: campeoes.equipe.valor,
-    },
-    campeoes.representacao && {
-      label: 'Representação', emoji: '🏢', nome: campeoes.representacao.nome, logo: campeoes.representacao.logo, sub: null, valor: campeoes.representacao.valor,
-    },
-  ].filter(Boolean) as any
+/** pódio vertical compacto de uma categoria (top 3) */
+function Coluna({ titulo, emoji, itens, delayBase }: { titulo: string; emoji: string; itens: Campeao[]; delayBase: number }) {
+  return (
+    <div className="flex-1 min-w-0">
+      <div className="flex items-center gap-1.5 mb-2.5">
+        <span className="leading-none" style={{ fontSize: 14 }} role="img" aria-label={titulo}>{emoji}</span>
+        <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--muted-color)' }}>{titulo}</span>
+      </div>
+
+      {itens.length === 0 ? (
+        <p className="text-[11px] py-2" style={{ color: 'var(--muted-color)' }}>—</p>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          {itens.map((it, i) => {
+            const primeiro = i === 0
+            const av = primeiro ? 40 : 28
+            return (
+              <div
+                key={i}
+                className="anim-fade-up flex items-center gap-2 rounded-lg"
+                style={{
+                  animationDelay: `${delayBase + i * 70}ms`,
+                  padding: primeiro ? '8px' : '5px 8px',
+                  background: primeiro ? 'rgba(212,175,55,0.08)' : 'rgba(255,255,255,0.02)',
+                  border: `1px solid ${primeiro ? 'rgba(212,175,55,0.25)' : 'var(--border)'}`,
+                }}
+              >
+                <span className="shrink-0 leading-none" style={{ fontSize: primeiro ? 18 : 14 }} role="img" aria-label={`${i + 1}º`}>{MEDALHAS[i]}</span>
+
+                {/* avatar/escudo — 1º com anel dourado + glow */}
+                <div
+                  className={`relative flex shrink-0 items-center justify-center overflow-hidden rounded-full ${primeiro ? 'anel-dourado' : ''}`}
+                  style={{ height: av, width: av, background: it.logo ? 'rgba(255,255,255,0.95)' : 'rgba(212,175,55,0.12)', border: primeiro ? undefined : '1px solid var(--border)' }}
+                >
+                  {it.foto ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={it.foto || "/placeholder.svg"} alt={it.nome} className="h-full w-full object-cover" crossOrigin="anonymous" />
+                  ) : it.logo ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={it.logo || "/placeholder.svg"} alt={it.nome} className="h-full w-full object-contain p-0.5" crossOrigin="anonymous" />
+                  ) : (
+                    <Iniciais nome={it.nome} size={primeiro ? 14 : 11} />
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-semibold" style={{ color: 'var(--text)', fontSize: primeiro ? 13 : 12 }}>{it.nome}</p>
+                  <p className="truncate font-mono font-bold" style={{ color: 'var(--accent)', fontSize: primeiro ? 12 : 11 }}>{fmtMoeda(it.valor)}</p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default function CampeoesCard({ titulo, subtitulo, badge, campeoes, vazioLabel }: Props) {
+  const vazio =
+    campeoes.vendedores.length === 0 &&
+    campeoes.equipes.length === 0 &&
+    campeoes.representacoes.length === 0
 
   return (
     <div className="card-dark relative overflow-hidden p-5 h-full anim-fade-up">
@@ -69,44 +117,13 @@ export default function CampeoesCard({ titulo, subtitulo, badge, campeoes, desta
         </div>
       </div>
 
-      {linhas.length === 0 ? (
-        <p className="relative text-sm py-6 text-center" style={{ color: 'var(--muted-color)' }}>Nenhuma venda no período ainda</p>
+      {vazio ? (
+        <p className="relative text-sm py-6 text-center" style={{ color: 'var(--muted-color)' }}>{vazioLabel || 'Nenhuma venda no período ainda'}</p>
       ) : (
-        <div className="relative flex flex-col gap-2.5">
-          {linhas.map((l, i) => (
-            <div
-              key={l.label}
-              className="anim-fade-up flex items-center gap-3 rounded-xl p-3"
-              style={{
-                animationDelay: `${i * 80}ms`,
-                background: i === 0 && destaque ? 'rgba(212,175,55,0.08)' : 'rgba(255,255,255,0.02)',
-                border: `1px solid ${i === 0 && destaque ? 'rgba(212,175,55,0.25)' : 'var(--border)'}`,
-              }}
-            >
-              {/* avatar/escudo com anel dourado + glow */}
-              <div className="anel-dourado relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full" style={{ background: l.logo ? 'rgba(255,255,255,0.95)' : 'rgba(212,175,55,0.12)' }}>
-                {l.foto ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={l.foto || "/placeholder.svg"} alt={l.nome} className="h-full w-full object-cover" crossOrigin="anonymous" />
-                ) : l.logo ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={l.logo || "/placeholder.svg"} alt={l.nome} className="h-full w-full object-contain p-1" crossOrigin="anonymous" />
-                ) : (
-                  <Iniciais nome={l.nome} />
-                )}
-              </div>
-
-              {/* medalha/categoria grande (22px) */}
-              <span className="shrink-0 leading-none" style={{ fontSize: 22 }} role="img" aria-label={l.label}>{l.emoji}</span>
-
-              <div className="min-w-0 flex-1">
-                <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: 'var(--muted-color)' }}>{l.label}</span>
-                <p className="truncate text-sm font-semibold" style={{ color: 'var(--text)' }}>{l.nome}</p>
-                {l.sub && <p className="truncate text-[11px]" style={{ color: 'var(--muted-color)' }}>{l.sub}</p>}
-              </div>
-              <span className="shrink-0 font-mono text-sm font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(l.valor)}</span>
-            </div>
-          ))}
+        <div className="relative flex flex-col gap-5 sm:flex-row sm:gap-4">
+          <Coluna titulo="Vendedores" emoji="🥇" itens={campeoes.vendedores} delayBase={0} />
+          <Coluna titulo="Equipes" emoji="🛡️" itens={campeoes.equipes} delayBase={120} />
+          <Coluna titulo="Representações" emoji="🏢" itens={campeoes.representacoes} delayBase={240} />
         </div>
       )}
     </div>

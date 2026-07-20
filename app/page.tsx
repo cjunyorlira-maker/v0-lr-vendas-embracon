@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 
 interface Campeao { nome: string; foto?: string | null; equipe?: string | null; empresa?: string | null; logo?: string | null; valor: number }
-interface Campeoes { vendedor: Campeao | null; equipe: Campeao | null; representacao: Campeao | null }
+interface Campeoes { vendedores: Campeao[]; equipes: Campeao[]; representacoes: Campeao[] }
 interface Aviso { id: string; titulo: string; mensagem: string; tipo: string; fixado: boolean; criado_em: string }
 
 interface DashData {
@@ -229,13 +229,6 @@ export default function DashboardPage() {
                   )}
                 </section>
 
-                <CampeoesCard titulo="Campeões do mês" subtitulo="Produção corrente" campeoes={data.campeoes_mes} destaque />
-              </div>
-
-              {/* ═══ LINHA 3: MELHORES DA SEMANA · SEUS LANCES ═══ */}
-              <div className="grid gap-5 lg:grid-cols-2">
-                <CampeoesCard titulo="Melhores da semana" subtitulo="Domingo a sábado" badge="dom–sáb" campeoes={data.melhores_semana} />
-
                 {/* Seus lances */}
                 <section className="card-dark flex flex-col p-5 anim-fade-up">
                   <div className="mb-4 flex items-center gap-2">
@@ -279,7 +272,13 @@ export default function DashboardPage() {
                 </section>
               </div>
 
-              {/* ═══ LINHA 4: PRÓXIMOS VENCIMENTOS · QUADRO DE AVISOS ═══ */}
+              {/* ═══ LINHA 3: TOP 3 DO MÊS (largura total, 3 colunas) ═══ */}
+              <CampeoesCard titulo="🏆 Top 3 do Mês" subtitulo="Produção corrente" campeoes={data.campeoes_mes} />
+
+              {/* ═══ LINHA 4: TOP 3 DA SEMANA (largura total, 3 colunas) ═══ */}
+              <CampeoesCard titulo="⚡ Top 3 da Semana" subtitulo="Domingo a sábado" badge="dom–sáb" campeoes={data.melhores_semana} vazioLabel="Nenhuma venda no período ainda" />
+
+              {/* ═══ LINHA 5: PRÓXIMOS VENCIMENTOS · QUADRO DE AVISOS ═══ */}
               <div className="grid gap-5 lg:grid-cols-2">
                 {/* Próximos vencimentos */}
                 <section className="card-dark p-5 anim-fade-up">

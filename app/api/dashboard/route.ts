@@ -65,13 +65,13 @@ function calcularCampeoes(vendas: any[]) {
       it.valor += cred; if (!it.equipe && eq?.nome) it.equipe = eq.nome; if (!it.empresa && emp?.nome) it.empresa = emp.nome; vendMap.set(v.vendedor_id, it)
     }
   }
-  const topVend = Array.from(vendMap.values()).sort((a, b) => b.valor - a.valor)[0] || null
-  const topEq = Array.from(eqMap.values()).sort((a, b) => b.valor - a.valor)[0] || null
-  const topEmp = Array.from(empMap.values()).sort((a, b) => b.valor - a.valor)[0] || null
+  // TOP 3 de cada categoria (ordenado desc, só com valor > 0)
+  const top3 = <T extends { valor: number }>(m: Map<string, T>) =>
+    Array.from(m.values()).filter((x) => x.valor > 0).sort((a, b) => b.valor - a.valor).slice(0, 3)
   return {
-    vendedor: topVend ? { nome: topVend.nome, foto: topVend.foto || null, equipe: topVend.equipe || null, empresa: topVend.empresa || null, valor: topVend.valor } : null,
-    equipe: topEq ? { nome: topEq.nome, empresa: topEq.empresa || null, valor: topEq.valor } : null,
-    representacao: topEmp ? { nome: topEmp.nome, logo: topEmp.logo || null, valor: topEmp.valor } : null,
+    vendedores: top3(vendMap).map((v) => ({ nome: v.nome, foto: v.foto || null, equipe: v.equipe || null, empresa: v.empresa || null, valor: v.valor })),
+    equipes: top3(eqMap).map((e) => ({ nome: e.nome, empresa: e.empresa || null, valor: e.valor })),
+    representacoes: top3(empMap).map((r) => ({ nome: r.nome, logo: r.logo || null, valor: r.valor })),
   }
 }
 
