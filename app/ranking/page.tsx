@@ -149,6 +149,7 @@ export default function RankingPage() {
   const [producaoId, setProducaoId] = useState('')
   const [periodo, setPeriodo] = useState<'' | 'semana' | 'ano'>('')
   const [loading, setLoading] = useState(true)
+  const [trocando, setTrocando] = useState(false) // esmaece a lista em trocas intencionais (não no auto-refresh)
   const [modo, setModo] = useState<'vendedor' | 'equipe' | 'representante'>('vendedor')
   const [escopo, setEscopo] = useState<'operacao' | 'geral'>('operacao')
   const [role, setRole] = useState('')
@@ -187,7 +188,7 @@ export default function RankingPage() {
   // auto-refresh de 60s no modo tel��o OU no Ranking Geral (tempo real)
   useEffect(() => {
     if (!telao && escopo !== 'geral') return
-    const id = setInterval(() => loadData(), 60000)
+    const id = setInterval(() => loadData(true), 60000)
     return () => clearInterval(id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [telao, escopo, modo, fEmpresa, producaoId, periodo])
@@ -242,10 +243,12 @@ export default function RankingPage() {
     return f
   }, [ranking, variacao, reiSemana, destaques, producoes, producaoId, periodo])
 
-  async function loadData() {
+  async function loadData(isRefresh = false) {
     const meuReq = ++reqSeq.current // sequência desta requisição
     // spinner só quando ainda não há dados; refreshes trocam os dados em background sem desmontar a tela
     if (ranking.length === 0) setLoading(true)
+    // troca intencional do usuário com dados já na tela: esmaece a lista até a resposta chegar
+    else if (!isRefresh) setTrocando(true)
     const params = (extra: string) => {
       let u = `/api/ranking?modo=${modo}${extra}`
       if (escopo === 'geral') u += `&escopo=geral`
@@ -296,7 +299,7 @@ export default function RankingPage() {
         setTimeout(() => setJaAnimou(true), 900)
       }
     }
-    if (meuReq === reqSeq.current) setLoading(false)
+    if (meuReq === reqSeq.current) { setLoading(false); setTrocando(false) }
   }
 
   async function toggleTelao() {
@@ -468,7 +471,7 @@ export default function RankingPage() {
       ) : ranking.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-12 gap-2"><Trophy size={32} style={{ color: 'var(--muted-color)' }} /><p className="text-sm" style={{ color: 'var(--muted-color)' }}>Nenhuma venda no período</p></div>
       ) : (
-        <>
+        <div style={{ transition: 'opacity 150ms ease', opacity: trocando ? 0.35 : 1, pointerEvents: trocando ? 'none' : 'auto' }}>
           <Ticker frases={frasesTicker} />
           {escopo === 'geral' && ranking.length >= 2 && (
             <div className={`rounded-xl px-4 py-2.5 mb-5 flex items-center gap-2 ${animCls}`} style={{ background: 'linear-gradient(90deg, rgba(212,175,55,0.12), rgba(0,0,0,0.12))', border: '1px solid rgba(212,175,55,0.25)' }}>
@@ -538,7 +541,7 @@ export default function RankingPage() {
             </p>
           )}
 
-        </>
+        </div>
       )}
     </>
   )
@@ -637,6 +640,8 @@ export default function RankingPage() {
             })}
           </div>
         )}
+        {/* mini spinner discreto: só durante trocas intencionais (não no auto-refresh) */}
+        {trocando && <Loader2 size={16} className="animate-spin shrink-0" style={{ color: 'var(--accent)' }} />}
         {empresas.length > 0 && escopo !== 'geral' && (
           <select value={fEmpresa} onChange={(e) => setFEmpresa(e.target.value)} className="rounded-full px-4 py-2 text-[13px] outline-none cursor-pointer" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)', color: 'var(--text2)' }}>
             <option value="" style={{ background: '#131313' }}>Todas as empresas</option>
