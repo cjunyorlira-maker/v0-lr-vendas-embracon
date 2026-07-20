@@ -251,7 +251,10 @@ export async function GET(req: NextRequest) {
       producao_ativa: producaoAtiva,
       periodo_tipo: periodoParam || null,
       periodo: { inicio, fim },
+      // ── eco dos parâmetros que geraram ESTA resposta (blindagem anti-resposta-trocada) ──
       modo,
+      escopo: escopoGeral ? 'geral' : 'operacao',
+      producao_id: producaoIdParam || null,
       meu_role: me.role,
       rei_semana: game.rei_semana,
       semana_atual_lider: game.semana_atual_lider,
@@ -259,7 +262,7 @@ export async function GET(req: NextRequest) {
       fixos,
       // transparência (só modo equipe): total excluído por não ter equipe definida
       fora_do_ranking: foraDoRanking,
-    })
+    }, { headers: { 'Cache-Control': 'no-store, max-age=0' } })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
   }
