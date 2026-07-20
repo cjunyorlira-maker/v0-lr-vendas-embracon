@@ -8,8 +8,8 @@ import AnimatedNumber from '@/components/dashboard/AnimatedNumber'
 import CampeoesCard from '@/components/dashboard/CampeoesCard'
 import NovoAvisoModal from '@/components/dashboard/NovoAvisoModal'
 import {
-  Target, Building2, Gem, CalendarClock, Megaphone, Plus, Pin, ArrowRight,
-  TrendingUp, Wallet, Trash2,
+  Target, Gem, CalendarClock, Megaphone, Plus, Pin, ArrowRight,
+  Wallet, Trash2,
 } from 'lucide-react'
 
 interface Campeao { nome: string; foto?: string | null; equipe?: string | null; empresa?: string | null; logo?: string | null; valor: number }
@@ -128,6 +128,27 @@ export default function DashboardPage() {
                     <AnimatedNumber value={data.meta.pct} format={(n) => `${n.toFixed(1)}%`} />
                   </p>
                 </div>
+
+                {/* faixa de destaque: a operação do usuário, colada ao termômetro (parte do bloco da meta) */}
+                {(isMaster ? data.minha_fatia_master : data.minha_operacao) && (() => {
+                  const op = isMaster ? data.minha_fatia_master! : data.minha_operacao!
+                  const pct = isMaster ? data.minha_fatia_master!.pct_da_producao : data.minha_operacao!.pct_da_master
+                  return (
+                    <div
+                      className="-mx-6 -mb-6 mt-5 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-b-2xl px-6 py-4"
+                      style={{ background: 'rgba(212,175,55,0.07)', borderTop: '1px solid rgba(212,175,55,0.18)' }}
+                    >
+                      <span className="shrink-0 leading-none" style={{ fontSize: 16 }} role="img" aria-label="Operação">🏢</span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--accent)' }}>Sua operação</span>
+                      <span className="truncate text-sm font-semibold" style={{ color: 'var(--text)' }}>{op.empresa_nome}</span>
+                      <span className="ml-auto text-xs" style={{ color: 'var(--muted-color)' }}>
+                        <span className="font-mono font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(op.vendido)}</span>
+                        {' · '}{op.cotas} cotas
+                        {' · '}<span className="font-semibold" style={{ color: 'var(--accent)' }}>{pct.toFixed(1)}%</span> da produção Master
+                      </span>
+                    </div>
+                  )
+                })()}
               </section>
 
               {/* ═══ CARD EXTRA: PRÓXIMA SEXTA (só master/representante) ═══ */}
@@ -160,75 +181,8 @@ export default function DashboardPage() {
                 </section>
               )}
 
-              {/* ═══ LINHA 2: SUA OPERAÇÃO · CAMPEÕES DO MÊS ═══ */}
+              {/* ═══ LINHA 2: SEUS LANCES · PRÓXIMOS VENCIMENTOS ═══ */}
               <div className="grid gap-5 lg:grid-cols-2">
-                {/* Sua Operação / Consolidado */}
-                <section className="card-dark p-5 anim-fade-up">
-                  <div className="mb-4 flex items-center gap-2">
-                    <Building2 size={16} style={{ color: 'var(--accent)' }} />
-                    <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>
-                      {isMaster ? 'Operação consolidada' : 'Sua operação'}
-                    </h3>
-                  </div>
-                  {isMaster ? (
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)' }}>
-                        <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Vendido (todas)</p>
-                        <p className="mt-1 font-mono text-xl font-bold" style={{ color: 'var(--accent)' }}><AnimatedNumber value={data.meta.vendido_master} format={fmtMoeda} /></p>
-                      </div>
-                      <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)' }}>
-                        <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Cotas</p>
-                        <p className="mt-1 font-mono text-xl font-bold" style={{ color: 'var(--text)' }}><AnimatedNumber value={data.meta.cotas_master} /></p>
-                      </div>
-                      <div className="col-span-2 rounded-xl p-4" style={{ background: 'rgba(212,175,55,0.06)', border: '1px solid rgba(212,175,55,0.2)' }}>
-                        <div className="flex items-center gap-2">
-                          <TrendingUp size={14} style={{ color: 'var(--accent)' }} />
-                          <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Progresso da meta</p>
-                        </div>
-                        <p className="mt-1 font-mono text-lg font-bold" style={{ color: 'var(--accent)' }}>{data.meta.pct.toFixed(1)}%</p>
-                      </div>
-                      {/* fatia da própria empresa do master */}
-                      {data.minha_fatia_master && (
-                        <div className="col-span-2 flex flex-wrap items-center justify-between gap-2 rounded-xl p-3.5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border)' }}>
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="shrink-0 leading-none" style={{ fontSize: 18 }} role="img" aria-label="Representação">🏢</span>
-                            <span className="truncate text-sm font-semibold" style={{ color: 'var(--text)' }}>{data.minha_fatia_master.empresa_nome}</span>
-                          </div>
-                          <p className="text-xs" style={{ color: 'var(--muted-color)' }}>
-                            <span className="font-mono font-bold" style={{ color: 'var(--accent)' }}>{fmtMoeda(data.minha_fatia_master.vendido)}</span>
-                            {' · '}{data.minha_fatia_master.cotas} cotas
-                            {' · '}<span className="font-semibold" style={{ color: 'var(--accent)' }}>{data.minha_fatia_master.pct_da_producao.toFixed(1)}%</span> da produção
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  ) : data.minha_operacao ? (
-                    <>
-                      <p className="mb-3 text-sm font-semibold" style={{ color: 'var(--text)' }}>{data.minha_operacao.empresa_nome}</p>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)' }}>
-                          <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Vendido</p>
-                          <p className="mt-1 font-mono text-xl font-bold" style={{ color: 'var(--accent)' }}><AnimatedNumber value={data.minha_operacao.vendido} format={fmtMoeda} /></p>
-                        </div>
-                        <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)' }}>
-                          <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Cotas</p>
-                          <p className="mt-1 font-mono text-xl font-bold" style={{ color: 'var(--text)' }}><AnimatedNumber value={data.minha_operacao.cotas} /></p>
-                        </div>
-                        <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)' }}>
-                          <p className="text-xs" style={{ color: 'var(--muted-color)' }}>Ticket médio</p>
-                          <p className="mt-1 font-mono text-lg font-bold" style={{ color: 'var(--text)' }}><AnimatedNumber value={data.minha_operacao.ticket} format={fmtMoeda} /></p>
-                        </div>
-                        <div className="rounded-xl p-4" style={{ background: 'rgba(212,175,55,0.06)', border: '1px solid rgba(212,175,55,0.2)' }}>
-                          <p className="text-xs" style={{ color: 'var(--muted-color)' }}>% da Master</p>
-                          <p className="mt-1 font-mono text-lg font-bold" style={{ color: 'var(--accent)' }}>{data.minha_operacao.pct_da_master.toFixed(1)}%</p>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <p className="py-6 text-center text-sm" style={{ color: 'var(--muted-color)' }}>Sem operação vinculada</p>
-                  )}
-                </section>
-
                 {/* Seus lances */}
                 <section className="card-dark flex flex-col p-5 anim-fade-up">
                   <div className="mb-4 flex items-center gap-2">
@@ -270,16 +224,7 @@ export default function DashboardPage() {
                     Ver lances <ArrowRight size={15} />
                   </Link>
                 </section>
-              </div>
 
-              {/* ═══ LINHA 3: TOP 3 DO MÊS (largura total, 3 colunas) ═══ */}
-              <CampeoesCard titulo="🏆 Top 3 do Mês" subtitulo="Produção corrente" campeoes={data.campeoes_mes} />
-
-              {/* ═══ LINHA 4: TOP 3 DA SEMANA (largura total, 3 colunas) ═══ */}
-              <CampeoesCard titulo="⚡ Top 3 da Semana" subtitulo="Domingo a sábado" badge="dom–sáb" campeoes={data.melhores_semana} vazioLabel="Nenhuma venda no período ainda" />
-
-              {/* ═══ LINHA 5: PRÓXIMOS VENCIMENTOS · QUADRO DE AVISOS ═══ */}
-              <div className="grid gap-5 lg:grid-cols-2">
                 {/* Próximos vencimentos */}
                 <section className="card-dark p-5 anim-fade-up">
                   <div className="mb-4 flex items-center gap-2">
@@ -308,9 +253,17 @@ export default function DashboardPage() {
                     </div>
                   )}
                 </section>
+              </div>
 
-                {/* Quadro de avisos */}
-                <section className="card-dark p-5 anim-fade-up">
+              {/* ═══ LINHA 3: TOP 3 DO MÊS (largura total, 3 colunas) ═══ */}
+              <CampeoesCard titulo="🏆 Top 3 do Mês" subtitulo="Produção corrente" campeoes={data.campeoes_mes} />
+
+              {/* ═══ LINHA 4: TOP 3 DA SEMANA (largura total, 3 colunas) ═══ */}
+              <CampeoesCard titulo="⚡ Top 3 da Semana" subtitulo="Domingo a sábado" badge="dom–sáb" campeoes={data.melhores_semana} vazioLabel="Nenhuma venda no período ainda" />
+
+              {/* ═══ LINHA 5: QUADRO DE AVISOS (largura total) ═══ */}
+              {/* Quadro de avisos */}
+              <section className="card-dark p-5 anim-fade-up">
                   <div className="mb-4 flex items-center gap-2">
                     <Megaphone size={16} style={{ color: 'var(--accent)' }} />
                     <h3 className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Quadro de avisos</h3>
@@ -359,7 +312,6 @@ export default function DashboardPage() {
                     </div>
                   )}
                 </section>
-              </div>
 
             </div>
           )}
