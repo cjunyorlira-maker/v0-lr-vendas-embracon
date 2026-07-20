@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import Sidebar from '@/components/Sidebar'
 import Header from '@/components/Header'
-import { Users, Loader2, ChevronDown, ChevronUp, Search, SlidersHorizontal, Home, Car, Truck, FileText, Target, Check, CalendarClock, Pencil, Trash2 } from 'lucide-react'
+import { Users, Loader2, ChevronDown, ChevronUp, Search, SlidersHorizontal, Home, Car, Truck, FileText, Target, Check, CalendarClock, Pencil, Trash2, Ban, RotateCcw, AlertTriangle } from 'lucide-react'
 
 interface Cota {
   venda_id: string; cliente_id: string; nome: string; cpf: string; telefone: string
@@ -13,6 +13,7 @@ interface Cota {
   vendedor: string | null; equipe_nome: string | null; vendedor_id: string; equipe_id: string; empresa_id: string
   status_boleto: string; qtd_parcelas: number; proxima_cobranca: string | null; status_cliente: string
   status_lance: string | null; checado: boolean; pdf_proposta_url: string | null; observacoes?: string | null
+  cancelada?: boolean; motivo_cancelamento?: string | null; cancelado_em?: string | null; cancelamento_dentro_prazo?: boolean | null
 }
 interface ClienteAgr { cliente_id: string; nome: string; cpf: string; telefone: string; cotas: Cota[] }
 
@@ -68,6 +69,14 @@ export default function ClientesPage() {
   const [recorrente, setRecorrente] = useState(false)
   const [clienteOfertou, setClienteOfertou] = useState(false)
   const [salvandoLance, setSalvandoLance] = useState(false)
+  // cancelamento de venda
+  const [cancelarModal, setCancelarModal] = useState<Cota | null>(null)
+  const [cancelInfo, setCancelInfo] = useState<{ dentro_prazo: boolean; tem_bordero: boolean; bordero_total: number; bordero_parcelas: number } | null>(null)
+  const [cancelInfoLoading, setCancelInfoLoading] = useState(false)
+  const [motivoCancel, setMotivoCancel] = useState('')
+  const [motivoTexto, setMotivoTexto] = useState('')
+  const [confirmBordero, setConfirmBordero] = useState(false)
+  const [salvandoCancel, setSalvandoCancel] = useState(false)
 
   useEffect(() => { load() }, [])
   async function load() {
@@ -128,6 +137,34 @@ export default function ClientesPage() {
     await fetch('/api/clientes-lista/editar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ venda_id: editarModal.venda_id, vendedor_id: edVendedor || null, equipe_id: edEquipe || null, empresa_id: edEmpresa || null, qtd_parcelas: edParcelas !== '' ? edParcelas : undefined }) })
     setSalvandoEditar(false)
     setEditarModal(null); load()
+  }
+
+  async function abrirCancelar(cota: Cota) {
+    setCancelarModal(cota); setCancelInfo(null); setMotivoCancel(''); setMotivoTexto(''); setConfirmBordero(false)
+    setCancelInfoLoading(true)
+    try {
+      const res = await fetch(`/api/vendas/cancelar?venda_id=${cota.venda_id}`)
+      const data = await res.json()
+      if (res.ok) setCancelInfo(data)
+    } catch {}
+    setCancelInfoLoading(false)
+  }
+
+  async function confirmarCancelamento() {
+    if (!cancelarModal || !motivoCancel) return
+    if (cancelInfo?.tem_bordero && !confirmBordero) return
+    setSalvandoCancel(true)
+    const res = await fetch('/api/vendas/cancelar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'cancelar', venda_id: cancelarModal.venda_id, motivo: motivoCancel, motivo_texto: motivoTexto }) })
+    setSalvandoCancel(false)
+    if (res.ok) { setCancelarModal(null); load() }
+    else { const d = await res.json(); alert(d.error || 'Erro ao cancelar') }
+  }
+
+  async function reativarVenda(cota: Cota) {
+    if (!confirm(`Reativar a venda de ${cota.nome} (${cota.grupo}/${cota.cota})? Os boletos e lances NÃO voltam automaticamente — precisam ser recriados se necessário.`)) return
+    const res = await fetch('/api/vendas/cancelar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ acao: 'reativar', venda_id: cota.venda_id }) })
+    if (res.ok) load()
+    else { const d = await res.json(); alert(d.error || 'Erro ao reativar') }
   }
 
   async function toggleChecado(cota: Cota) {
@@ -345,9 +382,22 @@ export default function ClientesPage() {
                                   {['master','representante','adm','supervisor'].includes(meuRole) && <button onClick={() => { setEditarModal(c); setEdVendedor(c.vendedor_id || ''); setEdEquipe(c.equipe_id || ''); setEdEmpresa(c.empresa_id || ''); setEdParcelas(String(c.qtd_parcelas ?? '')) }} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px]" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text2)', border: '1px solid var(--border)' }}><Pencil size={11} />Editar</button>}
                                   <button onClick={() => toggleChecado(c)} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px]" style={{ background: c.checado ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.04)', color: c.checado ? '#22c55e' : 'var(--muted-color)', border: `1px solid ${c.checado ? 'rgba(34,197,94,0.3)' : 'var(--border)'}` }}><Check size={11} />{c.checado ? 'Checado' : 'Marcar checado'}</button>
                                   <button onClick={() => baixarProposta(c)} disabled={baixando === c.venda_id} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px]" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--text2)', border: '1px solid var(--border)' }}>{baixando === c.venda_id ? <Loader2 size={11} className="animate-spin" /> : <FileText size={11} />}Proposta</button>
-                                  {!c.status_lance && <button onClick={() => setLanceModal(c)} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px]" style={{ background: 'rgba(168,85,247,0.15)', color: '#a855f7', border: '1px solid rgba(168,85,247,0.3)' }}><Target size={11} />Criar lance</button>}
+                                  {!c.status_lance && !c.cancelada && <button onClick={() => setLanceModal(c)} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px]" style={{ background: 'rgba(168,85,247,0.15)', color: '#a855f7', border: '1px solid rgba(168,85,247,0.3)' }}><Target size={11} />Criar lance</button>}
+                                  {!c.cancelada && ['master','representante','adm'].includes(meuRole) && <button onClick={() => abrirCancelar(c)} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px]" style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}><Ban size={11} />Cancelar</button>}
+                                  {c.cancelada && meuRole === 'master' && <button onClick={() => reativarVenda(c)} className="flex items-center gap-1 rounded-lg px-2 py-1 text-[10px]" style={{ background: 'rgba(34,197,94,0.12)', color: '#22c55e', border: '1px solid rgba(34,197,94,0.3)' }}><RotateCcw size={11} />Reativar</button>}
                                 </div>
                               </div>
+                              {c.cancelada && (
+                                <div className="flex items-start gap-2 rounded-lg px-3 py-2 mb-2 text-[11px]" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)', color: '#f87171' }}>
+                                  <Ban size={13} className="mt-0.5 shrink-0" />
+                                  <div>
+                                    <span className="font-semibold">Cancelada</span>
+                                    {c.motivo_cancelamento && <span> · {c.motivo_cancelamento}</span>}
+                                    {c.cancelado_em && <span> · em {fmtData(String(c.cancelado_em).slice(0, 10))}</span>}
+                                    {c.cancelamento_dentro_prazo != null && <span className="ml-1 px-1.5 py-0.5 rounded-full" style={{ background: c.cancelamento_dentro_prazo ? 'rgba(34,197,94,0.15)' : 'rgba(234,179,8,0.15)', color: c.cancelamento_dentro_prazo ? '#22c55e' : '#eab308' }}>{c.cancelamento_dentro_prazo ? 'dentro do prazo (7 dias)' : 'fora do prazo'}</span>}
+                                  </div>
+                                </div>
+                              )}
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                                 <div><span style={{ color: 'var(--muted-color)' }}>Grupo/Cota:</span> <span style={{ color: 'var(--text2)' }}>{c.grupo}/{c.cota}</span></div>
                                 <div><span style={{ color: 'var(--muted-color)' }}>Parcelas antec.:</span> <span style={{ color: 'var(--text2)' }}>{c.qtd_parcelas}</span></div>
@@ -458,6 +508,60 @@ export default function ClientesPage() {
                 <button onClick={criarLance} disabled={salvandoLance} className="flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold disabled:opacity-50" style={{ background: 'linear-gradient(135deg, #d4af37 0%, #c9a227 50%, #b8941f 100%)', color: '#0a0a0a' }}>{salvandoLance ? <Loader2 size={14} className="animate-spin" /> : 'Criar lance'}</button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal cancelar venda */}
+      {cancelarModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }} onClick={() => setCancelarModal(null)} />
+          <div className="relative w-full max-w-md rounded-xl p-6" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+            <h3 className="text-base font-semibold mb-1 flex items-center gap-2" style={{ color: 'var(--text)' }}><Ban size={16} style={{ color: '#ef4444' }} />Cancelar venda</h3>
+            <p className="text-xs mb-4" style={{ color: 'var(--muted-color)' }}>{cancelarModal.nome} · Grupo {cancelarModal.grupo}/{cancelarModal.cota}</p>
+
+            {cancelInfoLoading ? (
+              <div className="flex items-center justify-center py-8"><Loader2 size={20} className="animate-spin" style={{ color: 'var(--accent)' }} /></div>
+            ) : (
+              <div className="space-y-3">
+                {cancelInfo && (
+                  <div className="rounded-lg px-3 py-2 text-[11px]" style={{ background: cancelInfo.dentro_prazo ? 'rgba(34,197,94,0.1)' : 'rgba(234,179,8,0.1)', border: `1px solid ${cancelInfo.dentro_prazo ? 'rgba(34,197,94,0.3)' : 'rgba(234,179,8,0.3)'}`, color: cancelInfo.dentro_prazo ? '#22c55e' : '#eab308' }}>
+                    {cancelInfo.dentro_prazo ? 'Dentro do prazo de arrependimento (7 dias da venda).' : 'Fora do prazo de 7 dias — cancelamento após o período de arrependimento.'}
+                  </div>
+                )}
+                {cancelInfo?.tem_bordero && (
+                  <div className="rounded-lg px-3 py-2.5 text-[11px]" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171' }}>
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                      <div>
+                        <span className="font-semibold">Atenção: esta cota já entrou no borderô.</span>
+                        <div className="mt-0.5">{cancelInfo.bordero_parcelas} parcela(s) mapeada(s){cancelInfo.bordero_total > 0 && <> · comissão de {fmtMoeda(cancelInfo.bordero_total)}</>}. O cancelamento pode gerar estorno.</div>
+                        <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                          <input type="checkbox" checked={confirmBordero} onChange={(e) => setConfirmBordero(e.target.checked)} className="accent-red-500" />
+                          <span>Entendo e quero cancelar mesmo assim</span>
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                <div>
+                  <label className="block text-xs mb-1.5" style={{ color: 'var(--muted-color)' }}>Motivo do cancelamento</label>
+                  <div className="space-y-1.5">
+                    {([['desistencia_7dias','Desistência nos 7 dias'],['desistencia_apos','Desistência após o prazo'],['erro_cadastro','Erro de cadastro/duplicidade'],['outro','Outro']] as const).map(([k, lbl]) => (
+                      <button key={k} onClick={() => setMotivoCancel(k)} className="w-full text-left rounded-lg px-3 py-2 text-xs" style={{ background: motivoCancel === k ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)', border: `1px solid ${motivoCancel === k ? 'rgba(239,68,68,0.4)' : 'var(--border)'}`, color: motivoCancel === k ? '#f87171' : 'var(--text2)' }}>{lbl}</button>
+                    ))}
+                  </div>
+                </div>
+                {motivoCancel === 'outro' && (
+                  <input value={motivoTexto} onChange={(e) => setMotivoTexto(e.target.value)} placeholder="Descreva o motivo" className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+                )}
+                <p className="text-[10px]" style={{ color: 'var(--muted-color)' }}>Ao cancelar, os boletos da cota são cancelados e os lances ativos são encerrados. Só o master pode reverter.</p>
+                <div className="flex gap-2 pt-1">
+                  <button onClick={() => setCancelarModal(null)} className="flex-1 rounded-lg py-2.5 text-sm" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border)', color: 'var(--text2)' }}>Voltar</button>
+                  <button onClick={confirmarCancelamento} disabled={salvandoCancel || !motivoCancel || (motivoCancel === 'outro' && !motivoTexto.trim()) || (!!cancelInfo?.tem_bordero && !confirmBordero)} className="flex-1 flex items-center justify-center gap-2 rounded-lg py-2.5 text-sm font-semibold disabled:opacity-40" style={{ background: '#ef4444', color: '#fff' }}>{salvandoCancel ? <Loader2 size={14} className="animate-spin" /> : <><Ban size={14} />Cancelar venda</>}</button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

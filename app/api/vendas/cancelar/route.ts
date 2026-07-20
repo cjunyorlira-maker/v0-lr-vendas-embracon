@@ -39,16 +39,28 @@ function dentroPrazo(dataVenda: string | null): boolean {
   return limite.getTime() >= hoje.getTime()
 }
 
-// busca as linhas de borderô (mapa_linhas) que cruzam com o contrato/proposta da venda
+// busca as linhas de borderô (mapa_linhas) da venda — por venda_id (preferencial) ou contrato/proposta
 async function borderoDaVenda(venda: any): Promise<{ total: number; parcelas: number }> {
-  const chaves = [String(venda.numero_contrato || '').trim(), String(venda.numero_proposta || '').trim()].filter(Boolean)
-  if (chaves.length === 0) return { total: 0, parcelas: 0 }
-  const { data: linhas } = await supabaseAdmin
+  let linhas: any[] = []
+  // 1) match direto por venda_id
+  const { data: porVenda } = await supabaseAdmin
     .from('mapa_linhas')
     .select('valor_comissao, parcela_de, parcela_ate')
-    .in('contrato', chaves)
+    .eq('venda_id', venda.id)
+  linhas = porVenda || []
+  // 2) fallback por contrato/proposta (mapas antigos sem venda_id)
+  if (linhas.length === 0) {
+    const chaves = [String(venda.numero_contrato || '').trim(), String(venda.numero_proposta || '').trim()].filter(Boolean)
+    if (chaves.length > 0) {
+      const { data: porContrato } = await supabaseAdmin
+        .from('mapa_linhas')
+        .select('valor_comissao, parcela_de, parcela_ate')
+        .in('contrato', chaves)
+      linhas = porContrato || []
+    }
+  }
   let total = 0, parcelas = 0
-  for (const l of (linhas || []) as any[]) {
+  for (const l of linhas) {
     total += l.valor_comissao || 0
     const de = l.parcela_de || 1, ate = l.parcela_ate || de
     parcelas += Math.max(1, ate - de + 1)

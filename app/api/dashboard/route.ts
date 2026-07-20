@@ -108,6 +108,7 @@ export async function GET() {
       .from('vendas')
       .select('valor_credito, vendedor_id, equipe_id, empresa_id, data_venda, usuarios:vendedor_id(nome, foto_url, placeholder), equipes(nome), empresas(nome, logo_url)')
       .gte('data_venda', pInicio).lte('data_venda', pFim)
+      .neq('cancelada', true) // vendas canceladas não contam na produção
     const listaProd = (vendasProd || []) as any[]
 
     // 1. META (MASTER LR — global)
@@ -169,6 +170,7 @@ export async function GET() {
       .from('vendas')
       .select('valor_credito, vendedor_id, equipe_id, empresa_id, usuarios:vendedor_id(nome, foto_url, placeholder), equipes(nome), empresas(nome, logo_url)')
       .gte('data_venda', inicioSemana).lte('data_venda', hoje)
+      .neq('cancelada', true) // exclui canceladas
     const listaSemana = (vendasSemana || []) as any[]
     const melhores_semana = {
       geral: calcularCampeoes(listaSemana),

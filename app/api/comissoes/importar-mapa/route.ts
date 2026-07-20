@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
     // Busca todas as vendas pra cruzar por contrato
     const { data: vendas } = await supabaseAdmin
       .from('vendas')
-      .select('id, numero_contrato, numero_proposta, valor_credito, plano_id, planos(comissao_total)')
+      .select('id, numero_contrato, numero_proposta, valor_credito, plano_id, cancelada, clientes(nome), planos(comissao_total)')
 
     const vendaPorContrato = new Map<string, any>()
     for (const v of (vendas || []) as any[]) {
@@ -240,6 +240,20 @@ export async function POST(req: NextRequest) {
 
     const linhasEstorno = linhas.filter(l => l.valor_comissao < 0)
 
+    // ── VIGIA DE BORDERÔ: contratos deste mapa que batem em vendas CANCELADAS ──
+    // (o borderô continua vindo da Embracon mesmo após o cancelamento → alerta de possível estorno)
+    const contratosCancelados: { contrato: string; cliente: string | null; valor: number }[] = []
+    const vistosCancel = new Set<string>()
+    for (const contrato of contratosUnicos) {
+      const venda = vendaPorContrato.get(contrato)
+      if (venda?.cancelada && !vistosCancel.has(contrato)) {
+        vistosCancel.add(contrato)
+        const cli = Array.isArray(venda.clientes) ? venda.clientes[0]?.nome : venda.clientes?.nome
+        const valor = linhas.filter(l => l.contrato === contrato).reduce((s, l) => s + (l.valor_comissao || 0), 0)
+        contratosCancelados.push({ contrato, cliente: cli || null, valor })
+      }
+    }
+
     return NextResponse.json({
       success: true,
       mapa_id: mapa.id,
@@ -249,6 +263,7 @@ export async function POST(req: NextRequest) {
       contratos_nao_encontrados: naoEncontrados,
       total_estornos: linhasEstorno.reduce((s, l) => s + l.valor_comissao, 0),
       contratos_estornados: linhasEstorno.map(l => l.contrato),
+      contratos_cancelados: contratosCancelados,
     })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })
