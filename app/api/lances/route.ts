@@ -111,6 +111,12 @@ export async function GET(req: NextRequest) {
       .neq('ciclo_encerrado', true)
 
     const { escopoGlobal } = await getEscopo(me)
+    // ISOLAMENTO: kanban e régua de comprovantes da MATRIZ excluem operações autônomas por padrão.
+    // (Contemplados/vitrine seguem com todos — a autônoma conta na vitrine.)
+    const autonomasSet = new Set(await getEmpresasAutonomas())
+    const filtrarAutonomas = escopoGlobal && !incluirAutonomas && autonomasSet.size > 0
+    const semAutonomas = <T extends { empresa_id?: string | null }>(arr: T[]) =>
+      filtrarAutonomas ? arr.filter((x) => !(x.empresa_id && autonomasSet.has(x.empresa_id))) : arr
     if (escopoGlobal) { /* master ou adm matriz: vê tudo */ }
     else if (['representante', 'adm'].includes(me.role)) q = q.eq('empresa_id', me.empresa_id)
     else if (me.role === 'supervisor') q = q.eq('equipe_id', me.equipe_id)
@@ -209,9 +215,19 @@ export async function GET(req: NextRequest) {
       const { data: vd } = await supabaseAdmin.from('usuarios').select('id, nome, empresa_id, equipe_id').in('role', ['vendedor', 'supervisor']).eq('equipe_id', me.equipe_id).order('nome'); vendedoresOpc = vd || []
     }
 
+    const lancesVisiveis = semAutonomas(lancesEnriq)
+    const comprovantesVisiveis = semAutonomas(comprovantes_nao_baixados)
+    const ocultosAutonomas = filtrarAutonomas
+      ? (lancesEnriq.length - lancesVisiveis.length) + (comprovantes_nao_baixados.length - comprovantesVisiveis.length)
+      : 0
+
     return NextResponse.json({
-      mes_referencia: mesRef, lances: lancesEnriq, contemplados, comprovantes_nao_baixados, meu_role: me.role,
+      mes_referencia: mesRef, lances: lancesVisiveis, contemplados, comprovantes_nao_baixados: comprovantesVisiveis, meu_role: me.role,
       filtros: { empresas: empresasOpc, equipes: equipesOpc, vendedores: vendedoresOpc },
+      escopo_global: escopoGlobal,
+      tem_autonomas: autonomasSet.size > 0,
+      incluindo_autonomas: incluirAutonomas,
+      ocultos_autonomas: ocultosAutonomas,
     })
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 })

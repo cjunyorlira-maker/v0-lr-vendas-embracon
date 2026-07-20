@@ -100,6 +100,10 @@ export default function LancesPage() {
   const [fEmpresa, setFEmpresa] = useState('')
   const [fEquipe, setFEquipe] = useState('')
   const [fVendedor, setFVendedor] = useState('')
+  // isolamento financeiro: toggle "incluir operações autônomas" (só matriz)
+  const [incluirAutonomas, setIncluirAutonomas] = useState(false)
+  const [mostrarToggleAutonomas, setMostrarToggleAutonomas] = useState(false)
+  const [ocultosAutonomas, setOcultosAutonomas] = useState(0)
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { loadData() }, [])
@@ -116,16 +120,18 @@ export default function LancesPage() {
     setCarregandoHist(false)
   }
 
-  async function loadData() {
+  async function loadData(incluir = false) {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
-    const res = await fetch('/api/lances')
+    const res = await fetch(`/api/lances${incluir ? '?incluir_autonomas=1' : ''}`)
     const data = await res.json()
     if (data.lances) { setLances(data.lances); setMesRef(data.mes_referencia); setRole(data.meu_role) }
     if (data.contemplados) setContemplados(data.contemplados)
     if (data.comprovantes_nao_baixados) setNaoBaixados(data.comprovantes_nao_baixados)
     if (data.filtros) setFiltrosOpc(data.filtros)
+    setMostrarToggleAutonomas(!!data.escopo_global && !!data.tem_autonomas)
+    setOcultosAutonomas(data.ocultos_autonomas || 0)
     setLoading(false)
   }
 
@@ -531,6 +537,25 @@ export default function LancesPage() {
               </select>
               {(fGrupo || busca || fEmpresa || fEquipe || fVendedor) && <button onClick={() => { setFGrupo(''); setBusca(''); setFEmpresa(''); setFEquipe(''); setFVendedor('') }} className="rounded-lg px-3 py-1.5 text-xs" style={{ background: 'rgba(255,255,255,0.05)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>Limpar</button>}
             </div>
+
+            {mostrarToggleAutonomas && (
+              <div className="flex items-center gap-2 mb-4 text-xs">
+                <button
+                  onClick={() => { const novo = !incluirAutonomas; setIncluirAutonomas(novo); loadData(novo) }}
+                  className="rounded-lg px-3 py-1.5"
+                  style={incluirAutonomas
+                    ? { background: 'rgba(212,175,55,0.14)', color: 'var(--accent)', border: '1px solid rgba(212,175,55,0.35)' }
+                    : { background: 'rgba(255,255,255,0.05)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}
+                >
+                  {incluirAutonomas ? 'Ocultar operações autônomas' : 'Incluir operações autônomas'}
+                </button>
+                {!incluirAutonomas && ocultosAutonomas > 0 && (
+                  <span style={{ color: 'var(--muted-color)' }}>
+                    {ocultosAutonomas} lance(s) de operações autônomas ocultos
+                  </span>
+                )}
+              </div>
+            )}
 
             {/* Switcher de colunas (mobile) */}
             <div className="flex md:hidden gap-2 mb-4">
