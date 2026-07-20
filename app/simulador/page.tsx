@@ -690,7 +690,7 @@ function SimuladorTab({ planos, empresaNome, logoBase64 }: { planos: Plano[]; em
 // ═══════════════════════════════════��══════════════════════════
 // ABA ATENDIMENTO — estado próprio + apresentação pro cliente
 // ══════════════════════════════════════════════════════════════
-function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, onSair }: { planos: Plano[]; empresaNome: string; empresaLogo: string | null; logoBase64: string | null; ativo: boolean; onSair: () => void }) {
+function AtendimentoTab({ planos, empresaNome, atendLogo, logoBase64, ativo, onSair }: { planos: Plano[]; empresaNome: string; atendLogo: string | null; logoBase64: string | null; ativo: boolean; onSair: () => void }) {
   const s = useSimulacao(planos)
   const { faixa, qtd, planoAtual, lanceNum, creditoLiquido, ehParcelinha, pdProposta, entradaProposta, prazoRestante, nomeAmigavel, red25Pct, cheiaInc, tipoParcela } = s
 
@@ -874,9 +874,13 @@ function AtendimentoTab({ planos, empresaNome, empresaLogo, logoBase64, ativo, o
           </div>
         ) : (
           <div>
-            {/* logo dourado claro, sem fundo — direto sobre o palco escuro */}
+            {/* logo sem fundo, direto sobre o palco escuro (dourado LR p/ marca LR; branca p/ demais) */}
             <div className="flex items-center justify-center mb-8">
-              <img src="/images/logo-lr-gold.png" alt={empresaNome || 'LR Multimarcas'} className="h-24 w-auto object-contain" />
+              {atendLogo ? (
+                <img src={atendLogo || "/placeholder.svg"} alt={empresaNome || 'Empresa'} className="h-24 w-auto object-contain" crossOrigin="anonymous" />
+              ) : (
+                <p className="text-2xl font-bold tracking-wide" style={{ color: 'var(--accent)' }}>{empresaNome || 'LR MULTIMARCAS'}</p>
+              )}
             </div>
 
             {/* saudação personalizada (só com nome) + crédito gigante + pill da categoria */}
@@ -1057,6 +1061,8 @@ export default function SimuladorPage() {
   const [empresaNome, setEmpresaNome] = useState('')
   const [empresaLogo, setEmpresaLogo] = useState<string | null>(null)
   const [logoBase64, setLogoBase64] = useState<string | null>(null)
+  // logo exibida no palco do Atendimento (fundo escuro): dourado LR p/ marca LR, senão a branca da empresa
+  const [atendLogo, setAtendLogo] = useState<string | null>(null)
 
   useEffect(() => {
     const supabase = createClient()
@@ -1079,9 +1085,12 @@ export default function SimuladorPage() {
     fetch('/api/simulador/empresa').then(r => r.json()).then(d => {
       setEmpresaNome(d.empresa_nome || '')
       setEmpresaLogo(d.logo_url || null)
+      // PDF (cabeçalho vermelho): marca LR usa o logo LR branco; demais usam a própria logo branca
+      const pdfLogo = d.marca_lr ? '/images/logo-lr-branco.png' : (d.logo_branca_url || null)
+      if (pdfLogo) carregarLogo(pdfLogo); else setLogoBase64(null)
+      // Atendimento (palco escuro): marca LR usa o dourado LR; demais a própria logo branca
+      setAtendLogo(d.marca_lr ? '/images/logo-lr-gold.png' : (d.logo_branca_url || null))
     }).catch(() => {})
-    // o PDF usa sempre o logo branco (visível sobre o cabeçalho vermelho)
-    carregarLogo('/images/logo-lr-branco.png')
   }, [])
 
   const abas: { id: typeof modo; label: string; icon: typeof Calculator }[] = [
@@ -1125,7 +1134,7 @@ export default function SimuladorPage() {
 
       {/* Atendimento: sempre montado (preserva a simulação) — vira tela cheia quando ativo */}
       {!loading && (
-        <AtendimentoTab planos={planos} empresaNome={empresaNome} empresaLogo={empresaLogo} logoBase64={logoBase64} ativo={modo === 'atendimento'} onSair={() => setModo('simulador')} />
+          <AtendimentoTab planos={planos} empresaNome={empresaNome} atendLogo={atendLogo} logoBase64={logoBase64} ativo={modo === 'atendimento'} onSair={() => setModo('simulador')} />
       )}
     </div>
   )

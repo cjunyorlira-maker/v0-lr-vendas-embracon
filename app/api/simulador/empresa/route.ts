@@ -19,16 +19,28 @@ export async function GET() {
       .eq('auth_user_id', user.id)
       .single()
 
-    if (!me?.empresa_id) return NextResponse.json({ empresa_nome: '', logo_url: null })
+    if (!me?.empresa_id) return NextResponse.json({ empresa_nome: '', logo_url: null, logo_branca_url: null, marca_lr: false })
 
     const { data: emp } = await supabaseAdmin
       .from('empresas')
-      .select('nome, logo_url')
+      .select('id, nome, logo_url, logo_branca_url')
       .eq('id', me.empresa_id)
       .single()
 
-    return NextResponse.json({ empresa_nome: emp?.nome || '', logo_url: emp?.logo_url || null })
+    // Grupo LR - SJC e G.L.R - Ribeirão compartilham a marca LR (logo LR nas duas telas)
+    const MARCA_LR_IDS = [
+      '4b4088bb-ab79-4a8f-8517-6b1fdc6b0fd1', // Grupo LR - SJC
+      'f131525b-ce2b-4eb4-a282-8e5f4cc224f2', // G.L.R - Ribeirão
+    ]
+    const marca_lr = MARCA_LR_IDS.includes(emp?.id || '')
+
+    return NextResponse.json({
+      empresa_nome: emp?.nome || '',
+      logo_url: emp?.logo_url || null,
+      logo_branca_url: emp?.logo_branca_url || null,
+      marca_lr,
+    })
   } catch (e) {
-    return NextResponse.json({ empresa_nome: '', logo_url: null })
+    return NextResponse.json({ empresa_nome: '', logo_url: null, logo_branca_url: null, marca_lr: false })
   }
 }
