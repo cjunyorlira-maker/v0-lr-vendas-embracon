@@ -36,6 +36,15 @@ export async function GET(req: NextRequest) {
       .from('usuarios').select('id, role, empresa_id, equipe_id').eq('auth_user_id', authUser.id).single()
     if (!me) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 403 })
 
+    // ── bloqueio de ranking por empresa (empresas.ranking_bloqueado) ──
+    if (me.role !== 'master' && me.empresa_id) {
+      const { data: minhaEmp } = await supabaseAdmin
+        .from('empresas').select('ranking_bloqueado').eq('id', me.empresa_id).maybeSingle()
+      if (minhaEmp?.ranking_bloqueado === true) {
+        return NextResponse.json({ error: "Ranking indisponível para sua operação no momento" }, { status: 403 })
+      }
+    }
+
     const { searchParams } = new URL(req.url)
     const modo = searchParams.get('modo') || 'vendedor' // vendedor | equipe | representante
     const filtroEmpresa = searchParams.get('empresa') || ''
