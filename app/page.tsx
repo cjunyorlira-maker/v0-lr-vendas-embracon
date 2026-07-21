@@ -20,7 +20,7 @@ interface Aviso { id: string; titulo: string; mensagem: string; tipo: string; fi
 interface DashData {
   meu_role: string
   pode_publicar_avisos: boolean
-  meta: { valor: number; vendido_master: number; dias_restantes: number; ritmo_necessario: number; pct: number; producao_nome: string | null; cotas_master: number } | null
+  meta: { valor: number; vendido_master: number; dias_restantes: number; ritmo_necessario: number; pct: number; producao_nome: string | null; cotas_master: number; acumulado_ano_valor?: number; acumulado_ano_cotas?: number } | null
   minha_operacao: { empresa_nome: string; vendido: number; cotas: number; ticket: number; pct_da_master: number } | null
   minha_fatia_master: { empresa_nome: string; vendido: number; cotas: number; pct_da_producao: number } | null
   campeoes_mes: CampeoesDuplo
@@ -137,12 +137,19 @@ export default function DashboardPage() {
                 <div className="mt-3 flex flex-wrap items-baseline justify-between gap-2">
                   <p className="text-lg font-bold" style={{ color: 'var(--text)' }}>
                     <AnimatedNumber value={data.meta.vendido_master} format={fmtMoedaFull} className="font-mono" style={{ color: 'var(--accent)' }} />
-                    <span className="text-sm font-normal" style={{ color: 'var(--muted-color)' }}> de {fmtMoedaFull(data.meta.valor)}</span>
+                    <span className="text-sm font-normal" style={{ color: 'var(--muted-color)' }}> de {fmtMoedaFull(data.meta.valor)} · <span className="font-mono font-semibold" style={{ color: 'var(--text)' }}>{data.meta.cotas_master}</span> cotas</span>
                   </p>
                   <p className="text-2xl font-bold font-mono" style={{ color: 'var(--accent)' }}>
                     <AnimatedNumber value={data.meta.pct} format={(n) => `${n.toFixed(1)}%`} />
                   </p>
                 </div>
+                {data.meta.acumulado_ano_valor !== undefined && (
+                  <p className="mt-1 text-xs" style={{ color: 'var(--muted-color)' }}>
+                    Acumulado {new Date().getFullYear()} (Master):{' '}
+                    <span className="font-mono font-semibold" style={{ color: 'var(--accent)' }}>{fmtMoeda(data.meta.acumulado_ano_valor)}</span>
+                    {' · '}<span className="font-mono font-semibold" style={{ color: 'var(--text)' }}>{data.meta.acumulado_ano_cotas}</span> cotas
+                  </p>
+                )}
 
                 {/* faixa de destaque: a operação do usuário, colada ao termômetro (parte do bloco da meta) */}
                 {(isMaster ? data.minha_fatia_master : data.minha_operacao) && (() => {
