@@ -9,7 +9,7 @@ import CampeoesCard from '@/components/dashboard/CampeoesCard'
 import NovoAvisoModal from '@/components/dashboard/NovoAvisoModal'
 import {
   Target, Gem, CalendarClock, Megaphone, Plus, Pin, ArrowRight,
-  Wallet, Trash2,
+  Wallet, Trash2, Eye, EyeOff,
 } from 'lucide-react'
 
 interface Campeao { nome: string; foto?: string | null; equipe?: string | null; empresa?: string | null; logo?: string | null; valor: number }
@@ -49,6 +49,7 @@ function Skeleton({ h = 160 }: { h?: number }) {
 export default function DashboardPage() {
   const [data, setData] = useState<DashData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [mostrarSexta, setMostrarSexta] = useState(false) // valor da Próxima Sexta começa OCULTO (reuniões/projeção)
   const [modalAviso, setModalAviso] = useState(false)
   // toggle Master / Minha representação — compartilhado pelos dois cards Top 3, persiste na sessão
   const [modoCampeoes, setModoCampeoes] = useState<'geral' | 'minha_empresa'>('geral')
@@ -183,15 +184,30 @@ export default function DashboardPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-mono text-2xl font-bold" style={{ color: '#22c55e' }}>
-                      <AnimatedNumber value={data.proxima_sexta.valor} format={fmtMoedaFull} />
-                    </p>
-                    {data.proxima_sexta.fatia_empresa !== undefined && (
-                      <p className="mt-0.5 text-xs" style={{ color: 'var(--muted-color)' }}>
-                        sua operação ({data.proxima_sexta.empresa_nome}): <span className="font-mono font-semibold" style={{ color: '#22c55e' }}>{fmtMoeda(data.proxima_sexta.fatia_empresa)}</span>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <p className="font-mono text-2xl font-bold" style={{ color: '#22c55e' }}>
+                        {mostrarSexta
+                          ? <AnimatedNumber value={data.proxima_sexta.valor} format={fmtMoedaFull} />
+                          : <span className="tracking-widest">R$ ••••••</span>}
                       </p>
-                    )}
+                      {data.proxima_sexta.fatia_empresa !== undefined && (
+                        <p className="mt-0.5 text-xs" style={{ color: 'var(--muted-color)' }}>
+                          sua operação ({data.proxima_sexta.empresa_nome}):{' '}
+                          <span className="font-mono font-semibold" style={{ color: '#22c55e' }}>
+                            {mostrarSexta ? fmtMoeda(data.proxima_sexta.fatia_empresa) : '••••'}
+                          </span>
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setMostrarSexta((v) => !v)}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-white/5"
+                      style={{ border: '1px solid rgba(34,197,94,0.25)', color: '#22c55e' }}
+                      title={mostrarSexta ? 'Ocultar valor' : 'Mostrar valor'}
+                    >
+                      {mostrarSexta ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
                   </div>
                 </section>
               )}
