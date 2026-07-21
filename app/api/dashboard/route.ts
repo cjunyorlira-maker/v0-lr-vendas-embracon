@@ -135,6 +135,31 @@ export async function GET() {
       cotas_master: listaProd.length,
     }
 
+    // ── acumulado do ANO da Master (todas as vendas do ano, sem canceladas, paginado) ──
+    const anoIni = `${new Date().getFullYear()}-01-01`
+    let acumuladoAnoValor = 0
+    let acumuladoAnoCotas = 0
+    {
+      let from = 0
+      const PAGE = 1000
+      while (true) {
+        const { data: pg } = await supabaseAdmin
+          .from('vendas')
+          .select('valor_credito')
+          .gte('data_venda', anoIni)
+          .neq('cancelada', true)
+          .order('id', { ascending: true })
+          .range(from, from + PAGE - 1)
+        const lote = pg || []
+        acumuladoAnoValor += lote.reduce((s: number, v: any) => s + (v.valor_credito || 0), 0)
+        acumuladoAnoCotas += lote.length
+        if (lote.length < PAGE) break
+        from += PAGE
+      }
+    }
+    ;(meta as any).acumulado_ano_valor = acumuladoAnoValor
+    ;(meta as any).acumulado_ano_cotas = acumuladoAnoCotas
+
     // 2. MINHA OPERAÇÃO (todos menos master) — a EMPRESA do usuário
     let minha_operacao: any = null
     if (me.role !== 'master' && !escopoGlobal && me.empresa_id) {
