@@ -63,6 +63,13 @@ export async function GET(req: NextRequest) {
       for (const a of (cal || [])) {
         if (a.data_assembleia > aposData) return a.data_assembleia
       }
+      // 3ª fonte (último recurso — grupo ainda sem calendário completo):
+      // assembleia Embracon é mensal → projeta a data anterior + 1 mês (nunca deixa sem data)
+      if (aposData) {
+        const d = new Date(aposData + 'T12:00:00-03:00')
+        d.setMonth(d.getMonth() + 1)
+        return d.toISOString().slice(0, 10)
+      }
       return null
     }
 
