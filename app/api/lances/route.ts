@@ -47,6 +47,16 @@ export async function GET(req: NextRequest) {
     // helper: calcula a próxima assembleia do grupo a partir de uma data
     async function proximaAssembleiaGrupo(grupo: string | null, aposData: string): Promise<string | null> {
       if (!grupo) return null
+      // 1ª fonte (OFICIAL, por grupo): calendario_grupo — extraído dos extratos/PDFs Embracon
+      const { data: calGrupo } = await supabaseAdmin
+        .from('calendario_grupo')
+        .select('data_assembleia')
+        .eq('grupo', grupo)
+        .gt('data_assembleia', aposData)
+        .order('data_assembleia', { ascending: true })
+        .limit(1)
+      if (calGrupo && calGrupo.length > 0) return calGrupo[0].data_assembleia
+      // 2ª fonte (fallback genérico): linha de calendário Embracon
       const { data: g } = await supabaseAdmin.from('grupos_embracon').select('linha_calendario').eq('grupo', grupo).maybeSingle()
       if (!g?.linha_calendario) return null
       const { data: cal } = await supabaseAdmin.from('calendario_embracon').select('data_assembleia').eq('linha_calendario', g.linha_calendario).order('data_assembleia')
