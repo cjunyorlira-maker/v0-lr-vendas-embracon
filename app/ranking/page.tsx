@@ -552,6 +552,21 @@ export default function RankingPage() {
             </div>
           )}
 
+          {modo === 'representante' && ranking.length > 0 && (
+            <div className="mt-3 flex items-center justify-between rounded-xl px-4 py-3"
+              style={{ background: 'rgba(212,175,55,0.07)', border: '1px solid rgba(212,175,55,0.25)' }}>
+              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--muted-color)' }}>
+                Total geral ({ranking.length} representações)
+              </span>
+              <span className="font-mono text-base font-bold" style={{ color: 'var(--accent)' }}>
+                {fmtMoeda(ranking.reduce((s, r) => s + (r.valor || 0), 0))}
+                <span className="ml-2 text-xs font-normal" style={{ color: 'var(--muted-color)' }}>
+                  {ranking.reduce((s, r) => s + (r.qtd || 0), 0)} cotas
+                </span>
+              </span>
+            </div>
+          )}
+
           {/* Transparência p/ gestão: vendas sem equipe ficam fora do ranking de Equipes */}
           {modo === 'equipe' && foraDoRanking.vendas > 0 && (role === 'master' || role === 'adm') && (
             <p className="mt-3 text-[11px] leading-relaxed px-1" style={{ color: '#f59e0b' }}>

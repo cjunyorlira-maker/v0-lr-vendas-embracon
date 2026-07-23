@@ -93,6 +93,14 @@ export async function GET() {
     const { escopoGlobal } = await getEscopo(me)
     const hoje = hojeISO()
 
+    // ── empresas com ranking bloqueado: dashboard degradado (sem dados globais) ──
+    let dashRestrito = false
+    if (me.role !== 'master' && me.empresa_id) {
+      const { data: minhaEmpFlag } = await supabaseAdmin
+        .from('empresas').select('ranking_bloqueado').eq('id', me.empresa_id).maybeSingle()
+      dashRestrito = minhaEmpFlag?.ranking_bloqueado === true
+    }
+
     // ── produção corrente (tabela producoes; a que contém hoje, senão a mais recente) ──
     const { data: producoesRaw } = await supabaseAdmin
       .from('producoes')
@@ -126,6 +134,31 @@ export async function GET() {
       producao_nome: producao?.nome || null,
       cotas_master: listaProd.length,
     }
+
+    // ── acumulado do ANO da Master (todas as vendas do ano, sem canceladas, paginado) ──
+    const anoIni = `${new Date().getFullYear()}-01-01`
+    let acumuladoAnoValor = 0
+    let acumuladoAnoCotas = 0
+    {
+      let from = 0
+      const PAGE = 1000
+      while (true) {
+        const { data: pg } = await supabaseAdmin
+          .from('vendas')
+          .select('valor_credito')
+          .gte('data_venda', anoIni)
+          .neq('cancelada', true)
+          .order('id', { ascending: true })
+          .range(from, from + PAGE - 1)
+        const lote = pg || []
+        acumuladoAnoValor += lote.reduce((s: number, v: any) => s + (v.valor_credito || 0), 0)
+        acumuladoAnoCotas += lote.length
+        if (lote.length < PAGE) break
+        from += PAGE
+      }
+    }
+    ;(meta as any).acumulado_ano_valor = acumuladoAnoValor
+    ;(meta as any).acumulado_ano_cotas = acumuladoAnoCotas
 
     // 2. MINHA OPERAÇÃO (todos menos master) — a EMPRESA do usuário
     let minha_operacao: any = null
@@ -345,11 +378,15 @@ export async function GET() {
     const payload: any = {
       meu_role: me.role,
       pode_publicar_avisos: escopoGlobal, // master OU adm da matriz
-      meta,
+      meta: dashRestrito ? null : meta,
       minha_operacao,
       minha_fatia_master,
-      campeoes_mes,
-      melhores_semana,
+      campeoes_mes: dashRestrito
+        ? { geral: null, minha_empresa: campeoes_mes.minha_empresa }
+        : campeoes_mes,
+      melhores_semana: dashRestrito
+        ? { geral: null, minha_empresa: melhores_semana.minha_empresa }
+        : melhores_semana,
       minha_empresa_nome,
       lances_alerta,
       lances_minha_empresa,

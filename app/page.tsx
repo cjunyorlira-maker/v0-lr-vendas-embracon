@@ -9,18 +9,18 @@ import CampeoesCard from '@/components/dashboard/CampeoesCard'
 import NovoAvisoModal from '@/components/dashboard/NovoAvisoModal'
 import {
   Target, Gem, CalendarClock, Megaphone, Plus, Pin, ArrowRight,
-  Wallet, Trash2,
+  Wallet, Trash2, Eye, EyeOff,
 } from 'lucide-react'
 
 interface Campeao { nome: string; foto?: string | null; equipe?: string | null; empresa?: string | null; logo?: string | null; valor: number }
 interface Campeoes { vendedores: Campeao[]; equipes: Campeao[]; representacoes: Campeao[] }
-interface CampeoesDuplo { geral: Campeoes; minha_empresa: Campeoes | null }
+interface CampeoesDuplo { geral: Campeoes | null; minha_empresa: Campeoes | null }
 interface Aviso { id: string; titulo: string; mensagem: string; tipo: string; fixado: boolean; criado_em: string }
 
 interface DashData {
   meu_role: string
   pode_publicar_avisos: boolean
-  meta: { valor: number; vendido_master: number; dias_restantes: number; ritmo_necessario: number; pct: number; producao_nome: string | null; cotas_master: number }
+  meta: { valor: number; vendido_master: number; dias_restantes: number; ritmo_necessario: number; pct: number; producao_nome: string | null; cotas_master: number; acumulado_ano_valor?: number; acumulado_ano_cotas?: number } | null
   minha_operacao: { empresa_nome: string; vendido: number; cotas: number; ticket: number; pct_da_master: number } | null
   minha_fatia_master: { empresa_nome: string; vendido: number; cotas: number; pct_da_producao: number } | null
   campeoes_mes: CampeoesDuplo
@@ -49,6 +49,7 @@ function Skeleton({ h = 160 }: { h?: number }) {
 export default function DashboardPage() {
   const [data, setData] = useState<DashData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [mostrarSexta, setMostrarSexta] = useState(false) // valor da Próxima Sexta começa OCULTO (reuniões/projeção)
   const [modalAviso, setModalAviso] = useState(false)
   // toggle Master / Minha representação — compartilhado pelos dois cards Top 3, persiste na sessão
   const [modoCampeoes, setModoCampeoes] = useState<'geral' | 'minha_empresa'>('geral')
@@ -93,6 +94,7 @@ export default function DashboardPage() {
             <div className="flex flex-col gap-5">
 
               {/* ═══ LINHA 1: TERMÔMETRO DA META ═══ */}
+              {data.meta && (
               <section
                 className="rounded-2xl p-6 anim-fade-up"
                 style={{ background: 'linear-gradient(135deg, rgba(212,175,55,0.10) 0%, rgba(212,175,55,0.03) 100%)', border: '1px solid rgba(212,175,55,0.22)' }}
@@ -135,12 +137,19 @@ export default function DashboardPage() {
                 <div className="mt-3 flex flex-wrap items-baseline justify-between gap-2">
                   <p className="text-lg font-bold" style={{ color: 'var(--text)' }}>
                     <AnimatedNumber value={data.meta.vendido_master} format={fmtMoedaFull} className="font-mono" style={{ color: 'var(--accent)' }} />
-                    <span className="text-sm font-normal" style={{ color: 'var(--muted-color)' }}> de {fmtMoedaFull(data.meta.valor)}</span>
+                    <span className="text-sm font-normal" style={{ color: 'var(--muted-color)' }}> de {fmtMoedaFull(data.meta.valor)} · <span className="font-mono font-semibold" style={{ color: 'var(--text)' }}>{data.meta.cotas_master}</span> cotas</span>
                   </p>
                   <p className="text-2xl font-bold font-mono" style={{ color: 'var(--accent)' }}>
                     <AnimatedNumber value={data.meta.pct} format={(n) => `${n.toFixed(1)}%`} />
                   </p>
                 </div>
+                {data.meta.acumulado_ano_valor !== undefined && (
+                  <p className="mt-1 text-xs" style={{ color: 'var(--muted-color)' }}>
+                    Acumulado {new Date().getFullYear()} (Master):{' '}
+                    <span className="font-mono font-semibold" style={{ color: 'var(--accent)' }}>{fmtMoeda(data.meta.acumulado_ano_valor)}</span>
+                    {' · '}<span className="font-mono font-semibold" style={{ color: 'var(--text)' }}>{data.meta.acumulado_ano_cotas}</span> cotas
+                  </p>
+                )}
 
                 {/* faixa de destaque: a operação do usuário, colada ao termômetro (parte do bloco da meta) */}
                 {(isMaster ? data.minha_fatia_master : data.minha_operacao) && (() => {
@@ -163,6 +172,7 @@ export default function DashboardPage() {
                   )
                 })()}
               </section>
+              )}
 
               {/* ═══ CARD EXTRA: PRÓXIMA SEXTA (só master/representante) ═══ */}
               {data.proxima_sexta !== undefined && (
@@ -181,15 +191,30 @@ export default function DashboardPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="font-mono text-2xl font-bold" style={{ color: '#22c55e' }}>
-                      <AnimatedNumber value={data.proxima_sexta.valor} format={fmtMoedaFull} />
-                    </p>
-                    {data.proxima_sexta.fatia_empresa !== undefined && (
-                      <p className="mt-0.5 text-xs" style={{ color: 'var(--muted-color)' }}>
-                        sua operação ({data.proxima_sexta.empresa_nome}): <span className="font-mono font-semibold" style={{ color: '#22c55e' }}>{fmtMoeda(data.proxima_sexta.fatia_empresa)}</span>
+                  <div className="flex items-center gap-3">
+                    <div className="text-right">
+                      <p className="font-mono text-2xl font-bold" style={{ color: '#22c55e' }}>
+                        {mostrarSexta
+                          ? <AnimatedNumber value={data.proxima_sexta.valor} format={fmtMoedaFull} />
+                          : <span className="tracking-widest">R$ ••••••</span>}
                       </p>
-                    )}
+                      {data.proxima_sexta.fatia_empresa !== undefined && (
+                        <p className="mt-0.5 text-xs" style={{ color: 'var(--muted-color)' }}>
+                          sua operação ({data.proxima_sexta.empresa_nome}):{' '}
+                          <span className="font-mono font-semibold" style={{ color: '#22c55e' }}>
+                            {mostrarSexta ? fmtMoeda(data.proxima_sexta.fatia_empresa) : '••••'}
+                          </span>
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setMostrarSexta((v) => !v)}
+                      className="flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-white/5"
+                      style={{ border: '1px solid rgba(34,197,94,0.25)', color: '#22c55e' }}
+                      title={mostrarSexta ? 'Ocultar valor' : 'Mostrar valor'}
+                    >
+                      {mostrarSexta ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
                   </div>
                 </section>
               )}
