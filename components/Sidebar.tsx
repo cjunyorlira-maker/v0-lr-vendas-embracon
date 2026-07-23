@@ -24,6 +24,13 @@ const EMPRESAS_RANKING_BLOQUEADO = [
   '83f7f141-a6e8-4a96-8657-c5da7b994493', // Grupo Ribeiro Consultoria
 ]
 
+// empresas em MODO RESTRITO (mudaram de administradora — só consultam a carteira existente)
+const EMPRESAS_MODO_RESTRITO = [
+  'c08f519f-9e52-41ce-9f7e-9655102de17b', // Ravi Representações
+  '83f7f141-a6e8-4a96-8657-c5da7b994493', // Grupo Ribeiro Consultoria
+]
+const ROTAS_PERMITIDAS_RESTRITO = ['/clientes', '/boletos', '/lances', '/assembleias', '/comissoes']
+
 interface NavItem {
   icon: React.ReactNode
   label: string
@@ -265,6 +272,10 @@ function SidebarContent({ userNome, userEmail, userRole, empresaId, empresaNome,
       <nav className="flex-1 overflow-y-auto px-3 py-4">
         <div className="flex flex-col gap-1">
           {mainNav.filter((item) => {
+            // Modo restrito: empresa migrou de administradora — só as rotas de consulta da carteira
+            if (userRole !== 'master' && !!empresaId && EMPRESAS_MODO_RESTRITO.includes(empresaId)) {
+              return ROTAS_PERMITIDAS_RESTRITO.includes(item.href)
+            }
             // Equipe: não aparece para vendedor (ele não gerencia ninguém)
             if (item.href === '/equipe') return userRole !== 'vendedor'
             // Campanha: só master e usuários das empresas participantes
@@ -275,6 +286,10 @@ function SidebarContent({ userNome, userEmail, userRole, empresaId, empresaNome,
         </div>
         <div className="my-4 px-3" style={{ borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
           {adminNav.filter((item) => {
+            // Modo restrito: empresa migrou de administradora — só as rotas de consulta da carteira
+            if (userRole !== 'master' && !!empresaId && EMPRESAS_MODO_RESTRITO.includes(empresaId)) {
+              return ROTAS_PERMITIDAS_RESTRITO.includes(item.href)
+            }
             // Comissões: só master e representante
             if (item.href === '/comissoes') return ['master', 'representante'].includes(userRole ?? '')
             // Planos: só master e representante

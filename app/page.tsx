@@ -63,7 +63,10 @@ export default function DashboardPage() {
   }
 
   const carregar = () => {
-    fetch('/api/dashboard').then((r) => r.json()).then((d) => { if (!d.error) setData(d); setLoading(false) }).catch(() => setLoading(false))
+    fetch('/api/dashboard').then((r) => r.json()).then((d) => {
+      if (d?.modo_restrito === true) { window.location.replace('/clientes'); return }
+      if (!d.error) setData(d); setLoading(false)
+    }).catch(() => setLoading(false))
   }
   useEffect(() => { carregar() }, [])
 
