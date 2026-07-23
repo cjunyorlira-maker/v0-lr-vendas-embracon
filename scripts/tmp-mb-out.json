@@ -1,0 +1,77 @@
+[
+  {
+    "path": "scripts/mb-cor.png",
+    "w": 850,
+    "h": 303,
+    "channels": 4,
+    "hasAlpha": true,
+    "topLeft": [
+      22,
+      18,
+      15,
+      0
+    ],
+    "center": [
+      156,
+      138,
+      63,
+      255
+    ],
+    "alpha": {
+      "transparent": 176254,
+      "opaque": 67753,
+      "partial": 13543,
+      "total": 257550
+    }
+  },
+  {
+    "path": "scripts/mb-branca.png",
+    "w": 850,
+    "h": 303,
+    "channels": 4,
+    "hasAlpha": true,
+    "topLeft": [
+      255,
+      255,
+      255,
+      0
+    ],
+    "center": [
+      255,
+      255,
+      255,
+      206
+    ],
+    "alpha": {
+      "transparent": 176258,
+      "opaque": 39612,
+      "partial": 41680,
+      "total": 257550
+    }
+  },
+  {
+    "path": "scripts/marques-branca.png",
+    "w": 1701,
+    "h": 1340,
+    "channels": 4,
+    "hasAlpha": true,
+    "topLeft": [
+      255,
+      255,
+      255,
+      0
+    ],
+    "center": [
+      255,
+      255,
+      255,
+      255
+    ],
+    "alpha": {
+      "transparent": 1695611,
+      "opaque": 574645,
+      "partial": 9084,
+      "total": 2279340
+    }
+  }
+]

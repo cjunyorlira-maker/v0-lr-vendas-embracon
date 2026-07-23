@@ -1,7 +1,11 @@
 const sharp = require('/tmp/imgtool/node_modules/sharp')
 
-const LO = 18   // abaixo disso = fundo (alfa 0)
-const HI = 55   // acima disso = conteúdo pleno (alfa 255)
+// fundo quase-preto (L ~ 8-14). Piso corta o fundo; teto = conteúdo pleno.
+// Faixa larga => preserva o anti-aliasing suave (igual às logos da MB/Marques).
+const FLOOR = 16   // L abaixo disso => alfa 0 (fundo)
+const CEIL = 150   // L acima disso => alfa 255 (conteúdo)
+
+function lum(r, g, b) { return 0.299 * r + 0.587 * g + 0.114 * b }
 
 async function build(srcPath) {
   const { data, info } = await sharp(srcPath).ensureAlpha().raw().toBuffer({ resolveWithObject: true })
@@ -10,12 +14,12 @@ async function build(srcPath) {
   const branca = Buffer.alloc(width * height * 4)
   for (let p = 0, q = 0; p < data.length; p += channels, q += 4) {
     const r = data[p], g = data[p + 1], b = data[p + 2]
-    const maxc = Math.max(r, g, b)
-    let a = Math.round(((maxc - LO) / (HI - LO)) * 255)
+    const L = lum(r, g, b)
+    let a = Math.round(((L - FLOOR) / (CEIL - FLOOR)) * 255)
     if (a < 0) a = 0; if (a > 255) a = 255
-    // versão colorida: mantém RGB, aplica novo alfa (fundo escuro vira transparente)
+    // COLORIDA: mantém a cor original da arte, só recorta o fundo escuro
     cor[q] = r; cor[q + 1] = g; cor[q + 2] = b; cor[q + 3] = a
-    // versão branca: tudo branco, mesma máscara de alfa
+    // BRANCA: RGB branco puro + máscara de alfa (padrão MB/Marques)
     branca[q] = 255; branca[q + 1] = 255; branca[q + 2] = 255; branca[q + 3] = a
   }
   return { width, height, cor, branca }
@@ -24,9 +28,8 @@ async function build(srcPath) {
 async function finish(buf, width, height, outPath) {
   await sharp(buf, { raw: { width, height, channels: 4 } })
     .png()
-    .trim({ threshold: 1 })                 // remove borda transparente
-    .extend({ top: 16, bottom: 16, left: 16, right: 16, background: { r: 0, g: 0, b: 0, alpha: 0 } })
-    .resize({ width: 640, height: 640, fit: 'inside', withoutEnlargement: true })
+    .trim({ threshold: 10 })                         // remove a moldura transparente
+    .resize({ width: 800, height: 800, fit: 'inside', withoutEnlargement: true })
     .png({ compressionLevel: 9 })
     .toFile(outPath)
 }
