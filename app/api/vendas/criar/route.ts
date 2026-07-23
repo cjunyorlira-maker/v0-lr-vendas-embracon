@@ -127,6 +127,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Erro ao criar cliente: " + (clienteErr?.message || '') }, { status: 500 })
     }
 
+    // ── PRIMEIRA ASSEMBLEIA CALCULADA (grupo com calendário oficial) ──
+    // regra: venda até o dia do vencimento (inclusive) participa daquela assembleia
+    let dataAssembleiaCalculada: string | null = null
+    if (grupo) {
+      const dataVendaISO = (data_venda || new Date().toISOString()).slice(0, 10)
+      const { data: calc } = await supabaseAdmin
+        .from('calendario_grupo')
+        .select('data_assembleia, data_vencimento')
+        .eq('grupo', grupo)
+        .gte('data_vencimento', dataVendaISO)
+        .order('data_vencimento', { ascending: true })
+        .limit(1)
+      if (calc && calc.length > 0) dataAssembleiaCalculada = calc[0].data_assembleia
+    }
+    const dataAssembleiaFinal = dataAssembleiaCalculada || data_assembleia_entrada || null
+
     // 3. Cria venda
     const { data: venda, error: vendaErr } = await supabaseAdmin
       .from('vendas')
@@ -147,7 +163,7 @@ export async function POST(req: NextRequest) {
         pdf_proposta_url: pdf_url,
         pdf_proposta_nome: pdf_nome || null,
         observacoes: observacoes || null,
-        data_assembleia_entrada: data_assembleia_entrada || null,
+        data_assembleia_entrada: dataAssembleiaFinal,
         com_seguro: com_seguro || false,
         data_venda: data_venda || null,
       })
@@ -208,7 +224,7 @@ export async function POST(req: NextRequest) {
         await supabaseAdmin.from('lances_mensais').insert({
           lance_config_id: cfgLance.id, empresa_id, cliente_id: cliente.id,
           vendedor_id, equipe_id, mes_referencia: mesRefLance,
-          data_assembleia: data_assembleia_entrada || null, status: 'pendente',
+          data_assembleia: dataAssembleiaFinal, status: 'pendente',
         })
       }
     } catch (e) {

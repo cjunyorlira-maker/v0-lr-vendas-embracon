@@ -91,6 +91,10 @@ export default function LancesPage() {
   const [defObs, setDefObs] = useState('')
   const [defRecorrente, setDefRecorrente] = useState(false)
   const [editarLanceModal, setEditarLanceModal] = useState<any>(null)
+  // popover "Corrigir assembleia": id do lance aberto + valor do input + salvando
+  const [corrigirDataId, setCorrigirDataId] = useState<string | null>(null)
+  const [corrigirDataValor, setCorrigirDataValor] = useState('')
+  const [salvandoData, setSalvandoData] = useState(false)
   const [pdfAnexo, setPdfAnexo] = useState<{ base64: string; nome: string } | null>(null)
   const [justificativa, setJustificativa] = useState('')
   const [fGrupo, setFGrupo] = useState('')
@@ -111,6 +115,24 @@ export default function LancesPage() {
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => { loadData() }, [])
+
+  async function salvarCorrecaoData(lanceId: string) {
+    if (!corrigirDataValor) return
+    setSalvandoData(true)
+    try {
+      const res = await fetch('/api/lances/editar-data', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lanceId, novaData: corrigirDataValor }),
+      })
+      const data = await res.json()
+      if (!res.ok) { alert(data.error || 'Erro ao corrigir data'); setSalvandoData(false); return }
+      setCorrigirDataId(null); setCorrigirDataValor('')
+      await loadData(incluirAutonomas)
+    } catch {
+      alert('Erro ao corrigir data')
+    }
+    setSalvandoData(false)
+  }
 
   async function abrirHistorico(lance: any) {
     setHistoricoModal(lance)
@@ -379,6 +401,40 @@ export default function LancesPage() {
           <button onClick={() => { setDefinirModal(lance); setDefTipo((lance.lances_config?.tipo as 'fixo25' | 'fixo50' | 'valor' | 'livre') || 'fixo25'); setDefValor(lance.lances_config?.valor_percentual ? (lance.lances_config?.tipo === 'valor' ? Number(lance.lances_config.valor_percentual).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : String(lance.lances_config.valor_percentual)) : ''); setDefObs(lance.lances_config?.observacao || ''); setDefRecorrente(lance.lances_config?.recorrente || false) }} className="w-full flex items-center justify-center gap-2 rounded-lg py-1.5 text-[11px] mt-1" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>
             Editar lance
           </button>
+        )}
+
+        {podeOfertar && (lance.status === 'pendente' || lance.status === 'solicitado') && (
+          <div className="relative mt-1">
+            <button
+              onClick={() => { setCorrigirDataId(corrigirDataId === lance.id ? null : lance.id); setCorrigirDataValor(lance.data_assembleia || '') }}
+              className="w-full flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-[11px]"
+              style={{ background: 'rgba(255,255,255,0.03)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}
+            >
+              {'\u{1F4C5}'} Corrigir assembleia
+            </button>
+            {corrigirDataId === lance.id && (
+              <div className="absolute left-0 right-0 z-30 mt-1 rounded-xl p-3" style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: '0 12px 32px rgba(0,0,0,0.5)' }}>
+                <label className="block text-[11px] mb-1" style={{ color: 'var(--muted-color)' }}>Data da assembleia</label>
+                <input
+                  type="date"
+                  value={corrigirDataValor}
+                  onChange={(e) => setCorrigirDataValor(e.target.value)}
+                  className="w-full rounded-lg px-2.5 py-2 text-xs outline-none"
+                  style={{ background: 'rgba(22,23,28,0.9)', border: '1px solid var(--border)', color: 'var(--text)' }}
+                />
+                <p className="mt-2 text-[10px] leading-snug flex items-start gap-1" style={{ color: '#eab308' }}>
+                  <Clock size={11} className="mt-0.5 shrink-0" />
+                  cota vendida perto da assembleia geralmente só estreia na SEGUINTE.
+                </p>
+                <div className="flex gap-2 mt-2.5">
+                  <button onClick={() => { setCorrigirDataId(null); setCorrigirDataValor('') }} className="flex-1 rounded-lg py-1.5 text-[11px]" style={{ background: 'rgba(255,255,255,0.04)', color: 'var(--muted-color)', border: '1px solid var(--border)' }}>Cancelar</button>
+                  <button onClick={() => salvarCorrecaoData(lance.id)} disabled={salvandoData || !corrigirDataValor} className="flex-1 flex items-center justify-center gap-1.5 rounded-lg py-1.5 text-[11px] font-semibold disabled:opacity-40" style={{ background: 'rgba(212,175,55,0.15)', color: 'var(--accent)', border: '1px solid var(--accent)' }}>
+                    {salvandoData ? <Loader2 size={12} className="animate-spin" /> : 'Salvar'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
         {lance.status === 'ofertado' && (() => {
           const hoje = new Date().toISOString().slice(0,10)
