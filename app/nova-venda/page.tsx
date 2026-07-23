@@ -263,6 +263,27 @@ export default function NovaVendaPage() {
                   <div><label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Assembleia de entrada {grupoEncontrado === false && <span style={{ color: '#ef4444' }}>*</span>}</label><input type="date" value={dataAssembleia} onChange={(e) => setDataAssembleia(e.target.value)} className="w-full rounded-lg px-3 py-2 text-sm outline-none" style={inputStyle} /></div>
                   <div><label className="block text-xs mb-1" style={{ color: 'var(--muted-color)' }}>Próxima cobrança</label><div className="rounded-lg px-3 py-2 text-sm font-bold" style={{ background: 'rgba(59,130,246,0.1)', color: '#3b82f6' }}>{proximaCobranca ? new Date(proximaCobranca + 'T00:00:00').toLocaleDateString('pt-BR') : '—'}</div></div>
                 </div>
+                {(() => {
+                  // aviso não-bloqueante: assembleia a menos de 5 dias da venda → provavelmente entra só na SEGUINTE
+                  if (!dataAssembleia) return null
+                  const ref = dataVenda || new Date().toISOString().slice(0, 10)
+                  const dAss = new Date(dataAssembleia + 'T00:00:00')
+                  const dias = Math.round((dAss.getTime() - new Date(ref + 'T00:00:00').getTime()) / 86400000)
+                  if (dias < 0 || dias >= 5) return null
+                  const dMais1 = new Date(dAss); dMais1.setMonth(dMais1.getMonth() + 1)
+                  const iso1 = dMais1.toISOString().slice(0, 10)
+                  const lbl1 = dMais1.toLocaleDateString('pt-BR')
+                  return (
+                    <div className="mt-3 rounded-lg p-3" style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.35)' }}>
+                      <p className="text-xs leading-snug" style={{ color: '#eab308' }}>
+                        {'\u26a0\ufe0f'} Assembleia em {dias} dia{dias === 1 ? '' : 's'} — cotas vendidas perto da assembleia normalmente só participam da SEGUINTE ({lbl1}). Confirme no extrato/protocolo antes de salvar.
+                      </p>
+                      <button type="button" onClick={() => setDataAssembleia(iso1)} className="mt-2 rounded-lg px-3 py-1.5 text-[11px] font-semibold" style={{ background: 'rgba(234,179,8,0.15)', color: '#eab308', border: '1px solid #eab308' }}>
+                        usar {lbl1}
+                      </button>
+                    </div>
+                  )
+                })()}
                 <p className="text-xs mt-2" style={{ color: 'var(--muted-color)' }}>A cobrança segue o vencimento do calendário Embracon. Após as {qtdParcelas || '0'} parcelas, a próxima cai nessa data.</p>
               </div>
               <div className="rounded-xl p-5" style={{ background: 'rgba(212,175,55,0.05)', border: '1px solid rgba(212,175,55,0.2)' }}>
