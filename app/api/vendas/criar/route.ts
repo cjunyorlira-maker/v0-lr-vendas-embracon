@@ -149,6 +149,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Erro ao criar venda: " + (vendaErr?.message || '') }, { status: 500 })
     }
 
+    // ── grupo novo sem calendário: a data informada pelo vendedor SEMEIA o calendario_grupo ──
+    if (grupo && data_assembleia_entrada) {
+      const { data: jaTem } = await supabaseAdmin
+        .from('calendario_grupo').select('id').eq('grupo', grupo).limit(1)
+      if (!jaTem || jaTem.length === 0) {
+        await supabaseAdmin.from('calendario_grupo').insert({
+          grupo,
+          data_assembleia: data_assembleia_entrada,
+          // data_vencimento é NOT NULL: usa a próxima cobrança do boleto quando houver, senão a própria data informada
+          data_vencimento: proxima_cobranca || data_assembleia_entrada,
+        })
+      }
+    }
+
     // 4. Cria boleto pendente
     const { data: boleto, error: boletoErr } = await supabaseAdmin
       .from('boletos')

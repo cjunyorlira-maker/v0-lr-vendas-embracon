@@ -47,11 +47,28 @@ export async function GET(req: NextRequest) {
     // helper: calcula a próxima assembleia do grupo a partir de uma data
     async function proximaAssembleiaGrupo(grupo: string | null, aposData: string): Promise<string | null> {
       if (!grupo) return null
+      // 1ª fonte (OFICIAL, por grupo): calendario_grupo — extraído dos extratos/PDFs Embracon
+      const { data: calGrupo } = await supabaseAdmin
+        .from('calendario_grupo')
+        .select('data_assembleia')
+        .eq('grupo', grupo)
+        .gt('data_assembleia', aposData)
+        .order('data_assembleia', { ascending: true })
+        .limit(1)
+      if (calGrupo && calGrupo.length > 0) return calGrupo[0].data_assembleia
+      // 2ª fonte (fallback genérico): linha de calendário Embracon
       const { data: g } = await supabaseAdmin.from('grupos_embracon').select('linha_calendario').eq('grupo', grupo).maybeSingle()
       if (!g?.linha_calendario) return null
       const { data: cal } = await supabaseAdmin.from('calendario_embracon').select('data_assembleia').eq('linha_calendario', g.linha_calendario).order('data_assembleia')
       for (const a of (cal || [])) {
         if (a.data_assembleia > aposData) return a.data_assembleia
+      }
+      // 3ª fonte (último recurso — grupo ainda sem calendário completo):
+      // assembleia Embracon é mensal → projeta a data anterior + 1 mês (nunca deixa sem data)
+      if (aposData) {
+        const d = new Date(aposData + 'T12:00:00-03:00')
+        d.setMonth(d.getMonth() + 1)
+        return d.toISOString().slice(0, 10)
       }
       return null
     }
