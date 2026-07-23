@@ -38,6 +38,15 @@ export async function GET(req: NextRequest) {
       .from('usuarios').select('id, role, empresa_id').eq('auth_user_id', authUser.id).single()
     if (!me) return NextResponse.json({ error: "Não encontrado" }, { status: 404 })
 
+    // modo restrito: empresa migrou de administradora — funcionalidade indisponível
+    if (me.role !== 'master' && me.empresa_id) {
+      const { data: empFlag } = await supabaseAdmin
+        .from('empresas').select('modo_restrito').eq('id', me.empresa_id).maybeSingle()
+      if (empFlag?.modo_restrito === true) {
+        return NextResponse.json({ error: "Funcionalidade indisponível para sua operação" }, { status: 403 })
+      }
+    }
+
     // Visibilidade: master OU usuário de empresa participante. Qualquer outro → 404 (não revela a rota).
     const podeVer = me.role === 'master' || (me.empresa_id && EMPRESAS_CAMPANHA.includes(me.empresa_id))
     if (!podeVer) return NextResponse.json({ error: "Não encontrado" }, { status: 404 })

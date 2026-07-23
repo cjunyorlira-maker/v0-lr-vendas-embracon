@@ -97,7 +97,11 @@ export async function GET() {
     let dashRestrito = false
     if (me.role !== 'master' && me.empresa_id) {
       const { data: minhaEmpFlag } = await supabaseAdmin
-        .from('empresas').select('ranking_bloqueado').eq('id', me.empresa_id).maybeSingle()
+        .from('empresas').select('ranking_bloqueado, modo_restrito').eq('id', me.empresa_id).maybeSingle()
+      // modo restrito: empresa migrou de administradora — dashboard bloqueado, front redireciona
+      if (minhaEmpFlag?.modo_restrito === true) {
+        return NextResponse.json({ modo_restrito: true })
+      }
       dashRestrito = minhaEmpFlag?.ranking_bloqueado === true
     }
 

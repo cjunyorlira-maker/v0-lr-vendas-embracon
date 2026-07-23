@@ -28,6 +28,15 @@ export async function POST(req: NextRequest) {
 
     if (!criador) return NextResponse.json({ error: "Usuário não encontrado" }, { status: 403 })
 
+    // modo restrito: empresa migrou de administradora — não cria novas vendas, só consulta a carteira
+    if (criador.role !== 'master' && criador.empresa_id) {
+      const { data: empFlag } = await supabaseAdmin
+        .from('empresas').select('modo_restrito').eq('id', criador.empresa_id).maybeSingle()
+      if (empFlag?.modo_restrito === true) {
+        return NextResponse.json({ error: "Funcionalidade indisponível para sua operação" }, { status: 403 })
+      }
+    }
+
     const body = await req.json()
     const {
       nome_cliente, cpf_cnpj, telefone, email,
